@@ -156,7 +156,7 @@ export default function PlansPage() {
       </Collapsible>
 
       <Collapsible id="plans-filters" open={filtersOpen} testId="filters-panel">
-      <ListToolbar searchRef={searchRef} text={list.text} onText={list.setText} placeholder="Số phiếu TK, số lệnh VC..."
+      <ListToolbar searchRef={searchRef} text={list.text} onText={list.setText} placeholder="Tìm trong mọi cột…" searchTitle="Tìm trên mọi cột: số TK, lệnh VC, xe, tài xế, NV xuất, ghi chú, người tạo…"
         from={p.from} to={p.to} onFrom={(from) => update({ from })} onTo={(to) => update({ to })}
         active={filtered} onClear={list.clearFilters} />
       </Collapsible>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { errorMessage } from './format'
 import { FRESH_MS, cacheGeneration, cacheGet, cacheKey, cacheSet, clearListCache } from './listCache'
-import { nextSort, pageCount, parseListParams, toSearchParams, type ListConfig, type ListParams } from './listQuery'
+import { isCappedTotal, nextSort, pageCount, parseListParams, toSearchParams, type ListConfig, type ListParams } from './listQuery'
 
 type Fetched = PromiseLike<{ data: unknown; count: number | null; error: { code?: string; message?: string } | null }>
 export type Fetcher = (p: ListParams) => Fetched
@@ -26,7 +26,7 @@ export function useListPage<T>(cfg: ListConfig, fetcher: Fetcher, table: string)
 
   /** Trang kế chưa có trong cache thì tải sẵn (lỗi bỏ qua: tới lúc bấm sẽ tải lại và báo lỗi). */
   const prefetch = useCallback((rows: unknown[], total: number | null) => {
-    const hasNext = total === null ? rows.length === p.size : p.page < pageCount(total, p.size)
+    const hasNext = total === null || isCappedTotal(total) ? rows.length === p.size : p.page < pageCount(total, p.size)
     const next = { ...p, page: p.page + 1 }
     const nextKey = cacheKey(table, next)
     if (!hasNext || cacheGet(nextKey)) return
@@ -62,9 +62,9 @@ export function useListPage<T>(cfg: ListConfig, fetcher: Fetcher, table: string)
   // eslint-disable-next-line react-hooks/set-state-in-effect -- tải dữ liệu, hiện cache hoặc setState sau await
   useEffect(() => { void load() }, [load])
 
-  // Xóa hết dòng cuối của trang cuối → lùi về trang cuối còn dữ liệu.
+  // Xóa hết dòng cuối của trang cuối → lùi về trang cuối còn dữ liệu. Tổng chạm trần (D-022) thì không biết trang cuối: để người dùng tự lùi.
   useEffect(() => {
-    if (state.key === key && state.rows.length === 0 && state.total !== null && state.total > 0 && p.page > 1) update({ page: pageCount(state.total, p.size) })
+    if (state.key === key && state.rows.length === 0 && state.total !== null && !isCappedTotal(state.total) && state.total > 0 && p.page > 1) update({ page: pageCount(state.total, p.size) })
   }, [state, key, p.page, p.size, update])
 
   // Ô tìm nhanh: gõ tức thì, ghi vào URL sau 200ms.

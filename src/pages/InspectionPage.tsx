@@ -131,7 +131,7 @@ export default function InspectionPage() {
       </PageHeader>
 
       <Collapsible id="inspection-filters" open={filtersOpen} testId="filters-panel">
-      <ListToolbar searchRef={searchRef} text={list.text} onText={list.setText} placeholder="Số TK, số phiếu xuất kho..."
+      <ListToolbar searchRef={searchRef} text={list.text} onText={list.setText} placeholder="Tìm trong mọi cột…" searchTitle="Tìm trên mọi cột: số TK, số PXK, lệnh VC, công trình, đơn vị giao/nhận, loại hình xuất, mặt hàng, ĐVT, xe, tài xế, nhà xe, NV xuất, ghi chú, người tạo…"
         from={p.from} to={p.to} onFrom={(from) => update({ from })} onTo={(to) => update({ to })}
         active={filtered} onClear={clearFilters}>
         <Field compact label="Loại hình xuất" className="col-span-2 sm:col-span-1 sm:w-44">

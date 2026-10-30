@@ -73,6 +73,10 @@ export function nextSort(p: Pick<ListParams, 'sort' | 'dir'>, col: string, cfg: 
 export const sanitizeTerm = (s: string) => s.replace(/[,()"\\%*]/g, ' ').replace(/\s+/g, ' ').trim()
 
 export const pageCount = (total: number, size: number) => Math.max(1, Math.ceil(total / size))
+
+/** Khi có từ khóa tìm, RPC đếm dừng ở trần này (D-022): trả SEARCH_COUNT_CAP + 1 nghĩa là "hơn 10.000 dòng". */
+export const SEARCH_COUNT_CAP = 10000
+export const isCappedTotal = (total: number | null) => total === SEARCH_COUNT_CAP + 1
 export const pageRange = (page: number, size: number): [number, number] => [(page - 1) * size, page * size - 1]
 
 /** [đầu tháng, đầu tháng sau) của ngày `today` (yyyy-mm-dd). */

@@ -9,6 +9,7 @@ type Props = {
   text: string
   onText: (v: string) => void
   placeholder: string
+  searchTitle?: string // mô tả đầy đủ các cột được tìm (tooltip + aria-label)
   from: string // ISO yyyy-mm-dd
   to: string
   onFrom: (v: string) => void
@@ -19,7 +20,7 @@ type Props = {
 }
 
 // Thanh lọc phía server: ô tìm nhanh (phím /), khoảng ngày xuất (dd/mm/yyyy), bộ lọc thêm. Nhãn nổi trên viền ô để thanh lọc thấp.
-export default function ListToolbar({ searchRef, text, onText, placeholder, from, to, onFrom, onTo, active, onClear, children }: Props) {
+export default function ListToolbar({ searchRef, text, onText, placeholder, searchTitle, from, to, onFrom, onTo, active, onClear, children }: Props) {
   return (
     // pt-3: chừa chỗ cho nhãn nổi nằm trên viền ô
     <div className="grid grid-cols-2 items-start gap-x-2 gap-y-3 rounded-card border border-stone-200 bg-white p-2 pt-3 shadow-sm sm:flex sm:flex-wrap" data-testid="list-toolbar">
@@ -27,7 +28,7 @@ export default function ListToolbar({ searchRef, text, onText, placeholder, from
         <span className="relative block">
           <Icon name="search" size={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
           <Input inputSize="sm" ref={searchRef} type="search" value={text} onChange={(e) => onText(e.target.value)} placeholder={placeholder}
-            title="Phím tắt: /" autoComplete="off" className="pl-8" data-testid="search" />
+            title={searchTitle ? `${searchTitle}. Phím tắt: /` : 'Phím tắt: /'} aria-label={searchTitle ? `Tìm nhanh: ${searchTitle}` : undefined} autoComplete="off" className="pl-8" data-testid="search" />
         </span>
       </Field>
       <div className="col-span-2 flex items-start gap-1.5" role="group" aria-label="Khoảng ngày xuất">

@@ -111,5 +111,11 @@ Mục tiêu: `inspection_details` ≥ 1–5 triệu dòng, `transport_plans` ≥
 - Thêm `count_transport_plans` / `count_inspection_details` (security definer, cùng bộ lọc với list) thay cho request đếm `count: 'exact'` qua PostgREST.
 - Sau nạp/nhân dữ liệu lớn phải `VACUUM ANALYZE` (dọn pending list của GIN): trước 1.006 ms, sau 23 ms.
 
+## D-022 — Tìm nhanh trang Nhập phiếu trên mọi cột hiển thị (30/10/2026)
+- Ô Tìm nhanh của `list_transport_plans`/`count_transport_plans` khớp: số phiếu TK, số lệnh VC, ghi chú (ilike, index trigram) + Phân loại VC, Số xe, Tài xế, NV xuất TP/BTP, NV xuất VT (tên/mã danh mục, không dấu) + Người tạo/sửa (username/họ tên, không dấu). Không tìm Ngày xuất (đã có bộ lọc ngày).
+- Cách giữ tốc độ: tìm trước trong `lookup_items` (~4.5k) và `profiles` (ít) → mảng id; rồi lọc phiếu bằng `= any(id[])` trên cột khóa ngoại có index (BitmapOr), không join chuỗi tên trên bảng lớn.
+- Đếm khi có từ khóa: tối đa 10.001 (đo ở 470k dòng: 'thep' khớp 189k dòng — đếm đủ 800 ms, đếm trần 80 ms; 'bao' khớp toàn bộ phiếu ~7 s). Không có từ khóa: vẫn đếm chính xác. FE hiện "hơn 10.000" và cho chuyển trang tiếp khi trang đầy.
+- Bảng kiểm (`list/count_inspection_details`) làm tương tự: số TK, số PXK, hạng mục, ghi chú (ilike, trigram) + công trình (mã/tên), đơn vị giao/nhận, loại hình xuất, mặt hàng, ĐVT, nhà xe, NV xuất hàng (danh mục) + số lệnh VC, số xe, tài xế, NV xuất của phiếu cha + người tạo/sửa.
+
 ## D-006 — Supabase project
 Project riêng `in-thong-ke` (ref `sybzvaybffgkgiyvevsp`, ap-southeast-1), tạo 29/10/2026.

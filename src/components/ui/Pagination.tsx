@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { formatNumber } from '../../lib/format'
-import { PAGE_SIZES, pageCount } from '../../lib/listQuery'
+import { PAGE_SIZES, SEARCH_COUNT_CAP, isCappedTotal, pageCount } from '../../lib/listQuery'
 import Icon from './Icon'
 
 // total = null: không đếm được (request đếm lỗi) → chỉ hiện "Trang x", nút Sau bật khi trang hiện tại đầy.
@@ -10,7 +10,8 @@ const iconBtn = 'flex h-7 w-7 items-center justify-center rounded border border-
 
 /** Dải mảnh (cao 32px, xuống 2 dòng nhỏ khi hẹp) dính liền đáy bảng — bảng bên trên phải bật `attached`. Giữ đủ thông tin ở mọi cỡ màn hình. */
 export default function Pagination({ page, size, total, rowCount, disabled, onPage, onSize }: Props) {
-  const pages = total === null ? Infinity : pageCount(total, size)
+  const capped = isCappedTotal(total) // "hơn 10.000 dòng": không biết số trang thật
+  const pages = total === null || capped ? Infinity : pageCount(total, size)
   const full = rowCount >= size // trang đầy → có thể còn trang sau, kể cả khi số đếm lệch
   const cur = full ? page : Math.min(page, pages)
   const [draft, setDraft] = useState<string | null>(null) // số đang gõ; null = hiện trang hiện tại
@@ -31,8 +32,8 @@ export default function Pagination({ page, size, total, rowCount, disabled, onPa
             onKeyDown={(e) => { if (e.key === 'Enter') commit(); else if (e.key === 'Escape') setDraft(null) }}
             className="h-6 w-12 rounded border border-line bg-white px-1 text-center text-xs tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:bg-gray-100" />
         </label>
-        {total !== null && <span data-testid="page-count">/{formatNumber(pages)}</span>}
-        {total !== null && <span className="text-muted" data-testid="page-total" title="Tổng số dòng">· tổng {formatNumber(total)} dòng</span>}
+        {total !== null && <span data-testid="page-count">/{capped ? `${formatNumber(Math.floor(SEARCH_COUNT_CAP / size))}+` : formatNumber(pages)}</span>}
+        {total !== null && <span className="text-muted" data-testid="page-total" title="Tổng số dòng">· {capped ? `hơn ${formatNumber(SEARCH_COUNT_CAP)}` : `tổng ${formatNumber(total)}`} dòng</span>}
       </p>
       <div className="flex items-center gap-1">
         <label className="flex items-center gap-1 text-muted">
@@ -43,7 +44,7 @@ export default function Pagination({ page, size, total, rowCount, disabled, onPa
           </select>
         </label>
         <button type="button" className={iconBtn} onClick={() => onPage(cur - 1)} disabled={disabled || cur <= 1} aria-label="Trang trước" title="Trang trước" data-testid="page-prev"><Icon name="prev" size={16} /></button>
-        <button type="button" className={iconBtn} onClick={() => onPage(cur + 1)} disabled={disabled || !(full || (total !== null && cur < pages))} aria-label="Trang sau" title="Trang sau" data-testid="page-next"><Icon name="next" size={16} /></button>
+        <button type="button" className={iconBtn} onClick={() => onPage(cur + 1)} disabled={disabled || !(full || (total !== null && !capped && cur < pages))} aria-label="Trang sau" title="Trang sau" data-testid="page-next"><Icon name="next" size={16} /></button>
       </div>
     </div>
   )
