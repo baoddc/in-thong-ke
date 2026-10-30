@@ -8,7 +8,7 @@ import Icon from './Icon'
 export function Collapsible({ id, open, children, testId }: { id: string; open: boolean; children: ReactNode; testId?: string }) {
   return (
     <div id={id} data-testid={testId} data-state={open ? 'open' : 'closed'}
-      className={`grid transition-[grid-template-rows,opacity,margin,visibility] duration-200 motion-reduce:transition-none ${open ? 'grid-rows-[1fr] opacity-100' : '!mt-0 invisible grid-rows-[0fr] opacity-0'}`}>
+      className={`grid shrink-0 transition-[grid-template-rows,opacity,margin,visibility] duration-200 motion-reduce:transition-none ${open ? 'grid-rows-[1fr] opacity-100' : '!mt-0 invisible grid-rows-[0fr] opacity-0'}`}>
       <div className={`min-h-0 ${open ? '' : 'overflow-hidden'}`}>{children}</div>
     </div>
   )

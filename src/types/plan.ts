@@ -2,6 +2,7 @@ export type PlanRow = {
   id: number
   tk_number: string
   created_at?: string
+  created_by?: string | null
   export_date: string | null
   transport_order_no: string | null
   transport_type_id: number | null

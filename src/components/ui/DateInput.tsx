@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 import { maskDateInput, parseDisplayDate } from '../../lib/date'
 import { formatDate } from '../../lib/format'
 import Icon from './Icon'
-import { inputClass } from './Input'
+import { inputClass, inputSmClass } from './Input'
 
 const CAN_PICK = typeof HTMLInputElement !== 'undefined' && 'showPicker' in HTMLInputElement.prototype
 const INVALID = 'Ngày không hợp lệ. Nhập theo dạng dd/mm/yyyy.'
@@ -15,11 +15,13 @@ type Props = {
   required?: boolean
   disabled?: boolean
   className?: string
+  inputSize?: 'md' | 'sm'
   'data-testid'?: string
 }
 
 /** Ô ngày dd/mm/yyyy: tự chèn "/", kiểm ngày có thật, kèm nút lịch (nếu trình duyệt hỗ trợ). Giá trị vào/ra là ISO. */
-const DateInput = forwardRef<HTMLInputElement, Props>(function DateInput({ value, onChange, min, max, required, disabled, className = '', 'data-testid': testId }, ref) {
+const DateInput = forwardRef<HTMLInputElement, Props>(function DateInput({ value, onChange, min, max, required, disabled, className = '', inputSize, 'data-testid': testId }, ref) {
+  const sm = inputSize === 'sm'
   const textRef = useRef<HTMLInputElement>(null)
   const pickerRef = useRef<HTMLInputElement>(null)
   useImperativeHandle(ref, () => textRef.current as HTMLInputElement)
@@ -40,7 +42,7 @@ const DateInput = forwardRef<HTMLInputElement, Props>(function DateInput({ value
 
   return (
     <span className={`block ${className}`}>
-      <span className="relative mt-1 block">
+      <span className={`relative block ${sm ? '' : 'mt-1'}`}>
         <input ref={textRef} type="text" inputMode="numeric" autoComplete="off" placeholder="dd/mm/yyyy" maxLength={10}
           value={shown} required={required} disabled={disabled} aria-invalid={showError} data-testid={testId}
           onChange={(e) => {
@@ -52,7 +54,7 @@ const DateInput = forwardRef<HTMLInputElement, Props>(function DateInput({ value
             setTouched(true)
             if (parsed) setText(formatDate(parsed)) // "1/2/2026" → "01/02/2026"
           }}
-          className={`${inputClass} !mt-0 ${CAN_PICK ? 'pr-11' : ''}`} />
+          className={`${inputClass} !mt-0 ${sm ? inputSmClass : ''} ${CAN_PICK ? 'pr-11' : ''}`} />
         {CAN_PICK && !disabled && (
           <>
             <button type="button" aria-label="Chọn ngày từ lịch" title="Chọn ngày từ lịch" data-testid={testId ? `${testId}-calendar` : undefined}

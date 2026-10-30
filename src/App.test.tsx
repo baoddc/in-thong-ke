@@ -5,10 +5,16 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('./lib/supabase', () => ({ supabase: { auth: { signOut: vi.fn() } } }))
+vi.mock('./pages/UsersPage', () => ({ default: () => <p>Trang người dùng</p> }))
+const prof: { value: { id: string; full_name: string; role: 'root' | 'admin' | 'user'; is_active: boolean } | null } = { value: null }
+vi.mock('./lib/useProfile', () => ({
+  ProfileProvider: ({ children }: { children: unknown }) => children,
+  useProfile: () => ({ profile: prof.value, isAdmin: prof.value?.role === 'admin' || prof.value?.role === 'root', isRoot: prof.value?.role === 'root', loading: false, error: '' }),
+}))
 
-import { Layout } from './App'
+import { AccessGate, AdminOnly, Layout } from './App'
 
-afterEach(() => { cleanup(); localStorage.clear() })
+afterEach(() => { cleanup(); localStorage.clear(); prof.value = null })
 
 const renderLayout = () => render(
   <MemoryRouter>
@@ -16,11 +22,85 @@ const renderLayout = () => render(
   </MemoryRouter>,
 )
 
+describe('Quyền người dùng (D-013)', () => {
+  it('user thường: sidebar không có "Quản lý người dùng", hiện họ tên + badge "Người dùng"', () => {
+    prof.value = { id: 'u', full_name: 'Lê Thái Bão', role: 'user', is_active: true }
+    renderLayout()
+    expect(screen.queryByRole('link', { name: 'Quản lý người dùng' })).toBeNull()
+    expect(screen.getByTestId('user-name').textContent).toBe('Lê Thái Bão')
+    expect(screen.getByTestId('user-role').textContent).toBe('Người dùng')
+  })
+
+  it('admin: có "Quản lý người dùng" ở cuối danh sách, badge "Admin"', () => {
+    prof.value = { id: 'a', full_name: 'Quản trị', role: 'admin', is_active: true }
+    renderLayout()
+    const links = Array.from(screen.getByRole('navigation', { name: 'Menu chính' }).querySelectorAll('a'))
+    const last = links[links.length - 1]
+    expect(last.textContent).toBe('Quản lý người dùng')
+    expect(last.getAttribute('href')).toBe('/nguoi-dung')
+    expect(screen.getByTestId('user-role').textContent).toBe('Admin')
+  })
+
+  it('root: có "Quản lý người dùng", badge "Root" màu nổi khác admin', () => {
+    prof.value = { id: 'r', full_name: 'Bão', role: 'root', is_active: true }
+    renderLayout()
+    expect(screen.getByRole('link', { name: 'Quản lý người dùng' })).toBeTruthy()
+    const badge = screen.getByTestId('user-role')
+    expect(badge.textContent).toBe('Root')
+    expect(badge.className).toContain('bg-amber-400')
+  })
+
+  it('route /nguoi-dung chặn user thường (chuyển về /), admin vào được', () => {
+    const go = () => render(
+      <MemoryRouter initialEntries={['/nguoi-dung']}>
+        <Routes>
+          <Route path="/" element={<p>Trang chủ</p>} />
+          <Route path="/nguoi-dung" element={<AdminOnly><p>Trang người dùng</p></AdminOnly>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    prof.value = { id: 'u', full_name: 'A', role: 'user', is_active: true }
+    go()
+    expect(screen.queryByText('Trang người dùng')).toBeNull()
+    expect(screen.getByText('Trang chủ')).toBeTruthy()
+    cleanup()
+    prof.value = { id: 'a', full_name: 'A', role: 'admin', is_active: true }
+    go()
+    expect(screen.getByText('Trang người dùng')).toBeTruthy()
+    cleanup()
+    prof.value = { id: 'r', full_name: 'A', role: 'root', is_active: true }
+    go()
+    expect(screen.getByText('Trang người dùng')).toBeTruthy()
+  })
+
+  it('không có hồ sơ hoặc bị khóa → thông báo + nút Đăng xuất, không hiện menu', () => {
+    render(<MemoryRouter><AccessGate email="x@y.vn" /></MemoryRouter>)
+    expect(screen.getByTestId('access-denied')).toBeTruthy()
+    expect(screen.getByTestId('access-signout').textContent).toBe('Đăng xuất')
+    cleanup()
+    prof.value = { id: 'u', full_name: 'A', role: 'user', is_active: false }
+    render(<MemoryRouter><AccessGate email="x@y.vn" /></MemoryRouter>)
+    expect(screen.getByTestId('access-denied').textContent).toContain('đã bị khóa')
+    expect(screen.queryByRole('navigation')).toBeNull()
+  })
+})
+
 describe('Layout sidebar', () => {
   it('có 5 mục theo thứ tự, Luồng công việc sau Danh mục', () => {
     renderLayout()
     const labels = screen.getByRole('navigation', { name: 'Menu chính' }).textContent
     expect(labels).toBe('Nhập phiếuBảng kiểmIn thống kêDanh mụcLuồng công việc')
+  })
+
+  it('khung đúng bằng màn hình từ md (không cuộn cả trang), vẫn cuộn bình thường trên điện thoại và khi in', () => {
+    renderLayout()
+    const main = screen.getByRole('main')
+    const root = main.parentElement!
+    expect(root.className).toMatch(/\bmd:h-dvh\b/)
+    expect(root.className).toMatch(/\bmd:overflow-hidden\b/)
+    expect(root.className).toMatch(/\bprint:h-auto\b/)
+    expect(main.className).toMatch(/\bmd:overflow-y-auto\b/)
+    expect(root.className).not.toMatch(/(^|\s)(h-dvh|overflow-hidden)(\s|$)/) // không khóa cuộn ở mobile
   })
 
   it('đủ 5 mục, mỗi mục là liên kết có nhãn đọc được (kể cả mục đang chọn "Nhập phiếu")', () => {

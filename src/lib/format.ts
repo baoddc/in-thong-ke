@@ -5,6 +5,16 @@ export function formatDate(value: string | null | undefined): string {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : value
 }
 
+const dateTimeFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+
+/** ISO timestamp -> "30/10/2026 14:05" (giờ Việt Nam); rỗng/sai -> "". */
+export function formatDateTime(value: string | null | undefined): string {
+  const t = value ? Date.parse(value) : NaN
+  if (Number.isNaN(t)) return ''
+  const p = Object.fromEntries(dateTimeFmt.formatToParts(t).map((x) => [x.type, x.value]))
+  return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}`
+}
+
 export function todayISO(): string {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date())
 }
@@ -34,5 +44,7 @@ export function errorMessage(err: { code?: string; message?: string } | null | u
   if (!err) return ''
   if (err.code === '23505') return 'Mục này đã có.'
   if (err.code === '23503') return 'Mục đang được dùng trong phiếu, không xóa được.'
+  if (err.code === 'P0002' && err.message) return err.message // RPC báo thiếu quyền: hiển thị nguyên văn
+  if (err.code === '42501') return 'Bạn không có quyền thực hiện thao tác này.'
   return `Có lỗi xảy ra: ${err.message ?? 'không rõ nguyên nhân'}`
 }

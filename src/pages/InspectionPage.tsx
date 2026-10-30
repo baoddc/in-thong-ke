@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { errorMessage, formatDate, formatNumber } from '../lib/format'
 import { useLookups } from '../lib/useLookups'
-import { applyList, countActiveFilters, type ListConfig } from '../lib/listQuery'
+import { applyFilters, applyList, countActiveFilters, type ListConfig } from '../lib/listQuery'
 import { useListPage, type Fetcher } from '../lib/useListPage'
 import { useShortcuts } from '../lib/useShortcuts'
 import { isSmallScreen, usePersistentToggle } from '../lib/usePersistentToggle'
@@ -19,6 +19,8 @@ import { Field, Select } from '../components/ui/Input'
 import PageHeader from '../components/ui/PageHeader'
 import Pagination from '../components/ui/Pagination'
 import { useToast } from '../components/ui/Toast'
+import { EDIT_DENIED_HINT, canEditRow } from '../lib/auth'
+import { useProfile } from '../lib/useProfile'
 import type { InspectionRow } from '../types/inspection'
 
 const CFG: ListConfig = {
@@ -27,13 +29,22 @@ const CFG: ListConfig = {
   searchCols: ['tk_number', 'warehouse_slip_no'], // chỉ cột có index trigram (D-012)
   dateCol: 'export_date', filterCols: { type: 'export_type_id', product: 'product_id', cons: 'construction_id', recv: 'receiving_unit_id' }, tiebreak: 'id',
 }
-const fetchRows: Fetcher = (p) => applyList(supabase.from('inspection_details_view').select('*', { count: 'estimated' }), p, CFG)
+// Dữ liệu từ view (không đếm: đếm qua view chậm do lateral join); đếm chính xác riêng trên bảng gốc, cùng bộ lọc, chạy song song.
+const fetchRows: Fetcher = async (p) => {
+  const [rows, cnt] = await Promise.all([
+    applyList(supabase.from('inspection_details_view').select('*'), p, CFG),
+    applyFilters(supabase.from('inspection_details').select('id', { count: 'exact', head: true }), p, CFG),
+  ])
+  return { data: rows.data, error: rows.error, count: cnt.error ? null : cnt.count }
+}
 
 const DASH = '—' // dòng cũ chưa có số phiếu TK
 
 export default function InspectionPage() {
   const lookups = useLookups()
   const toast = useToast()
+  const { profile } = useProfile()
+  const canEdit = (r: InspectionRow) => canEditRow(profile, r.created_by, r.created_at)
   const list = useListPage<InspectionRow>(CFG, fetchRows)
   const { p, update, reload } = list
   const searchRef = useRef<HTMLInputElement>(null)
@@ -48,9 +59,10 @@ export default function InspectionPage() {
   async function confirmDelete() {
     if (!deleting) return
     setDeleting({ ...deleting, busy: true })
-    const { error } = await supabase.from('inspection_details').delete().eq('id', deleting.row.id)
+    const { data, error } = await supabase.from('inspection_details').delete().eq('id', deleting.row.id).select('id')
     setDeleting(null)
     if (error) return toast.error(errorMessage(error))
+    if (!data?.length) return toast.error(`Bạn không có quyền xóa dòng này. ${EDIT_DENIED_HINT}.`) // RLS chặn: 0 dòng bị xóa
     toast.success('Đã xóa dòng')
     void reload()
   }
@@ -60,7 +72,7 @@ export default function InspectionPage() {
     {
       key: 'tk', header: 'Số phiếu TK', sort: 'tk_number', nowrap: true,
       render: (r) => (r.tk_number ? (
-        <button type="button" onClick={() => setModal({ row: r })} title="Sửa dòng này" data-testid={`open-${r.id}`}
+        <button type="button" onClick={() => setModal({ row: r })} title={canEdit(r) ? 'Sửa dòng này' : 'Xem dòng này'} data-testid={`open-${r.id}`}
           className="rounded font-bold text-primary underline-offset-2 transition-colors duration-150 hover:text-primary-dark hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{r.tk_number}</button>
       ) : DASH),
     },
@@ -85,8 +97,9 @@ export default function InspectionPage() {
       key: 'actions', header: 'Thao tác', nowrap: true,
       render: (r) => (
         <span className="inline-flex gap-0.5">
-          <IconButton icon="edit" label="Sửa dòng" onClick={() => setModal({ row: r })} data-testid={`edit-${r.id}`} />
-          <IconButton icon="trash" tone="danger" label="Xóa dòng" onClick={() => setDeleting({ row: r, busy: false })} data-testid={`delete-${r.id}`} />
+          <IconButton icon="edit" label={canEdit(r) ? 'Sửa dòng' : `Xem dòng (${EDIT_DENIED_HINT})`} onClick={() => setModal({ row: r })} data-testid={`edit-${r.id}`} />
+          <IconButton icon="trash" tone="danger" label={canEdit(r) ? 'Xóa dòng' : `Không xóa được: ${EDIT_DENIED_HINT}`} disabled={!canEdit(r)}
+            className="disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent" onClick={() => setDeleting({ row: r, busy: false })} data-testid={`delete-${r.id}`} />
         </span>
       ),
     },
@@ -96,33 +109,33 @@ export default function InspectionPage() {
   const [clearTick, setClearTick] = useState(0) // ô Công trình/Đơn vị nhận gõ sẵn chữ → khởi tạo lại khi xóa bộ lọc
   const clearFilters = () => { list.clearFilters(); setClearTick((t) => t + 1) }
   const serverFilter = (label: string, kind: string, key: string, testId: string) => (
-    <div className="col-span-2 sm:col-span-1 sm:w-56">
-      <LookupCombobox key={`${key}-${clearTick}`} label={label} kind={kind} server allowAdd={false}
+    <div className="col-span-2 sm:col-span-1 sm:w-44">
+      <LookupCombobox key={`${key}-${clearTick}`} inputSize="sm" label={label} kind={kind} server allowAdd={false}
         selectedIds={p.filters[key] ? [Number(p.filters[key])] : []} onChange={(ids) => { const v = ids[0] ? String(ids[0]) : ''; if (v !== p.filters[key]) setFilter(key, v) }} testId={testId} />
     </div>
   )
   const activeCount = countActiveFilters(p)
   const filtered = activeCount > 0
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-3 md:min-h-0 md:flex-1">
       <PageHeader title="Bảng kiểm chi tiết" description="Từng mặt hàng trên mỗi phiếu xuất kho">
         <PanelToggle controls="inspection-filters" open={filtersOpen} onToggle={toggleFilters} openLabel="Ẩn bộ lọc" closedLabel="Hiện bộ lọc" badge={activeCount} badgeLabel="Bộ lọc" testId="toggle-filters" />
         {!filtersOpen && filtered && <Button size="sm" icon="close" onClick={clearFilters} aria-label="Xóa lọc" title="Xóa lọc" data-testid="clear-filters-hidden"><span className="hidden sm:inline">Xóa lọc</span></Button>}
-        <Button variant="primary" icon="plus" onClick={openNew} title="Thêm dòng (phím N)" data-testid="add-inspection">Thêm dòng</Button>
+        <Button variant="primary" size="sm" icon="plus" onClick={openNew} title="Thêm dòng (phím N)" data-testid="add-inspection">Thêm dòng</Button>
       </PageHeader>
 
       <Collapsible id="inspection-filters" open={filtersOpen} testId="filters-panel">
       <ListToolbar searchRef={searchRef} text={list.text} onText={list.setText} placeholder="Số TK, số phiếu xuất kho..."
         from={p.from} to={p.to} onFrom={(from) => update({ from })} onTo={(to) => update({ to })}
         active={filtered} onClear={clearFilters}>
-        <Field label="Loại hình xuất" className="col-span-2 sm:col-span-1 sm:w-56">
-          <Select value={p.filters.type} onChange={(e) => setFilter('type', e.target.value)} data-testid="filter-type">
+        <Field compact label="Loại hình xuất" className="col-span-2 sm:col-span-1 sm:w-44">
+          <Select inputSize="sm" value={p.filters.type} onChange={(e) => setFilter('type', e.target.value)} data-testid="filter-type">
             <option value="">Tất cả</option>
             {lookups.byKind('export_type').map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
           </Select>
         </Field>
-        <Field label="Mặt hàng" className="col-span-2 sm:col-span-1 sm:w-56">
-          <Select value={p.filters.product} onChange={(e) => setFilter('product', e.target.value)} data-testid="filter-product">
+        <Field compact label="Mặt hàng" className="col-span-2 sm:col-span-1 sm:w-44">
+          <Select inputSize="sm" value={p.filters.product} onChange={(e) => setFilter('product', e.target.value)} data-testid="filter-product">
             <option value="">Tất cả</option>
             {lookups.byKind('product').map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
           </Select>
@@ -134,7 +147,7 @@ export default function InspectionPage() {
 
       <DataTable columns={columns} rows={list.rows} rowKey={(r) => r.id} rowTestId={(r) => `row-${r.id}`}
         loading={list.loading} refreshing={list.refreshing} error={list.error} onRetry={() => void reload()}
-        sort={p.sort} dir={p.dir} onSort={list.sortBy} testId="inspection-table"
+        sort={p.sort} dir={p.dir} onSort={list.sortBy} testId="inspection-table" attached={!list.loading && list.hasData}
         empty={filtered ? (
           <EmptyState title="Không có dòng nào khớp bộ lọc." hint="Thử đổi từ khóa, khoảng ngày hoặc bộ lọc.">
             <Button onClick={clearFilters}>Xóa bộ lọc</Button>
@@ -144,13 +157,13 @@ export default function InspectionPage() {
             <Button variant="primary" icon="plus" onClick={openNew}>Thêm dòng</Button>
           </EmptyState>
         )} />
-      {!list.loading && !list.error && list.total > 0 && (
-        <Pagination page={p.page} size={p.size} total={list.total} disabled={list.refreshing}
+      {!list.loading && !list.error && list.hasData && (
+        <Pagination page={p.page} size={p.size} total={list.total} rowCount={list.rows.length} disabled={list.refreshing}
           onPage={(page) => update({ page })} onSize={(size) => update({ size })} />
       )}
 
       {modal && (
-        <InspectionFormModal row={modal.row} lookups={lookups} onClose={() => setModal(null)}
+        <InspectionFormModal row={modal.row} readOnly={!!modal.row && !canEdit(modal.row)} lookups={lookups} onClose={() => setModal(null)}
           onSaved={(msg, keepOpen) => { if (!keepOpen) setModal(null); toast.success(msg); void reload() }} />
       )}
       {deleting && (

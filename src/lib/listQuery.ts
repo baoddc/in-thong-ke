@@ -88,14 +88,20 @@ type Builder = {
   range(from: number, to: number): Builder
 }
 
-/** Áp tìm nhanh + khoảng ngày + lọc + sắp xếp + phân trang lên một truy vấn `select(..., { count: 'estimated' })`. */
-export function applyList<T>(query: T, p: ListParams, cfg: ListConfig): T {
+/** Chỉ phần lọc (tìm nhanh + khoảng ngày + lọc id): dùng chung cho truy vấn dữ liệu và truy vấn đếm riêng để không lệch nhau. */
+export function applyFilters<T>(query: T, p: ListParams, cfg: ListConfig): T {
   let q = query as unknown as Builder // shortcut: ép kiểu hẹp ở đây thay vì cho từng bảng/view
   const term = sanitizeTerm(p.q)
   if (term) q = q.or(cfg.searchCols.map((c) => `${c}.ilike.%${term}%`).join(','))
   if (p.from) q = q.gte(cfg.dateCol, p.from)
   if (p.to) q = q.lte(cfg.dateCol, p.to)
   for (const [key, col] of Object.entries(cfg.filterCols)) if (p.filters[key]) q = q.eq(col, Number(p.filters[key]))
+  return q as unknown as T
+}
+
+/** Áp lọc + sắp xếp + phân trang lên một truy vấn (đếm `count: 'exact'` do nơi gọi chọn). */
+export function applyList<T>(query: T, p: ListParams, cfg: ListConfig): T {
+  let q = applyFilters(query, p, cfg) as unknown as Builder
   q = q.order(p.sort, { ascending: p.dir === 'asc', nullsFirst: false }).order(cfg.tiebreak, { ascending: p.dir === 'asc' })
   const [a, b] = pageRange(p.page, p.size)
   return q.range(a, b) as unknown as T

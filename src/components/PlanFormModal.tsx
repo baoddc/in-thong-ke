@@ -9,6 +9,7 @@ import DateInput from './ui/DateInput'
 import Icon from './ui/Icon'
 import { inputClass, labelClass } from './ui/Input'
 import { sortedMaterials } from '../lib/plans'
+import { EDIT_DENIED_HINT } from '../lib/auth'
 import type { PlanRow } from '../types/plan'
 
 type Form = {
@@ -26,13 +27,14 @@ const fromPlan = (p: PlanRow | null): Form => ({
 
 type Props = {
   plan: PlanRow | null // null: thêm mới
+  readOnly?: boolean // không có quyền sửa (D-013): chỉ xem
   lookups: { byKind: (k: string) => LookupItem[]; loading: boolean; error: string; reload: () => Promise<void> }
   onClose: () => void
   onSaved: (message: string) => void
 }
 
 // Component chỉ được mount khi mở modal → đóng (unmount) là reset toàn bộ form.
-export default function PlanFormModal({ plan, lookups, onClose, onSaved }: Props) {
+export default function PlanFormModal({ plan, readOnly = false, lookups, onClose, onSaved }: Props) {
   const { byKind, loading: lookupLoading, error: lookupError, reload } = lookups
   const dialogRef = useRef<HTMLDialogElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
@@ -71,7 +73,7 @@ export default function PlanFormModal({ plan, lookups, onClose, onSaved }: Props
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    if (busy) return
+    if (busy || readOnly) return
     if (!form.exportDate) return setError('Vui lòng chọn ngày xuất.')
     if (Object.values(pending).some(Boolean)) return setError('Có ô đã gõ chữ nhưng chưa chọn từ danh mục. Vui lòng chọn một mục hoặc xóa chữ.')
     setBusy(true)
@@ -118,10 +120,11 @@ export default function PlanFormModal({ plan, lookups, onClose, onSaved }: Props
       className="p-0 w-full max-w-[640px] max-h-[90vh] overflow-hidden rounded-2xl border-t-4 border-primary-brand shadow-2xl backdrop:bg-slate-900/60 open:flex flex-col max-sm:max-w-none max-sm:max-h-none max-sm:w-screen max-sm:h-dvh max-sm:rounded-none">
       <form ref={formRef} onSubmit={submit} className="flex flex-col min-h-0 flex-1" data-testid="plan-form">
         <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3">
-          <h2 id="plan-modal-title" className="text-lg font-bold">{plan ? `Sửa phiếu ${plan.tk_number}` : 'Thêm phiếu'}</h2>
+          <h2 id="plan-modal-title" className="text-lg font-bold">{plan ? `${readOnly ? 'Xem' : 'Sửa'} phiếu ${plan.tk_number}` : 'Thêm phiếu'}</h2>
           <button type="button" onClick={requestClose} aria-label="Đóng" className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-600 transition-colors duration-150 hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="plan-close"><Icon name="close" /></button>
         </div>
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3">
+        <fieldset disabled={readOnly} className="min-w-0 flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3">
+          {readOnly && <p className="rounded-card border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900" data-testid="readonly-note">{EDIT_DENIED_HINT}. Bạn chỉ xem được phiếu này.</p>}
           <label className={labelClass}>Số phiếu thống kê
             <input readOnly className={`${inputClass} bg-stone-100 font-semibold text-primary`} value={plan ? plan.tk_number : preview} data-testid="tk-number" />
             {!plan && <span className="text-sm font-normal text-muted">Số chính thức cấp khi lưu</span>}
@@ -142,13 +145,15 @@ export default function PlanFormModal({ plan, lookups, onClose, onSaved }: Props
             <textarea rows={3} className={inputClass} value={form.note} onChange={(e) => set('note', e.target.value)} data-testid="note" />
           </label>
           {(error || lookupError) && <p role="alert" className="rounded-card border border-danger-line bg-danger-soft p-2 text-danger" data-testid="plan-error">{error || lookupError}</p>}
-        </div>
+        </fieldset>
         <div className="flex items-center justify-end gap-2 border-t border-stone-200 bg-surface px-4 py-3">
-          <span className="mr-auto hidden text-sm text-muted sm:inline">Ctrl+Enter để lưu</span>
-          <Button onClick={requestClose} data-testid="plan-cancel">Hủy</Button>
-          <Button type="submit" variant="primary" disabled={busy} title="Lưu (Ctrl+Enter)" data-testid="plan-save">
-            {busy ? 'Đang lưu...' : plan ? 'Cập nhật' : 'Lưu'}
-          </Button>
+          {!readOnly && <span className="mr-auto hidden text-sm text-muted sm:inline">Ctrl+Enter để lưu</span>}
+          <Button onClick={requestClose} data-testid="plan-cancel">{readOnly ? 'Đóng' : 'Hủy'}</Button>
+          {!readOnly && (
+            <Button type="submit" variant="primary" disabled={busy} title="Lưu (Ctrl+Enter)" data-testid="plan-save">
+              {busy ? 'Đang lưu...' : plan ? 'Cập nhật' : 'Lưu'}
+            </Button>
+          )}
         </div>
       </form>
     </dialog>

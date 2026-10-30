@@ -322,6 +322,37 @@ export type Database = {
         }
         Relationships: []
       }
+      // D-013: chỉ đọc từ FE; ghi qua Edge Function admin-users.
+      profiles: {
+        Row: {
+          id: string
+          username: string
+          full_name: string
+          role: 'admin' | 'user' | 'root'
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          username: string
+          full_name: string
+          role?: 'admin' | 'user' | 'root'
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          username?: string
+          full_name?: string
+          role?: 'admin' | 'user' | 'root'
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       inspection_details_view: {
@@ -358,6 +389,7 @@ export type Database = {
           updated_at: string | null
           shipper_id: number | null
           plan_shipper_name: string | null
+          created_by: string | null
         }
         Relationships: []
       }
@@ -379,6 +411,26 @@ export type Database = {
       get_lookup_items: {
         Args: { p_ids: number[] }
         Returns: Database['public']['Tables']['lookup_items']['Row'][]
+      }
+      can_edit_row: {
+        Args: { p_created_by: string | null; p_created_at: string | null }
+        Returns: boolean
+      }
+      can_edit_plan: {
+        Args: { p_plan_id: number }
+        Returns: boolean
+      }
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_root: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_active_user: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
       }
       inspection_stats: {
         Args: { p_from: string | null; p_to: string | null; p_group: 'export_type' | 'product' | 'month' }

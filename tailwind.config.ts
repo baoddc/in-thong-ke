@@ -1,4 +1,4 @@
-﻿import type { Config } from 'tailwindcss'
+import type { Config } from 'tailwindcss'
 import colors from 'tailwindcss/colors'
 
 // Bộ token dùng chung. Thương hiệu Đại Dũng: đỏ (logo ~#E31E24). Nền nút dùng sắc đậm hơn (#C8102E) để chữ trắng đạt WCAG AA (~5,9:1).
@@ -17,6 +17,8 @@ export default {
         surface: '#F7F5F3',
         ink: colors.slate[900],
       },
+      // Gốc 14px: xs = 12px, sm = 13px, base = 14px (chữ chính không nhỏ hơn 12px).
+      fontSize: { xs: ['0.8571rem', { lineHeight: '1.15rem' }], sm: ['0.9286rem', { lineHeight: '1.3rem' }] },
       borderRadius: { card: '0.75rem' },
       boxShadow: { card: '0 1px 2px rgb(15 23 42 / 0.05), 0 2px 8px rgb(15 23 42 / 0.06)' },
       keyframes: {
@@ -33,3 +35,4 @@ export default {
   },
   plugins: [],
 } satisfies Config
+

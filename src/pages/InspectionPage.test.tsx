@@ -13,16 +13,17 @@ const lookups = [
 const oldRow = { id: 9, plan_id: null, tk_number: null, transport_order_no: null, export_date: '2026-09-30', product_name: 'Thép tấm', quantity: 1234.5, total_weight_kg: 5422 }
 
 // Mọi chuỗi gọi trả về chính nó và có thể await; lookup_items và inspection_details_view có dữ liệu.
-const h = vi.hoisted(() => ({ calls: [] as unknown[][] })) // các lệnh gọi lên inspection_details_view
+// calls: lệnh gọi lên inspection_details_view (dữ liệu); countCalls: lên inspection_details (đếm riêng)
+const h = vi.hoisted(() => ({ calls: [] as unknown[][], countCalls: [] as unknown[][], count: 41800 as number | null, countError: null as { message: string } | null, rows: [] as unknown[] }))
 vi.mock('../lib/supabase', () => {
   const chain = (data: unknown, t: string) => {
-    const c: Record<string, unknown> = { then: (r: (v: unknown) => unknown) => r({ data, error: null }) }
-    for (const m of ['select', 'order', 'limit', 'range', 'eq', 'in', 'or', 'gte', 'lte']) c[m] = (...a: unknown[]) => { if (t === 'inspection_details_view') h.calls.push([m, ...a]); return c }
+    const c: Record<string, unknown> = { then: (r: (v: unknown) => unknown) => r(t === 'inspection_details' ? { data: null, error: h.countError, count: h.countError ? null : h.count } : { data, error: null }) }
+    for (const m of ['select', 'order', 'limit', 'range', 'eq', 'in', 'or', 'gte', 'lte']) c[m] = (...a: unknown[]) => { if (t === 'inspection_details_view') h.calls.push([m, ...a]); if (t === 'inspection_details') h.countCalls.push([m, ...a]); return c }
     return c
   }
   return {
     supabase: {
-      from: (t: string) => chain(t === 'lookup_items' ? lookups : t === 'inspection_details_view' ? [oldRow] : [], t),
+      from: (t: string) => chain(t === 'lookup_items' ? lookups : t === 'inspection_details_view' ? (h.rows.length ? h.rows : [oldRow]) : [], t),
       rpc: (fn: string) => Promise.resolve({ data: fn === 'get_lookup_items' ? [{ id: 77, kind: 'construction', name: 'Nhà máy Bình Dương', code: 'CT77' }] : [], error: null }),
     },
   }
@@ -36,7 +37,7 @@ const renderPage = (url = '/') => render(<MemoryRouter initialEntries={[url]}><T
 beforeAll(() => {
   HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) { this.setAttribute('open', '') }
 })
-beforeEach(() => { localStorage.clear(); h.calls.length = 0 })
+beforeEach(() => { localStorage.clear(); h.calls.length = 0; h.countCalls.length = 0; h.count = 41800; h.countError = null; h.rows = [] })
 afterEach(cleanup)
 
 describe('InspectionPage', () => {
@@ -47,10 +48,31 @@ describe('InspectionPage', () => {
     expect(row.textContent).toContain('30/09/2026')
     expect(row.textContent).toContain('1.234,5')
     expect(row.textContent).toContain('5.422')
-    expect(screen.getByTestId('page-info').textContent).toBe('Trang 1/1 · tổng 1 dòng')
+    expect(screen.getByTestId('page-count').textContent).toBe('/836') // 41.800 / 50
+    expect(screen.getByTestId('page-total').textContent).toBe('· tổng 41.800 dòng')
   })
 
-  it('D-012: tìm nhanh chỉ trên TK + số phiếu; lọc công trình/đơn vị nhận theo id; đếm estimated; hiện tên công trình từ id', async () => {
+  it('đếm chính xác trên bảng gốc, view không đếm; lỗi đếm vẫn hiện dữ liệu, chỉ "Trang x"', async () => {
+    h.countError = { message: 'boom' }
+    renderPage()
+    await screen.findByTestId('row-9')
+    expect(h.calls).toContainEqual(['select', '*'])
+    expect(screen.queryByTestId('page-total')).toBeNull()
+    expect(screen.queryByTestId('page-count')).toBeNull()
+    expect((screen.getByTestId('page-input') as HTMLInputElement).value).toBe('1')
+    expect((screen.getByTestId('page-next') as HTMLButtonElement).disabled).toBe(true) // trang chưa đầy (1/50 dòng)
+  })
+
+  it('trang hiện tại đầy → nút Sau bật dù số đếm nói đã hết trang', async () => {
+    h.count = 50 // chỉ 1 trang theo số đếm
+    h.rows = Array.from({ length: 50 }, (_, i) => ({ ...oldRow, id: i + 1 }))
+    renderPage()
+    await screen.findByTestId('row-1')
+    expect(screen.getByTestId('page-count').textContent).toBe('/1')
+    expect((screen.getByTestId('page-next') as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('D-012: tìm nhanh chỉ trên TK + số phiếu; lọc công trình/đơn vị nhận theo id; đếm exact trên bảng gốc cùng bộ lọc; hiện tên công trình từ id', async () => {
     renderPage('/?q=49001&cons=77&recv=8')
     await screen.findByTestId('row-9')
     const or = h.calls.find((c) => c[0] === 'or')
@@ -58,8 +80,15 @@ describe('InspectionPage', () => {
     expect(String(or?.[1])).not.toContain('construction')
     expect(h.calls).toContainEqual(['eq', 'construction_id', 77])
     expect(h.calls).toContainEqual(['eq', 'receiving_unit_id', 8])
-    expect(h.calls).toContainEqual(['select', '*', { count: 'estimated' }])
+    expect(h.calls).toContainEqual(['select', '*'])
     expect(h.calls).toContainEqual(['order', 'id', { ascending: false }])
+    // request đếm: bảng gốc, head + exact, cùng bộ lọc, không sắp xếp/phân trang
+    expect(h.countCalls).toEqual([
+      ['select', 'id', { count: 'exact', head: true }],
+      ['or', 'tk_number.ilike.%49001%,warehouse_slip_no.ilike.%49001%'],
+      ['eq', 'construction_id', 77],
+      ['eq', 'receiving_unit_id', 8],
+    ])
     await waitFor(() => expect((screen.getByTestId('filter-construction') as HTMLInputElement).value).toBe('Nhà máy Bình Dương'))
     await userEvent.click(screen.getByTestId('toggle-filters')) // ẩn bộ lọc → hiện số bộ lọc đang bật
     expect(screen.getByTestId('toggle-filters').textContent).toContain('3') // q + cons + recv

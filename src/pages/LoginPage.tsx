@@ -1,11 +1,13 @@
 ﻿import { useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
+import { toLoginEmail } from '../lib/auth'
 import Button from '../components/ui/Button'
 import { Field, Input } from '../components/ui/Input'
 
 /** Lỗi đăng nhập của Supabase Auth -> thông báo tiếng Việt. */
 export function loginErrorMessage(err: { status?: number; code?: string; message?: string }): string {
-  if (err.code === 'invalid_credentials' || err.status === 400) return 'Email hoặc mật khẩu không đúng.'
+  if (err.code === 'user_banned' || /banned/i.test(err.message ?? '')) return 'Tài khoản đã bị khóa, liên hệ admin'
+  if (err.code === 'invalid_credentials' || err.status === 400) return 'Sai tên đăng nhập hoặc mật khẩu'
   if (err.status === 429) return 'Bạn thử quá nhiều lần. Vui lòng chờ ít phút rồi thử lại.'
   if (!err.status || /fetch|network/i.test(err.message ?? '')) return 'Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.'
   return `Không đăng nhập được: ${err.message ?? 'không rõ nguyên nhân'}`
@@ -23,7 +25,7 @@ export default function LoginPage() {
     if (busy) return
     setBusy(true)
     setError('')
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+    const { error } = await supabase.auth.signInWithPassword({ email: toLoginEmail(email), password })
     setBusy(false)
     if (error) setError(loginErrorMessage(error))
   }
@@ -37,8 +39,8 @@ export default function LoginPage() {
             <h1 className="text-xl font-bold" data-testid="login-title">In thống kê — Kho An Hạ</h1>
             <p className="text-sm text-muted">Đăng nhập để tiếp tục</p>
           </div>
-        <Field label="Email">
-          <Input type="email" required autoComplete="username" autoFocus value={email} onChange={(e) => setEmail(e.target.value)} data-testid="login-email" />
+        <Field label="Tên đăng nhập hoặc email">
+          <Input type="text" required autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoFocus value={email} onChange={(e) => setEmail(e.target.value)} data-testid="login-email" />
         </Field>
         <div className="relative">
           <Field label="Mật khẩu">

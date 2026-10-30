@@ -1,4 +1,4 @@
-﻿import type { ReactNode, RefObject } from 'react'
+import type { ReactNode, RefObject } from 'react'
 import Button from './ui/Button'
 import DateInput from './ui/DateInput'
 import Icon from './ui/Icon'
@@ -18,25 +18,29 @@ type Props = {
   children?: ReactNode // bộ lọc thêm (select…)
 }
 
-// Thanh lọc phía server: ô tìm nhanh (phím /), khoảng ngày xuất (dd/mm/yyyy), bộ lọc thêm.
+// Thanh lọc phía server: ô tìm nhanh (phím /), khoảng ngày xuất (dd/mm/yyyy), bộ lọc thêm. Nhãn nổi trên viền ô để thanh lọc thấp.
 export default function ListToolbar({ searchRef, text, onText, placeholder, from, to, onFrom, onTo, active, onClear, children }: Props) {
   return (
-    <div className="grid grid-cols-2 items-end gap-3 rounded-card border border-stone-200 bg-white p-3 shadow-card sm:flex sm:flex-wrap" data-testid="list-toolbar">
-      <Field label="Tìm nhanh" className="col-span-2 sm:w-72">
+    // pt-3: chừa chỗ cho nhãn nổi nằm trên viền ô
+    <div className="grid grid-cols-2 items-start gap-x-2 gap-y-3 rounded-card border border-stone-200 bg-white p-2 pt-3 shadow-sm sm:flex sm:flex-wrap" data-testid="list-toolbar">
+      <Field compact label="Tìm nhanh" className="col-span-2 sm:w-60">
         <span className="relative block">
-          <Icon name="search" size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-          <Input ref={searchRef} type="search" value={text} onChange={(e) => onText(e.target.value)} placeholder={placeholder}
-            title="Phím tắt: /" autoComplete="off" className="pl-9" data-testid="search" />
+          <Icon name="search" size={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
+          <Input inputSize="sm" ref={searchRef} type="search" value={text} onChange={(e) => onText(e.target.value)} placeholder={placeholder}
+            title="Phím tắt: /" autoComplete="off" className="pl-8" data-testid="search" />
         </span>
       </Field>
-      <Field label="Từ ngày" className="sm:w-44">
-        <DateInput value={from} max={to || undefined} onChange={onFrom} data-testid="filter-from" />
-      </Field>
-      <Field label="Đến ngày" className="sm:w-44">
-        <DateInput value={to} min={from || undefined} onChange={onTo} data-testid="filter-to" />
-      </Field>
+      <div className="col-span-2 flex items-start gap-1.5" role="group" aria-label="Khoảng ngày xuất">
+        <Field compact label="Từ ngày" className="min-w-0 flex-1 sm:w-36 sm:flex-none">
+          <DateInput inputSize="sm" value={from} max={to || undefined} onChange={onFrom} data-testid="filter-from" />
+        </Field>
+        <span aria-hidden="true" className="pt-1.5 text-gray-500">–</span>
+        <Field compact label="Đến ngày" className="min-w-0 flex-1 sm:w-36 sm:flex-none">
+          <DateInput inputSize="sm" value={to} min={from || undefined} onChange={onTo} data-testid="filter-to" />
+        </Field>
+      </div>
       {children}
-      {active && <Button onClick={onClear} className="col-span-2 sm:col-span-1" data-testid="clear-filters">Xóa bộ lọc</Button>}
+      {active && <Button size="sm" onClick={onClear} className="col-span-2 sm:col-span-1 sm:min-h-9" data-testid="clear-filters">Xóa bộ lọc</Button>}
     </div>
   )
 }

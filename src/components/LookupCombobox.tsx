@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { errorMessage } from '../lib/format'
 import { filterSuggestions, findIdByName, hasExactMatch } from '../lib/lookupMatch'
 import { recall, remember, resolveFn, searchFn, useRemoteOptions, type Opt } from '../lib/lookupSearch'
-import { inputClass, labelClass } from './ui/Input'
+import { floatLabelClass, inputClass, inputSmClass, labelClass } from './ui/Input'
 
 type Item = Opt
 
@@ -26,12 +26,15 @@ type Props = {
   onPending?: (pending: boolean) => void
   reload?: () => Promise<void>
   testId: string
+  /** 'sm': ô thấp 36px, nhãn nổi trên viền (thanh lọc). */
+  inputSize?: 'md' | 'sm'
 }
 
 // Combobox gõ để tìm; không có thì cho thêm mới vào lookup_items.
 // Văn bản khởi tạo lấy từ `selectedIds`; đổi giá trị từ ngoài (Sửa/Hủy) thì remount bằng `key`.
-export default function LookupCombobox({ label, kind, items: rawItems = [], server = false, known, selectedIds, multiple, field = 'name', allowAdd = true, onChange, onPending, reload, testId }: Props) {
+export default function LookupCombobox({ label, kind, items: rawItems = [], server = false, known, selectedIds, multiple, field = 'name', allowAdd = true, onChange, onPending, reload, testId, inputSize }: Props) {
   const uid = useId()
+  const sm = inputSize === 'sm'
   const view = (list: Item[]) => (field === 'code' ? list.flatMap((i) => (i.code ? [{ ...i, name: i.code }] : [])) : list)
   // Chế độ server: tên của id = dòng đang sửa (known) hoặc bộ nhớ đệm các lần tìm trước.
   const nameOf = (id: number | undefined) => {
@@ -133,7 +136,7 @@ export default function LookupCombobox({ label, kind, items: rawItems = [], serv
 
   return (
     <div className="relative">
-      <label htmlFor={`${uid}-in`} className={labelClass}>{label}{multiple ? ' (chọn nhiều)' : ''}</label>
+      <label htmlFor={`${uid}-in`} className={sm ? floatLabelClass : labelClass}>{label}{multiple ? ' (chọn nhiều)' : ''}</label>
       {multiple && selectedIds.length > 0 && (
         <ul className="mt-1 flex flex-wrap gap-1" data-testid={`${testId}-chips`}>
           {selectedIds.map((id) => {
@@ -160,7 +163,7 @@ export default function LookupCombobox({ label, kind, items: rawItems = [], serv
           if (!multiple) { onChange([]); onPending?.(t.trim() !== '') }
         }}
         onKeyDown={onKeyDown} onBlur={() => void onBlur()}
-        className={inputClass}
+        className={sm ? `${inputClass} ${inputSmClass}` : inputClass}
       />
       {open && rows > 0 && (
         <ul id={`${uid}-list`} role="listbox" aria-label={label} data-testid={`${testId}-list`}

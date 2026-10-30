@@ -16,7 +16,7 @@ vi.mock('../lib/supabase', () => {
       then: (r: (v: unknown) => unknown) => r({ data, error: null }),
       maybeSingle: () => Promise.resolve({ data: plan, error: null }),
       insert: (p: Record<string, unknown>) => { inserted.push(p); return Promise.resolve({ error: null }) },
-      update: (p: Record<string, unknown>) => { updated.push(p); return c },
+      update: (p: Record<string, unknown>) => { updated.push(p); return { eq: () => ({ select: () => Promise.resolve({ data: [{ id: 1 }], error: null }) }) } },
     }
     for (const m of ['select', 'order', 'range', 'eq']) c[m] = () => c
     return c

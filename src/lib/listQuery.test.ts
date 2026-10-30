@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyList, hasActiveFilters, monthRange, nextSort, pageCount, pageRange, parseListParams, sanitizeTerm, toSearchParams, type ListConfig } from './listQuery'
+import { applyFilters, applyList, hasActiveFilters, monthRange, nextSort, pageCount, pageRange, parseListParams, sanitizeTerm, toSearchParams, type ListConfig } from './listQuery'
 
 const cfg: ListConfig = {
   sorts: ['created_at', 'export_date', 'tk_number'], defaultSort: 'created_at', defaultDir: 'desc', descFirst: ['export_date'],
@@ -69,6 +69,14 @@ describe('applyList', () => {
       ['order', 'id', { ascending: true }], // khóa phụ cùng chiều với cột sắp xếp
       ['range', 50, 74],
     ])
+  })
+
+  it('applyFilters (dùng cho request đếm) chỉ lọc, không sắp xếp/phân trang; khớp phần lọc của applyList', () => {
+    const qs = 'q=TK01&from=2026-10-01&to=2026-10-31&type=5&page=3&size=25'
+    const a = fakeBuilder(); applyFilters(a.b, parse(qs), cfg)
+    const l = fakeBuilder(); applyList(l.b, parse(qs), cfg)
+    expect(a.calls.map((c) => c[0])).toEqual(['or', 'gte', 'lte', 'eq'])
+    expect(l.calls.slice(0, 4)).toEqual(a.calls)
   })
 
   it('chuỗi tìm chỉ toàn ký tự đặc biệt thì không thêm điều kiện or', () => {

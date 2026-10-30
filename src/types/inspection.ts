@@ -30,4 +30,6 @@ export type InspectionRow = {
   carrier_id: number | null
   carrier_name: string | null
   note: string | null
+  created_at?: string | null
+  created_by?: string | null // D-013: cột cuối của view
 }

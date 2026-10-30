@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { NavLink, Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { useSession } from './lib/useSession'
@@ -9,16 +9,22 @@ import InspectionPage from './pages/InspectionPage'
 import PrintPage from './pages/PrintPage'
 import LookupsPage from './pages/LookupsPage'
 import WorkflowPage from './pages/WorkflowPage'
+import UsersPage from './pages/UsersPage'
+import { ProfileProvider, useProfile } from './lib/useProfile'
+import { ROLE_LABEL } from './lib/auth'
+import Button from './components/ui/Button'
 
 const STORAGE_KEY = 'sidebar-collapsed'
 
-const ITEMS: { to: string; label: string; icon: IconName; end?: boolean }[] = [
+type NavItem = { to: string; label: string; icon: IconName; end?: boolean }
+const ITEMS: NavItem[] = [
   { to: '/', label: 'Nhập phiếu', icon: 'plan', end: true },
   { to: '/bang-kiem', label: 'Bảng kiểm', icon: 'inspection' },
   { to: '/in-thong-ke', label: 'In thống kê', icon: 'print' },
   { to: '/danh-muc', label: 'Danh mục', icon: 'lookup' },
   { to: '/luong-cong-viec', label: 'Luồng công việc', icon: 'workflow' },
 ]
+const ADMIN_ITEMS: NavItem[] = [{ to: '/nguoi-dung', label: 'Quản lý người dùng', icon: 'user' }] // D-013/D-014: admin và root
 
 function readCollapsed() {
   try { return localStorage.getItem(STORAGE_KEY) === '1' } catch { return false }
@@ -34,6 +40,8 @@ function LogoTile({ className = 'h-10 w-10' }: { className?: string }) {
 }
 
 export function Layout({ email }: { email: string }) {
+  const { profile, isAdmin } = useProfile()
+  const displayName = profile?.full_name || email
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [drawer, setDrawer] = useState(false) // ngăn kéo trên màn hình nhỏ
   const showLabels = !collapsed || drawer // ngăn kéo luôn hiện nhãn
@@ -58,7 +66,8 @@ export function Layout({ email }: { email: string }) {
   const hint = (text: string) => (showLabels ? {} : { title: text, 'aria-label': text })
 
   return (
-    <div className="min-h-screen bg-surface text-gray-900 md:flex">
+    // Từ md: khung đúng bằng màn hình, không cuộn cả trang — bảng tự cuộn bên trong; khi in thì trả về dòng chảy bình thường.
+    <div className="min-h-screen bg-surface text-gray-900 md:flex md:h-dvh md:min-h-0 md:overflow-hidden print:block print:h-auto print:overflow-visible">
       <header className="md:hidden print:hidden flex items-center gap-3 border-b-2 border-primary-brand bg-white p-2 shadow-sm">
         <button onClick={() => setDrawer(true)} aria-label="Mở menu" className="flex h-10 w-10 items-center justify-center rounded-lg border border-line transition duration-150 hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="open-drawer">
           <Icon name="menu" />
@@ -80,7 +89,7 @@ export function Layout({ email }: { email: string }) {
           )}
         </div>
         <nav aria-label="Menu chính" className="mt-1 flex flex-col gap-1">
-          {ITEMS.map((i) => (
+          {(isAdmin ? [...ITEMS, ...ADMIN_ITEMS] : ITEMS).map((i) => (
             <NavLink key={i.to} to={i.to} end={i.end} className={link} onClick={() => setDrawer(false)} {...hint(i.label)}>
               <Icon name={i.icon} />{showLabels && <span>{i.label}</span>}
             </NavLink>
@@ -94,8 +103,11 @@ export function Layout({ email }: { email: string }) {
           </button>
           {showLabels && (
             <div className="flex items-center gap-2 px-2 py-1" data-testid="user-chip">
-              <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">{(email[0] ?? '?').toLocaleUpperCase('vi')}</span>
-              <p className="truncate text-sm text-slate-300" data-testid="user-email">{email}</p>
+              <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">{(displayName[0] ?? '?').toLocaleUpperCase('vi')}</span>
+              <div className="min-w-0 leading-tight">
+                <p className="truncate text-sm text-slate-100" data-testid="user-name" title={displayName}>{displayName}</p>
+                {profile && <span className={`mt-0.5 inline-block rounded px-1.5 text-xs font-medium ${profile.role === 'root' ? 'bg-amber-400 font-bold text-slate-900' : 'bg-white/15 text-slate-200'}`} data-testid="user-role">{ROLE_LABEL[profile.role]}</span>}
+              </div>
             </div>
           )}
           <button className={`${row} w-full border-transparent text-slate-300 hover:bg-primary hover:text-white`} onClick={() => supabase.auth.signOut()} {...hint('Đăng xuất')}>
@@ -104,27 +116,55 @@ export function Layout({ email }: { email: string }) {
         </div>
       </aside>
 
-      <main id="noi-dung" className="min-w-0 flex-1 p-3 md:p-6 print:p-0">
+      <main id="noi-dung" className="min-w-0 flex-1 p-3 md:flex md:min-h-0 md:flex-col md:overflow-y-auto md:p-6 print:block print:overflow-visible print:p-0">
         <Outlet />
       </main>
     </div>
   )
 }
 
+/** Đăng nhập được nhưng không có hồ sơ hoặc bị khóa → thông báo + Đăng xuất (RLS cũng chặn mọi dữ liệu). */
+export function AccessGate({ email }: { email: string }) {
+  const { profile, loading, error } = useProfile()
+  if (loading) return <p className="p-4 text-muted" role="status">Đang tải...</p>
+  if (!profile || !profile.is_active) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface p-4">
+        <div className="w-full max-w-md space-y-3 rounded-2xl bg-white p-6 text-center shadow-xl" role="alert" data-testid="access-denied">
+          <h1 className="text-lg font-bold">{profile ? 'Tài khoản đã bị khóa' : 'Chưa có quyền truy cập'}</h1>
+          <p className="text-gray-700">
+            {profile ? 'Tài khoản này đã bị khóa. Vui lòng liên hệ admin.' : error ? `Không đọc được hồ sơ người dùng: ${error}` : 'Tài khoản này chưa được cấp hồ sơ người dùng. Vui lòng liên hệ admin.'}
+          </p>
+          <Button variant="primary" onClick={() => supabase.auth.signOut()} data-testid="access-signout">Đăng xuất</Button>
+        </div>
+      </div>
+    )
+  }
+  return <Layout email={email} />
+}
+
+export function AdminOnly({ children }: { children: ReactNode }) {
+  const { isAdmin, loading } = useProfile()
+  if (loading) return null
+  return isAdmin ? children : <Navigate to="/" replace />
+}
+
 export default function App() {
   const session = useSession()
   if (session === undefined) return <p className="p-4 text-muted" role="status">Đang tải...</p>
-  return (
+  const routes = (
     <Routes>
       <Route path="/dang-nhap" element={session ? <Navigate to="/" replace /> : <LoginPage />} />
-      <Route element={session ? <Layout email={session.user.email ?? ''} /> : <Navigate to="/dang-nhap" replace />}>
+      <Route element={session ? <AccessGate email={session.user.email ?? ''} /> : <Navigate to="/dang-nhap" replace />}>
         <Route path="/" element={<PlansPage />} />
         <Route path="/bang-kiem" element={<InspectionPage />} />
         <Route path="/in-thong-ke" element={<PrintPage />} />
         <Route path="/danh-muc" element={<LookupsPage />} />
         <Route path="/luong-cong-viec" element={<WorkflowPage />} />
+        <Route path="/nguoi-dung" element={<AdminOnly><UsersPage /></AdminOnly>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
+  return session ? <ProfileProvider userId={session.user.id}>{routes}</ProfileProvider> : routes
 }

@@ -11,7 +11,8 @@ export function useListPage<T>(cfg: ListConfig, fetcher: Fetcher) {
   const [sp, setSp] = useSearchParams()
   const p = useMemo(() => parseListParams(sp, cfg), [sp, cfg])
   const key = sp.toString()
-  const [state, setState] = useState<{ key: string | null; rows: T[]; total: number; error: string }>({ key: null, rows: [], total: 0, error: '' })
+  // total = null khi không đếm được (request đếm lỗi): vẫn hiện dữ liệu, không chặn điều hướng.
+  const [state, setState] = useState<{ key: string | null; rows: T[]; total: number | null; error: string }>({ key: null, rows: [], total: 0, error: '' })
   const req = useRef(0)
 
   /** Đổi bộ lọc/sắp xếp/cỡ trang thì về trang 1, trừ khi patch có `page`. */
@@ -29,7 +30,7 @@ export function useListPage<T>(cfg: ListConfig, fetcher: Fetcher) {
     if (r.error) setState((s) => ({ ...s, key, error: errorMessage(r.error) }))
     else {
       const rows = (r.data ?? []) as T[]
-      setState({ key, rows, total: r.count ?? rows.length, error: '' })
+      setState({ key, rows, total: r.count ?? null, error: '' })
     }
   }, [fetcher, p, key])
 
@@ -38,7 +39,7 @@ export function useListPage<T>(cfg: ListConfig, fetcher: Fetcher) {
 
   // Xóa hết dòng cuối của trang cuối → lùi về trang cuối còn dữ liệu.
   useEffect(() => {
-    if (state.key === key && state.rows.length === 0 && state.total > 0 && p.page > 1) update({ page: pageCount(state.total, p.size) })
+    if (state.key === key && state.rows.length === 0 && state.total !== null && state.total > 0 && p.page > 1) update({ page: pageCount(state.total, p.size) })
   }, [state, key, p.page, p.size, update])
 
   // Ô tìm nhanh: gõ tức thì, ghi vào URL sau 300ms.
@@ -56,6 +57,7 @@ export function useListPage<T>(cfg: ListConfig, fetcher: Fetcher) {
   return {
     p, update, text, setText, reload: load,
     rows: state.rows, total: state.total, error: state.error,
+    hasData: state.rows.length > 0 || (state.total ?? 0) > 0,
     loading: state.key === null, // chưa tải xong lần nào
     refreshing: state.key !== key && state.key !== null, // đang tải trang/bộ lọc mới, giữ dòng cũ mờ đi
     sortBy: (col: string) => update(nextSort(p, col, cfg)),

@@ -11,6 +11,7 @@ import { Input } from '../components/ui/Input'
 import PageHeader from '../components/ui/PageHeader'
 import Pagination from '../components/ui/Pagination'
 import { useToast } from '../components/ui/Toast'
+import { useProfile } from '../lib/useProfile'
 
 // Nhóm tab theo vị trí: từ 'construction' trở đi thuộc "Bảng kiểm chi tiết".
 const SPLIT = KINDS.findIndex((k) => k.kind === 'construction')
@@ -28,7 +29,7 @@ function useBigLookups(kind: string, q: string, page: number, size: number) {
     if (!isBigKind(kind)) return
     let alive = true
     const t = setTimeout(async () => {
-      let qb = supabase.from('lookup_items').select('*', { count: 'estimated' }).eq('kind', kind)
+      let qb = supabase.from('lookup_items').select('*', { count: 'exact' }).eq('kind', kind)
       const term = sanitizeTerm(q)
       if (term) qb = qb.or(`name.ilike.%${term}%,code.ilike.%${term}%`)
       const [a, b] = pageRange(page, size)
@@ -44,6 +45,7 @@ function useBigLookups(kind: string, q: string, page: number, size: number) {
 export default function LookupsPage() {
   const { byKind, loading, error: loadError, reload } = useLookups()
   const toast = useToast()
+  const { isAdmin } = useProfile()
   const [kind, setKind] = useState<string>(KINDS[0].kind)
   const [name, setName] = useState('')
   const [filter, setFilter] = useState('')
@@ -97,7 +99,7 @@ export default function LookupsPage() {
   const q = filter.trim().toLowerCase()
   const list = big ? bigList.rows : byKind(kind).filter((i) => `${i.code ?? ''} ${i.name}`.toLowerCase().includes(q))
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-3 md:min-h-0 md:flex-1">
       <PageHeader title="Danh mục" description="Các lựa chọn dùng trong phiếu và bảng kiểm" />
       <div className="space-y-3 rounded-card border border-stone-200 bg-white p-3 shadow-card">
         {TAB_GROUPS.map((g) => (
@@ -129,7 +131,7 @@ export default function LookupsPage() {
           <EmptyState title={q ? 'Không có mục nào khớp.' : 'Chưa có mục nào.'} hint={q ? undefined : 'Nhập tên ở ô phía trên rồi bấm “Thêm”.'} />
         </div>
       ) : (
-        <ul className={`divide-y divide-stone-100 overflow-hidden rounded-card border border-stone-200 bg-white shadow-card ${big && bigList.refreshing ? 'opacity-60' : ''}`} data-testid="lookup-list">
+        <ul className={`divide-y divide-stone-100 overflow-y-auto ${big && !bigList.error && bigList.total > 0 ? 'rounded-t-card border-b-0' : 'rounded-card'} md:min-h-[15rem] md:flex-1 border border-stone-200 bg-white shadow-card ${big && bigList.refreshing ? 'opacity-60' : ''}`} data-testid="lookup-list">
           {list.map((it) => (
             <li key={it.id} className="flex items-center gap-2 p-2 transition-colors duration-150 even:bg-stone-50 hover:bg-primary-soft">
               {editId === it.id ? (
@@ -143,8 +145,12 @@ export default function LookupsPage() {
                 <>
                   {isCons && <span className="w-24 shrink-0 font-medium break-words" data-testid="lookup-code">{it.code}</span>}
                   <span className="flex-1 break-words">{it.name}</span>
-                  <IconButton icon="edit" label={`Sửa ${it.name}`} onClick={() => { setEditId(it.id); setEditName(it.name); setEditCode(it.code ?? '') }} />
-                  <IconButton icon="trash" tone="danger" label={`Xóa ${it.name}`} disabled={busy} onClick={() => setDeleting(it)} />
+                  {isAdmin && ( // D-013: user chỉ thêm mục, không sửa/xóa
+                    <>
+                      <IconButton icon="edit" label={`Sửa ${it.name}`} onClick={() => { setEditId(it.id); setEditName(it.name); setEditCode(it.code ?? '') }} />
+                      <IconButton icon="trash" tone="danger" label={`Xóa ${it.name}`} disabled={busy} onClick={() => setDeleting(it)} />
+                    </>
+                  )}
                 </>
               )}
             </li>
@@ -152,7 +158,7 @@ export default function LookupsPage() {
         </ul>
       )}
       {big && !bigList.loading && !bigList.error && bigList.total > 0 && (
-        <Pagination page={page} size={size} total={bigList.total} disabled={bigList.refreshing} onPage={setPage} onSize={(n) => { setSize(n); setPage(1) }} />
+        <Pagination page={page} size={size} total={bigList.total} rowCount={bigList.rows.length} disabled={bigList.refreshing} onPage={setPage} onSize={(n) => { setSize(n); setPage(1) }} />
       )}
       {deleting && (
         <ConfirmDialog title={`Xóa "${deleting.name}"?`} message="Mục sẽ bị xóa khỏi danh mục. Nếu đang được dùng trong phiếu thì không xóa được."

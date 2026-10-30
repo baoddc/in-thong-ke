@@ -52,11 +52,25 @@ Thay một phần D-008: NV xuất hàng vẫn **tự điền** theo phiếu TK 
 ## D-012 — Thiết kế chịu tải 500.000 – vài triệu dòng (29/10/2026)
 Mục tiêu: `inspection_details` ≥ 1–5 triệu dòng, `transport_plans` ≥ 500.000; mọi màn hình thường dùng < 2 s.
 - **Không tải toàn bộ về trình duyệt:** số TK và danh mục lớn (vehicle, driver, receiving_unit, construction) tìm phía server qua RPC `search_plan_numbers`, `search_lookup_items` (trigram, giới hạn 20). Danh mục nhỏ (< 500 mục) vẫn tải hết.
-- **Đếm dòng:** dùng `count: 'estimated'` của PostgREST (chính xác khi ít, ước lượng khi nhiều) thay `exact`.
+- ~~**Đếm dòng:** dùng `count: 'estimated'`~~ → **sửa 30/10/2026:** ước lượng của planner sai nặng khi có RLS (thấy 14.434/21.958 phiếu, 20.900/41.800 dòng) và làm phân trang không tới được trang cuối. Đổi sang **đếm chính xác trên BẢNG GỐC** (`transport_plans`, `inspection_details` — `head: true`, cùng bộ lọc), không đếm qua view (view có lateral join: 524 ms; bảng gốc index-only: ~4 ms ở 42k). Nút "Sau" còn bật khi trang hiện tại đầy (phòng khi số đếm lệch).
 - **Phân trang:** offset vẫn dùng cho vài trang đầu; sắp xếp luôn kèm `id` để ổn định; index ghép (cột sắp xếp, id).
 - **Tìm kiếm bảng kiểm:** chỉ ilike trên cột có index trigram (số TK, số phiếu xuất kho); lọc công trình/đơn vị nhận/… theo **id** chọn từ combobox, không ilike qua join.
 - **Thống kê:** bảng tổng hợp `inspection_daily_stats` (ngày × loại hình xuất × mặt hàng: số dòng, số lượng, kg) cập nhật bằng trigger khi thêm/sửa/xóa bảng kiểm; RPC thống kê đọc bảng này.
 - **Chưa phân vùng (partition):** Postgres xử lý vài triệu dòng tốt với index đúng; xem xét partition theo năm khi > 20 triệu dòng hoặc cần lưu trữ dữ liệu cũ.
+
+## D-013 — Người dùng & phân quyền (30/10/2026) — thay D-003
+- Bảng `profiles` (id = auth.users.id, username, full_name, role `admin`|`user`, is_active). `thaibao06061997@gmail.com` là **admin**; mọi người khác mặc định **user**.
+- **Tên đăng nhập** sinh từ họ tên: tên (chữ cuối) + "." + chữ cái đầu của họ và tên đệm, bỏ dấu, đ→d, chữ thường. Lê Thái Bão → `bao.lt`; Lê Thái Quốc → `quoc.lt`. Trùng → thêm số `bao.lt2`, `bao.lt3`…
+- **Không cần email thật:** tài khoản tạo mới có email nội bộ `<username>@kho-an-ha.local` (đã xác nhận sẵn, không gửi mail). Ô đăng nhập nhận tên đăng nhập hoặc email; không có `@` thì tự gắn `@kho-an-ha.local`.
+- **Quyền:** user — xem, thêm phiếu/bảng kiểm, in; được thêm mục danh mục từ ô "+ Thêm" khi nhập liệu. Admin — mọi thứ, gồm sửa/xóa Danh mục, Quản lý người dùng. Tài khoản bị khóa: không đăng nhập được (ban trong Auth) và RLS chặn mọi truy cập.
+- **Sửa/xóa phiếu & dòng bảng kiểm (bổ sung 30/10/2026):** chỉ **người tạo** (created_by) hoặc **admin**; người tạo chỉ trong **24 giờ** kể từ lúc tạo, quá 24 giờ chỉ admin. Người khác vẫn được thêm dòng bảng kiểm vào phiếu của người khác. created_by/created_at do trigger đặt, không sửa được từ web.
+- **Dữ liệu đã nạp sẵn** gán người tạo = tài khoản riêng `bao.lt` (Lê Thái Bão, vai trò user — họ tên/vai trò tạm theo ví dụ của người dùng, admin sửa được).
+- **Quản lý người dùng** (admin): tạo (họ tên + mật khẩu ban đầu + vai trò), đổi vai trò, khóa/mở khóa, đặt lại mật khẩu, sửa họ tên. Thực hiện qua Edge Function `admin-users` (giữ service role phía server); admin không tự hạ quyền / tự khóa chính mình. Không có tự khôi phục mật khẩu (không email) → admin đặt lại. Mật khẩu: người dùng muốn không giới hạn độ dài → tối thiểu 6 ký tự (mức thấp nhất Supabase Auth cho phép), tối đa 72.
+
+## D-014 — Vai trò root (30/10/2026) — bổ sung D-013
+- 3 vai trò: **root** > **admin** > **user**. `thaibao06061997@gmail.com` là **root** (duy nhất; không ai hạ/khóa được, kể cả chính mình).
+- **Dữ liệu:** admin = root (sửa/xóa mọi phiếu, dòng bảng kiểm kể cả quá 24h; quản lý Danh mục). User như D-013.
+- **Quản lý tài khoản:** admin chỉ quản lý tài khoản **user** (tạo user, sửa họ tên, đặt lại mật khẩu, khóa/mở khóa); admin chỉ thấy tài khoản user và chính mình; không tạo admin, không đổi vai trò, không đụng admin khác/root. **Root**: tạo user hoặc admin, đổi vai trò user ↔ admin, khóa/mở khóa, đặt lại mật khẩu mọi tài khoản trừ root; không ai tạo thêm root qua giao diện.
 
 ## D-006 — Supabase project
 Project riêng `in-thong-ke` (ref `sybzvaybffgkgiyvevsp`, ap-southeast-1), tạo 29/10/2026.

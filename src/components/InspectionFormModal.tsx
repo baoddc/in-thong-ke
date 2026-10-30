@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { errorMessage, formatNumber, parseVnNumber, todayISO } from '../lib/format'
 import type { LookupItem } from '../lib/useLookups'
 import { isBigKind, type Opt } from '../lib/lookupSearch'
+import { EDIT_DENIED_HINT } from '../lib/auth'
 import { PLAN_SELECT, mergeShippers, planShipperId, shipperIdToSave } from '../lib/plans'
 import LookupCombobox from './LookupCombobox'
 import Button from './ui/Button'
@@ -33,13 +34,14 @@ const NUM_ERR = 'Sai định dạng số: dùng dấu phẩy (,) cho phần th�
 
 type Props = {
   row: InspectionRow | null // null: thêm mới
+  readOnly?: boolean // không có quyền sửa (D-013): chỉ xem
   lookups: { byKind: (k: string) => LookupItem[]; loading: boolean; error: string; reload: () => Promise<void> }
   onClose: () => void
   onSaved: (message: string, keepOpen: boolean) => void
 }
 
 // Component chỉ được mount khi mở modal → đóng (unmount) là reset toàn bộ form.
-export default function InspectionFormModal({ row, lookups, onClose, onSaved }: Props) {
+export default function InspectionFormModal({ row, readOnly = false, lookups, onClose, onSaved }: Props) {
   const { byKind, loading: lookupLoading, error: lookupError, reload } = lookups
   // Tên các id có sẵn trong dòng đang sửa (view) → ô tìm phía server hiện ngay, không gọi thêm.
   const known: Record<string, Opt[]> = {
@@ -97,7 +99,7 @@ export default function InspectionFormModal({ row, lookups, onClose, onSaved }: 
   }
 
   async function save(andNext: boolean) {
-    if (busy) return
+    if (busy || readOnly) return
     if (!formRef.current?.reportValidity()) return // vd ngày xuất gõ sai (nút "Lưu và thêm dòng tiếp" không qua kiểm tra của form)
     if (form.planId === null && tkRequired) return setError('Vui lòng chọn số phiếu thống kê.')
     if (Object.values(pending).some(Boolean)) return setError('Có ô đã gõ chữ nhưng chưa chọn từ danh mục. Vui lòng chọn một mục hoặc xóa chữ.')
@@ -126,10 +128,11 @@ export default function InspectionFormModal({ row, lookups, onClose, onSaved }: 
       note: form.note.trim() || null,
     }
     const res = row
-      ? await supabase.from('inspection_details').update(payload).eq('id', row.id)
+      ? await supabase.from('inspection_details').update(payload).eq('id', row.id).select('id')
       : await supabase.from('inspection_details').insert(payload)
     setBusy(false)
     if (res.error) return setError(errorMessage(res.error))
+    if (row && !res.data?.length) return setError(`Bạn không có quyền sửa dòng này. ${EDIT_DENIED_HINT}.`) // RLS chặn: 0 dòng được cập nhật
     if (!andNext) return onSaved(row ? 'Đã cập nhật dòng' : 'Đã lưu dòng', false)
     const next = { ...form, deliveryUnitId, productId: null, unitId: null, quantity: '', weight: '', note: '' }
     setForm(next)
@@ -166,7 +169,7 @@ export default function InspectionFormModal({ row, lookups, onClose, onSaved }: 
     )
   }
 
-  const readOnly = (label: string, value: string, id: string) => (
+  const fromPlanField = (label: string, value: string, id: string) => (
     <label className={labelClass}>{label}
       <input readOnly className={`${inputClass} bg-stone-100`} value={value} data-testid={id} />
       <span className="text-sm font-normal text-muted">Lấy theo số phiếu TK</span>
@@ -181,10 +184,11 @@ export default function InspectionFormModal({ row, lookups, onClose, onSaved }: 
       className="p-0 w-full max-w-[640px] max-h-[90vh] overflow-hidden rounded-2xl border-t-4 border-primary-brand shadow-2xl backdrop:bg-slate-900/60 open:flex flex-col max-sm:max-w-none max-sm:max-h-none max-sm:w-screen max-sm:h-dvh max-sm:rounded-none">
       <form ref={formRef} onSubmit={(e) => { e.preventDefault(); void save(false) }} className="flex flex-col min-h-0 flex-1" data-testid="inspection-form">
         <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3">
-          <h2 id="inspection-modal-title" className="text-lg font-bold">{row ? 'Sửa dòng bảng kiểm' : 'Thêm dòng bảng kiểm'}</h2>
+          <h2 id="inspection-modal-title" className="text-lg font-bold">{row ? (readOnly ? 'Xem dòng bảng kiểm' : 'Sửa dòng bảng kiểm') : 'Thêm dòng bảng kiểm'}</h2>
           <button type="button" onClick={requestClose} aria-label="Đóng" className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-600 transition-colors duration-150 hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="inspection-close"><Icon name="close" /></button>
         </div>
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3">
+        <fieldset disabled={readOnly} className="min-w-0 flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3">
+          {readOnly && <p className="rounded-card border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900" data-testid="readonly-note">{EDIT_DENIED_HINT}. Bạn chỉ xem được dòng này.</p>}
           <label className={labelClass}>Ngày xuất
             <DateInput value={form.exportDate} onChange={(v) => set('exportDate', v)} data-testid="export-date" />
           </label>
@@ -192,13 +196,13 @@ export default function InspectionFormModal({ row, lookups, onClose, onSaved }: 
             server known={known.plan} selectedIds={form.planId === null ? [] : [form.planId]}
             onChange={(ids) => { set('planId', ids[0] ?? null); setPending((s) => ({ ...s, shipper: false })) }}
             onPending={(p) => setPending((s) => ({ ...s, tk: p }))} testId="tk" />
-          {readOnly('Số lệnh VC', plan?.transport_order_no ?? '', 'ro-order-no')}
+          {fromPlanField('Số lệnh VC', plan?.transport_order_no ?? '', 'ro-order-no')}
           <LookupCombobox key={`shipper-${lookupLoading}-${tick}-${planShipper}`} label="NV xuất hàng" kind="fg_exporter" allowAdd={false}
             items={shippers} selectedIds={shipperId === null ? [] : [shipperId]} onChange={(ids) => set('shipperId', ids[0] ?? null)}
             onPending={(p) => setPending((s) => ({ ...s, shipper: p }))} testId="shipper" />
           <p className="-mt-2 text-sm text-muted">Mặc định theo phiếu TK, có thể chọn người khác</p>
-          {readOnly('Số xe', plan?.vehicle?.name ?? '', 'ro-vehicle')}
-          {readOnly('Tên tài xế/ phụ xe', plan?.driver?.name ?? '', 'ro-driver')}
+          {fromPlanField('Số xe', plan?.vehicle?.name ?? '', 'ro-vehicle')}
+          {fromPlanField('Tên tài xế/ phụ xe', plan?.driver?.name ?? '', 'ro-driver')}
           <label className={labelClass}>Số phiếu xuất kho
             <input className={inputClass} value={form.slipNo} onChange={(e) => set('slipNo', e.target.value)} data-testid="slip-no" />
           </label>
@@ -223,18 +227,20 @@ export default function InspectionFormModal({ row, lookups, onClose, onSaved }: 
             <textarea rows={3} className={inputClass} value={form.note} onChange={(e) => set('note', e.target.value)} data-testid="note" />
           </label>
           {(error || lookupError) && <p role="alert" className="rounded-card border border-danger-line bg-danger-soft p-2 text-danger" data-testid="inspection-error">{error || lookupError}</p>}
-        </div>
+        </fieldset>
         <div className="flex flex-wrap items-center justify-end gap-2 border-t border-stone-200 bg-surface px-4 py-3">
           {saved && <p role="status" className="mr-auto text-sm font-medium text-success" data-testid="inspection-saved">{saved}</p>}
-          <Button onClick={requestClose} data-testid="inspection-cancel">Hủy</Button>
+          <Button onClick={requestClose} data-testid="inspection-cancel">{readOnly ? 'Đóng' : 'Hủy'}</Button>
           {!row && (
             <Button disabled={busy} onClick={() => void save(true)} className="!border-primary-line !text-primary hover:!bg-primary-soft" data-testid="inspection-save-next">
               Lưu và thêm dòng tiếp
             </Button>
           )}
-          <Button type="submit" variant="primary" disabled={busy} title="Lưu (Ctrl+Enter)" data-testid="inspection-save">
-            {busy ? 'Đang lưu...' : row ? 'Cập nhật' : 'Lưu'}
-          </Button>
+          {!readOnly && (
+            <Button type="submit" variant="primary" disabled={busy} title="Lưu (Ctrl+Enter)" data-testid="inspection-save">
+              {busy ? 'Đang lưu...' : row ? 'Cập nhật' : 'Lưu'}
+            </Button>
+          )}
         </div>
       </form>
     </dialog>

@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Cỡ chữ gốc: 15px trên điện thoại (vùng chạm ≥ 37px), 14px từ 640px. Mọi cỡ Tailwind theo rem nên co theo; bản in dùng pt/mm. */
+html { font-size: 93.75%; }
+@media (min-width: 640px) { html { font-size: 87.5%; } }
+@media print { html { font-size: 100%; } }
+
 @page { size: A4 portrait; margin: 8mm; }
 
 /* Hộp thoại: mờ dần + phóng nhẹ khi mở (nền mờ dần). */
@@ -18,3 +23,4 @@ dialog[open]::backdrop { animation: fade-in 180ms ease-out; }
 .print-sheet { font-family: "Times New Roman", Times, serif; }
 .print-sheet thead { display: table-header-group; }
 .print-sheet tr { break-inside: avoid; }
+

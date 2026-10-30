@@ -20,6 +20,8 @@ import Icon, { type IconName } from '../components/ui/Icon'
 import PageHeader from '../components/ui/PageHeader'
 import Pagination from '../components/ui/Pagination'
 import { useToast } from '../components/ui/Toast'
+import { EDIT_DENIED_HINT, canEditRow } from '../lib/auth'
+import { useProfile } from '../lib/useProfile'
 import { PLAN_SELECT, sortedMaterials } from '../lib/plans'
 import type { PlanRow } from '../types/plan'
 
@@ -28,7 +30,7 @@ const CFG: ListConfig = {
   defaultSort: 'created_at', defaultDir: 'desc', descFirst: ['created_at', 'export_date'],
   searchCols: ['tk_number', 'transport_order_no'], dateCol: 'export_date', filterCols: {}, tiebreak: 'id',
 }
-const fetchPlans: Fetcher = (p) => applyList(supabase.from('transport_plans').select(PLAN_SELECT, { count: 'estimated' }), p, CFG)
+const fetchPlans: Fetcher = (p) => applyList(supabase.from('transport_plans').select(PLAN_SELECT, { count: 'exact' }), p, CFG)
 
 // Màu theo thẻ: đỏ (thương hiệu), xanh dương (thông tin), cam (khối lượng). Viết nguyên chuỗi để Tailwind quét được.
 const TONES = {
@@ -40,11 +42,11 @@ const TONES = {
 function StatCard({ label, value, testId, error, icon, tone, className = '' }: { label: string; value: number | null; testId: string; error?: string; icon: IconName; tone: keyof typeof TONES; className?: string }) {
   const t = TONES[tone]
   return (
-    <div className={`flex items-center gap-3 rounded-card border border-stone-200 bg-gradient-to-br ${t.card} to-white p-4 shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-md ${className}`} data-testid={testId} title={error || undefined}>
-      <span aria-hidden="true" className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl shadow-sm ${t.box}`}><Icon name={icon} size={22} /></span>
-      <div className="min-w-0">
-        <p className="text-2xl font-bold leading-tight tabular-nums text-gray-900 sm:text-3xl">{value === null ? '—' : formatNumber(value)}</p>
-        <p className="text-sm text-muted">{label}</p>
+    <div className={`flex min-w-0 items-center gap-2 rounded-card border border-stone-200 bg-gradient-to-br ${t.card} to-white px-2 py-1.5 shadow-sm sm:px-3 ${className}`} data-testid={testId} title={error || undefined}>
+      <span aria-hidden="true" className={`hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg shadow-sm sm:flex ${t.box}`}><Icon name={icon} size={18} /></span>
+      <div className="min-w-0 lg:flex lg:items-baseline lg:gap-2">
+        <p className="text-lg font-bold leading-tight tabular-nums text-gray-900 sm:text-xl">{value === null ? '—' : formatNumber(value)}</p>
+        <p className="text-xs leading-tight text-muted">{label}</p>
       </div>
     </div>
   )
@@ -54,6 +56,8 @@ export default function PlansPage() {
   const lookups = useLookups()
   const toast = useToast()
   const stats = useMonthStats()
+  const { profile } = useProfile()
+  const canEdit = (r: PlanRow) => canEditRow(profile, r.created_by, r.created_at)
   const list = useListPage<PlanRow>(CFG, fetchPlans)
   const { p, update, reload } = list
   const searchRef = useRef<HTMLInputElement>(null)
@@ -69,10 +73,11 @@ export default function PlansPage() {
   async function confirmDelete() {
     if (!deleting) return
     setDeleting({ ...deleting, busy: true })
-    const { error } = await supabase.from('transport_plans').delete().eq('id', deleting.plan.id)
+    const { data, error } = await supabase.from('transport_plans').delete().eq('id', deleting.plan.id).select('id')
     const tk = deleting.plan.tk_number
     setDeleting(null)
     if (error) return toast.error(errorMessage(error))
+    if (!data?.length) return toast.error(`Bạn không có quyền xóa phiếu ${tk}. ${EDIT_DENIED_HINT}.`) // RLS chặn: 0 dòng bị xóa
     toast.success(`Đã xóa phiếu ${tk}`)
     void reload()
     void stats.reload()
@@ -82,7 +87,7 @@ export default function PlansPage() {
     {
       key: 'tk', header: 'Số phiếu TK', sort: 'tk_number', nowrap: true,
       render: (r) => (
-        <button type="button" onClick={() => setModal({ plan: r })} title={`Sửa phiếu ${r.tk_number}`} data-testid={`open-${r.tk_number}`}
+        <button type="button" onClick={() => setModal({ plan: r })} title={canEdit(r) ? `Sửa phiếu ${r.tk_number}` : `Xem phiếu ${r.tk_number}`} data-testid={`open-${r.tk_number}`}
           className="rounded font-bold text-primary underline-offset-2 transition-colors duration-150 hover:text-primary-dark hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{r.tk_number}</button>
       ),
     },
@@ -98,11 +103,12 @@ export default function PlansPage() {
       key: 'actions', header: 'Thao tác', nowrap: true,
       render: (r) => (
         <span className="inline-flex gap-0.5">
-          <IconButton icon="edit" label={`Sửa phiếu ${r.tk_number}`} onClick={() => setModal({ plan: r })} data-testid={`edit-${r.tk_number}`} />
+          <IconButton icon="edit" label={canEdit(r) ? `Sửa phiếu ${r.tk_number}` : `Xem phiếu ${r.tk_number} (${EDIT_DENIED_HINT})`} onClick={() => setModal({ plan: r })} data-testid={`edit-${r.tk_number}`} />
           <Link to={`/in-thong-ke?tk=${encodeURIComponent(r.tk_number)}`} className={iconButtonClass()} aria-label={`In phiếu ${r.tk_number}`} title={`In phiếu ${r.tk_number}`} data-testid={`print-${r.tk_number}`}>
             <Icon name="print" size={18} />
           </Link>
-          <IconButton icon="trash" tone="danger" label={`Xóa phiếu ${r.tk_number}`} onClick={() => setDeleting({ plan: r, busy: false })} data-testid={`delete-${r.tk_number}`} />
+          <IconButton icon="trash" tone="danger" label={canEdit(r) ? `Xóa phiếu ${r.tk_number}` : `Không xóa được: ${EDIT_DENIED_HINT}`} disabled={!canEdit(r)}
+            className="disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent" onClick={() => setDeleting({ plan: r, busy: false })} data-testid={`delete-${r.tk_number}`} />
         </span>
       ),
     },
@@ -111,19 +117,19 @@ export default function PlansPage() {
   const activeCount = countActiveFilters(p)
   const filtered = activeCount > 0
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-3 md:min-h-0 md:flex-1">
       <PageHeader title="Phiếu thống kê" description="Lập và tra cứu phiếu thống kê vận chuyển">
         <PanelToggle controls="plans-stats" open={statsOpen} onToggle={toggleStats} openLabel="Ẩn số liệu" closedLabel="Hiện số liệu" testId="toggle-stats" />
         <PanelToggle controls="plans-filters" open={filtersOpen} onToggle={toggleFilters} openLabel="Ẩn bộ lọc" closedLabel="Hiện bộ lọc" badge={activeCount} badgeLabel="Bộ lọc" testId="toggle-filters" />
         {!filtersOpen && filtered && <Button size="sm" icon="close" onClick={list.clearFilters} aria-label="Xóa lọc" title="Xóa lọc" data-testid="clear-filters-hidden"><span className="hidden sm:inline">Xóa lọc</span></Button>}
-        <Button variant="primary" icon="plus" onClick={openNew} title="Thêm phiếu (phím N)" data-testid="add-plan">Thêm phiếu</Button>
+        <Button variant="primary" size="sm" icon="plus" onClick={openNew} title="Thêm phiếu (phím N)" data-testid="add-plan">Thêm phiếu</Button>
       </PageHeader>
 
       <Collapsible id="plans-stats" open={statsOpen} testId="stats-panel">
-      <div role="group" aria-label="Số liệu tháng này" className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+      <div role="group" aria-label="Số liệu tháng này" className="grid grid-cols-3 gap-2">
         <StatCard label="Phiếu tháng này" value={stats.plans} icon="file" tone="red" testId="stat-plans" />
         <StatCard label="Dòng bảng kiểm tháng này" value={stats.lines} icon="list" tone="blue" testId="stat-lines" />
-        <StatCard label="Tổng khối lượng tháng này (kg)" value={stats.weightKg} error={stats.weightError} icon="scale" tone="amber" className="col-span-2 lg:col-span-1" testId="stat-weight" />
+        <StatCard label="Tổng khối lượng tháng này (kg)" value={stats.weightKg} error={stats.weightError} icon="scale" tone="amber" testId="stat-weight" />
       </div>
       </Collapsible>
 
@@ -134,7 +140,7 @@ export default function PlansPage() {
       </Collapsible>
 
       <DataTable columns={columns} rows={list.rows} rowKey={(r) => r.id} loading={list.loading} refreshing={list.refreshing}
-        error={list.error} onRetry={() => void reload()} sort={p.sort} dir={p.dir} onSort={list.sortBy} testId="plan-table"
+        error={list.error} onRetry={() => void reload()} sort={p.sort} dir={p.dir} onSort={list.sortBy} testId="plan-table" attached={!list.loading && list.hasData}
         empty={filtered ? (
           <EmptyState title="Không có phiếu nào khớp bộ lọc." hint="Thử đổi từ khóa hoặc khoảng ngày.">
             <Button onClick={list.clearFilters}>Xóa bộ lọc</Button>
@@ -144,13 +150,13 @@ export default function PlansPage() {
             <Button variant="primary" icon="plus" onClick={openNew}>Thêm phiếu</Button>
           </EmptyState>
         )} />
-      {!list.loading && !list.error && list.total > 0 && (
-        <Pagination page={p.page} size={p.size} total={list.total} disabled={list.refreshing}
+      {!list.loading && !list.error && list.hasData && (
+        <Pagination page={p.page} size={p.size} total={list.total} rowCount={list.rows.length} disabled={list.refreshing}
           onPage={(page) => update({ page })} onSize={(size) => update({ size })} />
       )}
 
       {modal && (
-        <PlanFormModal plan={modal.plan} lookups={lookups} onClose={() => setModal(null)}
+        <PlanFormModal plan={modal.plan} readOnly={!!modal.plan && !canEdit(modal.plan)} lookups={lookups} onClose={() => setModal(null)}
           onSaved={(msg) => { setModal(null); toast.success(msg); void reload(); void stats.reload() }} />
       )}
       {deleting && (
@@ -161,3 +167,4 @@ export default function PlansPage() {
     </div>
   )
 }
+

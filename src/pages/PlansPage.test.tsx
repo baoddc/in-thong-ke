@@ -12,11 +12,12 @@ const plan = {
 const calls: unknown[][] = [] // mọi lời gọi lên transport_plans, theo thứ tự
 let total: number | undefined
 let weightRpc: { data: unknown; error: { message: string } | null } = { data: 246043357.56, error: null }
+let deleteData: unknown[] | null = null // kết quả `.delete().select()`; null: trả về phiếu (xóa được)
 
 // Mọi chuỗi gọi trả về chính nó và có thể await; ghi lại lời gọi để kiểm tra truy vấn phân trang.
 vi.mock('../lib/supabase', () => {
   const chain = (t: string, data: unknown) => {
-    const c: Record<string, unknown> = { then: (r: (v: unknown) => unknown) => r({ data, error: null, count: t === 'transport_plans' ? total : undefined }) }
+    const c: Record<string, unknown> = { then: (r: (v: unknown) => unknown) => r({ data: t === 'transport_plans' && deleteData && calls.some((x) => x[0] === 'delete') ? deleteData : data, error: null, count: t === 'transport_plans' ? total : undefined }) }
     for (const m of ['select', 'order', 'limit', 'range', 'eq', 'in', 'or', 'gte', 'lte', 'lt', 'delete']) c[m] = (...a: unknown[]) => { if (t === 'transport_plans') calls.push([m, ...a]); return c }
     return c
   }
@@ -28,6 +29,9 @@ vi.mock('../lib/supabase', () => {
   }
 })
 
+const me = { id: 'a1', role: 'admin', is_active: true }
+vi.mock('../lib/useProfile', () => ({ useProfile: () => ({ profile: me, isAdmin: me.role === 'admin', loading: false, error: '' }) }))
+
 import PlansPage from './PlansPage'
 import { ToastProvider } from '../components/ui/Toast'
 
@@ -37,7 +41,7 @@ beforeAll(() => {
   // jsdom chưa có showModal/close → polyfill tối thiểu
   HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) { this.setAttribute('open', '') }
 })
-beforeEach(() => { localStorage.clear(); calls.length = 0; total = undefined; weightRpc = { data: 246043357.56, error: null } })
+beforeEach(() => { Object.assign(me, { id: 'a1', role: 'admin' }); Object.assign(plan, { created_by: null, created_at: '2026-10-01T00:00:00Z' }); deleteData = null; localStorage.clear(); calls.length = 0; total = undefined; weightRpc = { data: 246043357.56, error: null } })
 afterEach(cleanup)
 
 describe('PlansPage', () => {
@@ -77,9 +81,11 @@ describe('PlansPage', () => {
     renderPage()
     await screen.findByTestId('plan-table')
     expect(calls).toContainEqual(['range', 0, 49])
-    expect(calls).toContainEqual(['select', expect.any(String), { count: 'estimated' }]) // D-012: không đếm chính xác
+    expect(calls).toContainEqual(['select', expect.any(String), { count: 'exact' }]) // đếm chính xác (index-only, nhanh)
     expect(calls).toContainEqual(['order', 'id', { ascending: false }]) // khóa phụ cùng chiều (created_at giảm dần)
-    expect(screen.getByTestId('page-info').textContent).toBe('Trang 1/330 · khoảng 16.500 dòng')
+    expect((screen.getByTestId('page-input') as HTMLInputElement).value).toBe('1')
+    expect(screen.getByTestId('page-count').textContent).toBe('/330')
+    expect(screen.getByTestId('page-total').textContent).toBe('· tổng 16.500 dòng')
     expect((screen.getByTestId('page-prev') as HTMLButtonElement).disabled).toBe(true)
   })
 
@@ -91,7 +97,22 @@ describe('PlansPage', () => {
     expect(calls).toContainEqual(['gte', 'export_date', '2026-10-01'])
     expect(calls).toContainEqual(['range', 25, 49])
     expect((screen.getByTestId('search') as HTMLInputElement).value).toBe('TK01')
-    expect(screen.getByTestId('page-info').textContent).toBe('Trang 2/12 · tổng 300 dòng')
+    expect((screen.getByTestId('page-input') as HTMLInputElement).value).toBe('2')
+    expect(screen.getByTestId('page-count').textContent).toBe('/12')
+    expect(screen.getByTestId('page-total').textContent).toBe('· tổng 300 dòng')
+  })
+
+  it('gõ số trang rồi Enter để nhảy trang; số quá lớn bị chặn ở trang cuối', async () => {
+    total = 300
+    renderPage()
+    await screen.findByTestId('plan-table')
+    const input = screen.getByTestId('page-input')
+    await userEvent.clear(input)
+    await userEvent.type(input, '3{Enter}')
+    await waitFor(() => expect(calls).toContainEqual(['range', 100, 149]))
+    await userEvent.clear(input)
+    await userEvent.type(input, '999{Enter}')
+    await waitFor(() => expect(calls).toContainEqual(['range', 250, 299]))
   })
 
   it('bấm Trang sau tải trang kế (range 50..99)', async () => {
@@ -100,6 +121,13 @@ describe('PlansPage', () => {
     await screen.findByTestId('plan-table')
     await userEvent.click(screen.getByTestId('page-next'))
     await waitFor(() => expect(calls).toContainEqual(['range', 50, 99]))
+  })
+
+  it('không có số đếm → chỉ "Trang x", nút Sau tắt vì trang chưa đầy', async () => {
+    renderPage() // total undefined
+    await screen.findByTestId('plan-table')
+    expect(screen.queryByTestId('page-total')).toBeNull()
+    expect((screen.getByTestId('page-next') as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('Xóa mở hộp thoại xác nhận riêng (không dùng window.confirm), Hủy thì không xóa', async () => {
@@ -119,6 +147,32 @@ describe('PlansPage', () => {
     await userEvent.click(screen.getByTestId('confirm-ok'))
     expect((await screen.findByTestId('toast-success')).textContent).toContain('Đã xóa phiếu TK0001')
     expect(calls).toContainEqual(['delete'])
+  })
+
+  it('user không phải người tạo: Xóa bị khóa kèm giải thích, Sửa mở modal chỉ xem (không có nút Lưu)', async () => {
+    Object.assign(me, { id: 'u2', role: 'user' })
+    Object.assign(plan, { created_by: 'u1', created_at: new Date().toISOString() })
+    renderPage()
+    const del = (await screen.findByTestId('delete-TK0001')) as HTMLButtonElement
+    expect(del.disabled).toBe(true)
+    expect(del.title).toContain('Chỉ người tạo trong 24 giờ hoặc admin được sửa')
+    await userEvent.click(screen.getByTestId('edit-TK0001'))
+    expect(screen.getByText('Xem phiếu TK0001', { selector: 'h2' })).not.toBeNull()
+    expect(screen.queryByTestId('plan-save')).toBeNull()
+    expect(screen.getByTestId('order-no').matches(':disabled')).toBe(true) // fieldset disabled
+  })
+
+  it('người tạo trong 24 giờ được xóa; server xóa 0 dòng (RLS) → toast lỗi quyền, không báo thành công', async () => {
+    Object.assign(me, { id: 'u1', role: 'user' })
+    Object.assign(plan, { created_by: 'u1', created_at: new Date().toISOString() })
+    deleteData = []
+    renderPage()
+    const del = (await screen.findByTestId('delete-TK0001')) as HTMLButtonElement
+    expect(del.disabled).toBe(false)
+    await userEvent.click(del)
+    await userEvent.click(screen.getByTestId('confirm-ok'))
+    expect((await screen.findByTestId('toast-error')).textContent).toContain('Bạn không có quyền xóa phiếu TK0001')
+    expect(screen.queryByTestId('toast-success')).toBeNull()
   })
 
   it('thẻ Tổng khối lượng tháng này hiện số kiểu VN', async () => {

@@ -54,4 +54,11 @@ Danh mục do người dùng tự nhập trên trang "Danh mục" (D-005).
 | T-029 | FE chịu tải: tìm số TK/danh mục lớn phía server, count estimated, lọc theo id thay ilike qua join | frontend | Xong — 183 test qua; tìm server chưa bỏ dấu → thêm unaccent vào T-031 |
 | T-022 | Nâng cấp trải nghiệm giao diện + hiển thị dòng không có TK | frontend | Xong — 85 test qua; chưa xem bằng mắt. Thẻ tổng kg chờ T-023 |
 | T-023 | Migration 000006: pg_trgm + index tìm kiếm, RPC `inspection_weight_total` (+ thẻ tổng kg FE) | backend + frontend | Code xong, Lead đã review; chờ người dùng chạy 000006 |
+| T-033 | Thu gọn PageHeader, thẻ số liệu, thanh lọc; chữ gốc 14px, bảng 13px | frontend | Xong — 183 test qua; bảng 16–17 dòng ở 1100×700. Chưa push (git push bị auto-mode chặn — người dùng tự push) |
+| T-034 | Quản lý người dùng & phân quyền (D-013): profiles, RLS người tạo + 24h, Edge Function `admin-users` | backend | Code xong, Lead đã review. Edge Function `admin-users` ĐÃ DEPLOY (v1, verify_jwt on). Chờ người dùng chạy 000009, rồi tạo tài khoản Lê Thái Bão → Lead chạy `supabase/import/assign_owner_bao_lt.sql` |
+| T-035 | Trang Quản lý người dùng, đăng nhập bằng tên đăng nhập, ẩn nút theo quyền | frontend | Đang làm |
+| T-034b | Gán người tạo dữ liệu đã nạp | Lead | Xong: 21.958 phiếu + 41.799 dòng BK → bao.lt; email `.local` dùng được (bao.lt đã đăng nhập) |
+| T-036 | Vai trò root (D-014): migration 000010 + Edge Function | backend | Function v3 ĐÃ DEPLOY (nhận admin+root). Chờ người dùng chạy 000010 |
+| T-037 | Vai trò root ở giao diện + thanh phân trang mảnh (giữ đủ thông tin) | frontend | Xong — 217 test qua. Chưa push |
+| T-038 | Đếm dòng chính xác (bỏ `estimated` — sai khi có RLS, phân trang hụt trang cuối) | frontend | Xong — 221 test qua; chưa thử với DB thật. Chưa push |
 | T-005 | Dọn số xe/tài xế không hợp lệ | Lead | Chờ người dùng chạy SQL — `execute_sql` có xóa/sửa bị từ chối 2 lần |
