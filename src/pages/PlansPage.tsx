@@ -22,8 +22,10 @@ import Icon, { type IconName } from '../components/ui/Icon'
 import PageHeader from '../components/ui/PageHeader'
 import Pagination from '../components/ui/Pagination'
 import { useToast } from '../components/ui/Toast'
-import { EDIT_DENIED_HINT, canEditRow } from '../lib/auth'
+import { EDIT_DENIED_HINT, canEditRow, canUpdateRow } from '../lib/auth'
+import { untilLabel, useMyEditRequests } from '../lib/useEditRequests'
 import { useProfile } from '../lib/useProfile'
+import { EditRequestModal } from '../components/EditRequestModals'
 import { fromRpcPlan, sortedMaterials, type PlanRpcRow } from '../lib/plans'
 import type { PlanRow } from '../types/plan'
 
@@ -40,6 +42,8 @@ const fetchPlans: Fetcher = async (p) => {
   ])
   return { data: rows.error ? null : ((rows.data ?? []) as PlanRpcRow[]).map(fromRpcPlan), error: rows.error, count: cnt.error ? null : cnt.count }
 }
+
+const PILL = 'inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold'
 
 // Màu theo thẻ: đỏ (thương hiệu), xanh dương (thông tin), cam (khối lượng). Viết nguyên chuỗi để Tailwind quét được.
 const TONES = {
@@ -66,12 +70,15 @@ export default function PlansPage() {
   const toast = useToast()
   const stats = useMonthStats()
   const { profile } = useProfile()
-  const canEdit = (r: PlanRow) => canEditRow(profile, r.created_by, r.created_at)
+  const mine = useMyEditRequests(profile?.id)
+  const canEdit = (r: PlanRow) => canEditRow(profile, r.created_by, r.created_at) // xóa
+  const canUpdate = (r: PlanRow) => canUpdateRow(profile, r.created_by, r.created_at, mine.unlockOf(r.id)) // sửa (D-019: mở khóa theo yêu cầu đã duyệt)
   const list = useListPage<PlanRow>(CFG, fetchPlans, 'transport_plans')
   const { p, update, reload } = list
   const searchRef = useRef<HTMLInputElement>(null)
   const [modal, setModal] = useState<{ plan: PlanRow | null } | null>(null) // null: đóng
   const [deleting, setDeleting] = useState<{ plan: PlanRow; busy: boolean } | null>(null)
+  const [requesting, setRequesting] = useState<PlanRow | null>(null)
 
   const openNew = useCallback(() => setModal({ plan: null }), [])
   const [statsOpen,, toggleStats] = usePersistentToggle('plans:stats')
@@ -96,7 +103,7 @@ export default function PlansPage() {
     {
       key: 'tk', header: 'Số phiếu TK', sort: 'tk_number', nowrap: true,
       render: (r) => (
-        <button type="button" onClick={() => setModal({ plan: r })} title={canEdit(r) ? `Sửa phiếu ${r.tk_number}` : `Xem phiếu ${r.tk_number}`} data-testid={`open-${r.tk_number}`}
+        <button type="button" onClick={() => setModal({ plan: r })} title={canUpdate(r) ? `Sửa phiếu ${r.tk_number}` : `Xem phiếu ${r.tk_number}`} data-testid={`open-${r.tk_number}`}
           className="rounded font-bold text-primary underline-offset-2 transition-colors duration-150 hover:text-primary-dark hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{r.tk_number}</button>
       ),
     },
@@ -111,16 +118,24 @@ export default function PlansPage() {
     { key: 'audit', header: 'Người tạo / sửa', nowrap: true, render: (r) => <AuditCell row={r} /> },
     {
       key: 'actions', header: 'Thao tác', nowrap: true,
-      render: (r) => (
-        <span className="inline-flex gap-0.5">
-          <IconButton icon="edit" label={canEdit(r) ? `Sửa phiếu ${r.tk_number}` : `Xem phiếu ${r.tk_number} (${EDIT_DENIED_HINT})`} onClick={() => setModal({ plan: r })} data-testid={`edit-${r.tk_number}`} />
-          <Link to={`/in-thong-ke?tk=${encodeURIComponent(r.tk_number)}`} className={iconButtonClass()} aria-label={`In phiếu ${r.tk_number}`} title={`In phiếu ${r.tk_number}`} data-testid={`print-${r.tk_number}`}>
-            <Icon name="print" size={18} />
-          </Link>
-          <IconButton icon="trash" tone="danger" label={canEdit(r) ? `Xóa phiếu ${r.tk_number}` : `Không xóa được: ${EDIT_DENIED_HINT}`} disabled={!canEdit(r)}
-            className="disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent" onClick={() => setDeleting({ plan: r, busy: false })} data-testid={`delete-${r.tk_number}`} />
-        </span>
-      ),
+      render: (r) => {
+        const state = canEdit(r) || r.created_by !== profile?.id ? undefined : mine.unlocks.get(r.id) // chỉ người tạo đã quá 24 giờ mới có trạng thái yêu cầu
+        const until = mine.unlockOf(r.id)
+        const showUntil = !!state && !!until
+        return (
+          <span className="inline-flex items-center gap-0.5">
+            {profile && r.created_by === profile.id && !canEdit(r) && !state && <Button size="sm" onClick={() => setRequesting(r)} data-testid={`request-edit-${r.tk_number}`}>Yêu cầu sửa</Button>}
+            {state?.status === 'pending' && <span className={`${PILL} bg-orange-100 text-orange-900`} title="Yêu cầu sửa đang chờ admin duyệt" data-testid={`edit-pending-${r.tk_number}`}>Chờ duyệt</span>}
+            {showUntil && <span className={`${PILL} bg-green-100 text-green-900`} title={`Được sửa đến ${untilLabel(until)}`} data-testid={`edit-unlocked-${r.tk_number}`}>Sửa đến {untilLabel(until)}</span>}
+            <IconButton icon="edit" label={canUpdate(r) ? `Sửa phiếu ${r.tk_number}${showUntil ? ` (được sửa đến ${untilLabel(until)})` : ''}` : `Xem phiếu ${r.tk_number} (${EDIT_DENIED_HINT})`} onClick={() => setModal({ plan: r })} data-testid={`edit-${r.tk_number}`} />
+            <Link to={`/in-thong-ke?tk=${encodeURIComponent(r.tk_number)}`} className={iconButtonClass()} aria-label={`In phiếu ${r.tk_number}`} title={`In phiếu ${r.tk_number}`} data-testid={`print-${r.tk_number}`}>
+              <Icon name="print" size={18} />
+            </Link>
+            <IconButton icon="trash" tone="danger" label={canEdit(r) ? `Xóa phiếu ${r.tk_number}` : `Không xóa được: ${EDIT_DENIED_HINT}`} disabled={!canEdit(r)}
+              className="disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent" onClick={() => setDeleting({ plan: r, busy: false })} data-testid={`delete-${r.tk_number}`} />
+          </span>
+        )
+      },
     },
   ]
 
@@ -166,8 +181,12 @@ export default function PlansPage() {
       )}
 
       {modal && (
-        <PlanFormModal plan={modal.plan} readOnly={!!modal.plan && !canEdit(modal.plan)} lookups={lookups} onClose={() => setModal(null)}
+        <PlanFormModal plan={modal.plan} readOnly={!!modal.plan && !canUpdate(modal.plan)} lookups={lookups} onClose={() => setModal(null)}
           onSaved={(msg) => { setModal(null); toast.success(msg); void reload(); void stats.reload() }} />
+      )}
+      {requesting && (
+        <EditRequestModal planId={requesting.id} label={`phiếu ${requesting.tk_number}`} onClose={() => setRequesting(null)}
+          onDone={() => { setRequesting(null); toast.success(`Đã gửi yêu cầu sửa phiếu ${requesting.tk_number}. Chờ admin duyệt.`); void mine.reload() }} />
       )}
       {deleting && (
         <ConfirmDialog title={`Xóa phiếu ${deleting.plan.tk_number}?`} busy={deleting.busy}

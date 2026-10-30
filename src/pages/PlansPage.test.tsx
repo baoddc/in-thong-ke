@@ -16,6 +16,8 @@ const offsets = () => rpcCalls.map((a) => a.p_offset)
 let total: number | undefined
 let weightRpc: { data: unknown; error: { message: string } | null } = { data: 246043357.56, error: null }
 let deleteData: unknown[] | null = null // kết quả `.delete().select()`; null: trả về phiếu (xóa được)
+let editRows: unknown[] = [] // edit_requests của mình (D-019)
+const editRpc: [string, unknown][] = [] // lời gọi request_plan_edit
 
 // Mọi chuỗi gọi trả về chính nó và có thể await; ghi lại lời gọi để kiểm tra truy vấn phân trang.
 vi.mock('../lib/supabase', () => {
@@ -26,8 +28,8 @@ vi.mock('../lib/supabase', () => {
   }
   return {
     supabase: {
-      from: (t: string) => chain(t, t === 'transport_plans' ? [plan] : []),
-      rpc: (fn: string, args: Record<string, unknown>) => fn === 'list_transport_plans' ? (rpcCalls.push(args), Promise.resolve({ data: [plan], error: null })) : fn === 'inspection_weight_total' ? Promise.resolve(weightRpc) : Promise.resolve({ data: fn === 'next_tk_number' ? 'TK0002' : { tk_number: 'TK0002' }, error: null }),
+      from: (t: string) => chain(t, t === 'transport_plans' ? [plan] : t === 'edit_requests' ? editRows : []),
+      rpc: (fn: string, args: Record<string, unknown>) => fn === 'request_plan_edit' ? (editRpc.push([fn, args]), Promise.resolve({ data: 7, error: null })) : fn === 'list_transport_plans' ? (rpcCalls.push(args), Promise.resolve({ data: [plan], error: null })) : fn === 'inspection_weight_total' ? Promise.resolve(weightRpc) : Promise.resolve({ data: fn === 'reserve_tk_number' ? 'TK0002' : { tk_number: 'TK0002' }, error: null }),
     },
   }
 })
@@ -45,7 +47,7 @@ beforeAll(() => {
   // jsdom chưa có showModal/close → polyfill tối thiểu
   HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) { this.setAttribute('open', '') }
 })
-beforeEach(() => { Object.assign(me, { id: 'a1', role: 'admin' }); Object.assign(plan, { created_by: null, created_at: '2026-10-01T00:00:00Z' }); deleteData = null; localStorage.clear(); clearListCache(); calls.length = 0; rpcCalls.length = 0; total = undefined; weightRpc = { data: 246043357.56, error: null } })
+beforeEach(() => { editRows = []; editRpc.length = 0; Object.assign(me, { id: 'a1', role: 'admin' }); Object.assign(plan, { created_by: null, created_at: '2026-10-01T00:00:00Z' }); deleteData = null; localStorage.clear(); clearListCache(); calls.length = 0; rpcCalls.length = 0; total = undefined; weightRpc = { data: 246043357.56, error: null } })
 afterEach(cleanup)
 
 describe('PlansPage', () => {
@@ -212,6 +214,65 @@ describe('PlansPage', () => {
     await userEvent.click(screen.getByTestId('confirm-ok'))
     expect((await screen.findByTestId('toast-error')).textContent).toContain('Bạn không có quyền xóa phiếu TK0001')
     expect(screen.queryByTestId('toast-success')).toBeNull()
+  })
+
+  describe('Yêu cầu sửa phiếu quá 24 giờ (D-019)', () => {
+    const old = () => { Object.assign(me, { id: 'u1', role: 'user' }); Object.assign(plan, { created_by: 'u1', created_at: '2026-10-01T00:00:00Z' }) }
+
+    it('phiếu của mình quá 24 giờ: hiện "Yêu cầu sửa"; nhập lý do → gọi request_plan_edit; để trống thì báo lỗi cạnh ô', async () => {
+      old()
+      renderPage()
+      await userEvent.click(await screen.findByTestId('request-edit-TK0001'))
+      await userEvent.click(screen.getByTestId('edit-request-modal-submit'))
+      expect(screen.getByRole('alert').textContent).toContain('Vui lòng nhập lý do')
+      expect(editRpc).toEqual([])
+      await userEvent.type(screen.getByTestId('edit-request-modal-text'), 'Sai số xe')
+      await userEvent.click(screen.getByTestId('edit-request-modal-submit'))
+      expect((await screen.findByTestId('toast-success')).textContent).toContain('Đã gửi yêu cầu sửa phiếu TK0001')
+      expect(editRpc).toEqual([['request_plan_edit', { p_plan_id: 1, p_reason: 'Sai số xe' }]])
+      expect(screen.queryByTestId('edit-request-modal')).toBeNull()
+    })
+
+    it('phiếu của người khác hoặc admin: không có nút "Yêu cầu sửa"', async () => {
+      old()
+      Object.assign(plan, { created_by: 'u2' })
+      renderPage()
+      await screen.findByTestId('edit-TK0001')
+      expect(screen.queryByTestId('request-edit-TK0001')).toBeNull()
+      cleanup()
+      Object.assign(me, { id: 'a1', role: 'admin' })
+      renderPage()
+      await screen.findByTestId('edit-TK0001')
+      expect(screen.queryByTestId('request-edit-TK0001')).toBeNull()
+    })
+
+    it('đang chờ duyệt: badge "Chờ duyệt", không cho gửi lại', async () => {
+      old()
+      editRows = [{ plan_id: 1, status: 'pending', unlock_until: null }]
+      renderPage()
+      expect((await screen.findByTestId('edit-pending-TK0001')).textContent).toBe('Chờ duyệt')
+      expect(screen.queryByTestId('request-edit-TK0001')).toBeNull()
+    })
+
+    it('đã duyệt còn hạn: Sửa mở được form (có nút Lưu), hiện hạn, Xóa vẫn tắt', async () => {
+      old()
+      editRows = [{ plan_id: 1, status: 'approved', unlock_until: new Date(Date.now() + 3_600_000).toISOString() }]
+      renderPage()
+      expect((await screen.findByTestId('edit-unlocked-TK0001')).textContent).toContain('Sửa đến')
+      expect((screen.getByTestId('delete-TK0001') as HTMLButtonElement).disabled).toBe(true)
+      expect(screen.queryByTestId('request-edit-TK0001')).toBeNull()
+      await userEvent.click(screen.getByTestId('edit-TK0001'))
+      expect(screen.getByText('Sửa phiếu TK0001', { selector: 'h2' })).not.toBeNull()
+      expect(screen.getByTestId('plan-save')).not.toBeNull()
+    })
+
+    it('đã duyệt nhưng hết hạn: coi như chưa mở, cho yêu cầu lại', async () => {
+      old()
+      editRows = [{ plan_id: 1, status: 'approved', unlock_until: new Date(Date.now() - 1000).toISOString() }]
+      renderPage()
+      expect(await screen.findByTestId('request-edit-TK0001')).not.toBeNull()
+      expect(screen.queryByTestId('edit-unlocked-TK0001')).toBeNull()
+    })
   })
 
   it('thẻ Tổng khối lượng tháng này hiện số kiểu VN', async () => {

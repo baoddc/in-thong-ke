@@ -7,7 +7,7 @@ import { Field, Input, Select } from './ui/Input'
 import { useToast } from './ui/Toast'
 
 /** Khung hộp thoại gọn: chỉ mount khi mở (đóng = unmount, form tự reset). */
-function Shell({ title, onClose, busy, testId, footer, children, onSubmit }: {
+export function Shell({ title, onClose, busy, testId, footer, children, onSubmit }: {
   title: string; onClose: () => void; busy?: boolean; testId: string; footer: ReactNode; children: ReactNode; onSubmit?: (e: FormEvent) => void
 }) {
   const ref = useRef<HTMLDialogElement>(null)

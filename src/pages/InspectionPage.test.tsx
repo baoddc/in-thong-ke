@@ -15,23 +15,28 @@ const oldRow = { id: 9, plan_id: null, tk_number: null, transport_order_no: null
 // Mọi chuỗi gọi trả về chính nó và có thể await; lookup_items và inspection_details_view có dữ liệu.
 // calls: lệnh gọi lên inspection_details_view (dữ liệu); countCalls: lên inspection_details (đếm riêng)
 // rpcCalls: tham số mỗi lần gọi RPC list_inspection_details (dữ liệu trang, D-017)
-const h = vi.hoisted(() => ({ rpcCalls: [] as Record<string, unknown>[], countCalls: [] as unknown[][], count: 41800 as number | null, countError: null as { message: string } | null, rows: [] as unknown[] }))
+const h = vi.hoisted(() => ({ rpcCalls: [] as Record<string, unknown>[], countCalls: [] as unknown[][], count: 41800 as number | null, countError: null as { message: string } | null, rows: [] as unknown[], editRows: [] as unknown[], editRpc: [] as [string, unknown][] }))
 vi.mock('../lib/supabase', () => {
   const chain = (data: unknown, t: string) => {
     const c: Record<string, unknown> = { then: (r: (v: unknown) => unknown) => r(t === 'inspection_details' ? { data: null, error: h.countError, count: h.countError ? null : h.count } : { data, error: null }) }
     for (const m of ['select', 'order', 'limit', 'range', 'eq', 'in', 'or', 'gte', 'lte']) c[m] = (...a: unknown[]) => { if (t === 'inspection_details') h.countCalls.push([m, ...a]); return c }
+    c.maybeSingle = () => Promise.resolve({ data: null, error: null }) // tra phiếu của dòng khi mở modal
     return c
   }
   return {
     supabase: {
-      from: (t: string) => chain(t === 'lookup_items' ? lookups : [], t),
+      from: (t: string) => chain(t === 'lookup_items' ? lookups : t === 'edit_requests' ? h.editRows : [], t),
       rpc: (fn: string, args: Record<string, unknown>) => {
+        if (fn === 'request_detail_edit') { h.editRpc.push([fn, args]); return Promise.resolve({ data: 5, error: null }) }
         if (fn === 'list_inspection_details') { h.rpcCalls.push(args); return Promise.resolve({ data: h.rows.length ? h.rows : [oldRow], error: null }) }
         return Promise.resolve({ data: fn === 'get_lookup_items' ? [{ id: 77, kind: 'construction', name: 'Nhà máy Bình Dương', code: 'CT77' }] : [], error: null })
       },
     },
   }
 })
+
+const me = vi.hoisted(() => ({ id: 'u1', role: 'user', is_active: true }))
+vi.mock('../lib/useProfile', () => ({ useProfile: () => ({ profile: me, isAdmin: false, loading: false, error: '' }) }))
 
 import InspectionPage from './InspectionPage'
 import { ToastProvider } from '../components/ui/Toast'
@@ -42,7 +47,7 @@ const renderPage = (url = '/') => render(<MemoryRouter initialEntries={[url]}><T
 beforeAll(() => {
   HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) { this.setAttribute('open', '') }
 })
-beforeEach(() => { localStorage.clear(); clearListCache(); h.rpcCalls.length = 0; h.countCalls.length = 0; h.count = 41800; h.countError = null; h.rows = [] })
+beforeEach(() => { localStorage.clear(); clearListCache(); h.rpcCalls.length = 0; h.countCalls.length = 0; h.count = 41800; h.countError = null; h.rows = []; h.editRows = []; h.editRpc.length = 0 })
 afterEach(cleanup)
 
 describe('InspectionPage', () => {
@@ -131,4 +136,52 @@ describe('InspectionPage', () => {
     expect(screen.getByTestId('filters-panel').dataset.state).toBe('open')
     await userEvent.click(screen.getByTestId('toggle-filters'))
     expect(localStorage.getItem('tk:ui:inspection:filters')).toBe('0')
+  })
+
+  describe('Yêu cầu sửa dòng quá 24 giờ (D-020)', () => {
+    const own = () => { h.rows = [{ ...oldRow, plan_id: 3, tk_number: 'TK0003', warehouse_slip_no: 'PXK1', created_by: 'u1', created_at: '2026-10-01T00:00:00Z' }] }
+    const future = () => new Date(Date.now() + 3_600_000).toISOString()
+
+    it('dòng của mình quá 24 giờ: nút "Yêu cầu sửa" → nhập lý do → gọi request_detail_edit; Xóa tắt', async () => {
+      own()
+      renderPage()
+      expect((await screen.findByTestId('delete-9') as HTMLButtonElement).disabled).toBe(true)
+      await userEvent.click(screen.getByTestId('request-edit-9'))
+      await userEvent.click(screen.getByTestId('edit-request-modal-submit'))
+      expect(screen.getByRole('alert').textContent).toContain('Vui lòng nhập lý do')
+      await userEvent.type(screen.getByTestId('edit-request-modal-text'), 'Sai số lượng')
+      await userEvent.click(screen.getByTestId('edit-request-modal-submit'))
+      expect((await screen.findByTestId('toast-success')).textContent).toContain('Đã gửi yêu cầu sửa dòng bảng kiểm TK0003 / PXK PXK1')
+      expect(h.editRpc).toEqual([['request_detail_edit', { p_detail_id: 9, p_reason: 'Sai số lượng' }]])
+    })
+
+    it('đang chờ duyệt: badge "Chờ duyệt", không cho gửi lại', async () => {
+      own()
+      h.editRows = [{ plan_id: null, detail_id: 9, status: 'pending', unlock_until: null }]
+      renderPage()
+      expect((await screen.findByTestId('edit-pending-9')).textContent).toBe('Chờ duyệt')
+      expect(screen.queryByTestId('request-edit-9')).toBeNull()
+    })
+
+    it.each([
+      ['theo dòng', { plan_id: null, detail_id: 9 }],
+      ['theo phiếu của dòng', { plan_id: 3, detail_id: null }],
+    ])('đã duyệt %s: hiện "Sửa đến", Sửa mở form có nút Lưu, Xóa vẫn tắt', async (_name, ids) => {
+      own()
+      h.editRows = [{ ...ids, status: 'approved', unlock_until: future() }]
+      renderPage()
+      expect((await screen.findByTestId('edit-unlocked-9')).textContent).toContain('Sửa đến')
+      expect((screen.getByTestId('delete-9') as HTMLButtonElement).disabled).toBe(true)
+      expect(screen.queryByTestId('request-edit-9')).toBeNull()
+      await userEvent.click(screen.getByTestId('edit-9'))
+      expect(screen.getByTestId('inspection-save')).not.toBeNull()
+    })
+
+    it('dòng của người khác: không có nút "Yêu cầu sửa"', async () => {
+      own()
+      Object.assign(h.rows[0] as object, { created_by: 'x' })
+      renderPage()
+      await screen.findByTestId('row-9')
+      expect(screen.queryByTestId('request-edit-9')).toBeNull()
+    })
   })})

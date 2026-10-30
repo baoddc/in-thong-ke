@@ -6,7 +6,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('./pages/UsersPage', () => ({ default: () => <p>Trang người dùng</p> }))
 const invoke = vi.fn()
-vi.mock('./lib/supabase', () => ({ supabase: { auth: { signOut: vi.fn() }, functions: { invoke: (n: string, o: unknown) => invoke(n, o) } } }))
+vi.mock('./lib/supabase', () => ({
+  supabase: {
+    channel: () => { const ch = { on: () => ch, subscribe: () => ch }; return ch }, removeChannel: vi.fn(), // Realtime yêu cầu sửa (D-020)
+    auth: { signOut: vi.fn() }, functions: { invoke: (n: string, o: unknown) => invoke(n, o) },
+    from: () => ({ select: () => ({ eq: () => Promise.resolve({ count: 4, error: null }) }) }), // số yêu cầu sửa chờ duyệt (D-019)
+  },
+}))
 const prof: { value: { id: string; full_name: string; role: 'root' | 'admin' | 'user'; is_active: boolean } | null } = { value: null }
 vi.mock('./lib/useProfile', () => ({
   ProfileProvider: ({ children }: { children: unknown }) => children,
@@ -14,13 +20,14 @@ vi.mock('./lib/useProfile', () => ({
 }))
 
 import { AccessGate, AdminOnly, Layout } from './App'
+import { ToastProvider } from './components/ui/Toast'
 
 afterEach(() => { cleanup(); localStorage.clear(); prof.value = null })
 
 const renderLayout = () => render(
-  <MemoryRouter>
+  <MemoryRouter><ToastProvider>
     <Routes><Route element={<Layout email="a@b.vn" />}><Route path="/" element={<p>Nội dung</p>} /></Route></Routes>
-  </MemoryRouter>,
+  </ToastProvider></MemoryRouter>,
 )
 
 describe('Quyền người dùng (D-013)', () => {
@@ -57,6 +64,8 @@ describe('Quyền người dùng (D-013)', () => {
     renderLayout()
     expect((await screen.findByTestId('pending-badge')).textContent).toBe('2')
     expect(invoke).toHaveBeenCalledWith('admin-users', { body: { action: 'list' } })
+    expect((await screen.findByTestId('edit-pending-badge')).textContent).toBe('4') // mục "Yêu cầu sửa" (D-019)
+    expect(screen.getByRole('link', { name: /Yêu cầu sửa/ }).getAttribute('href')).toBe('/yeu-cau-sua')
     cleanup()
     invoke.mockClear()
     prof.value = { id: 'u', full_name: 'A', role: 'user', is_active: true }
@@ -89,12 +98,12 @@ describe('Quyền người dùng (D-013)', () => {
   })
 
   it('không có hồ sơ hoặc bị khóa → thông báo + nút Đăng xuất, không hiện menu', () => {
-    render(<MemoryRouter><AccessGate email="x@y.vn" /></MemoryRouter>)
+    render(<MemoryRouter><ToastProvider><AccessGate email="x@y.vn" /></ToastProvider></MemoryRouter>)
     expect(screen.getByTestId('access-denied')).toBeTruthy()
     expect(screen.getByTestId('access-signout').textContent).toBe('Đăng xuất')
     cleanup()
     prof.value = { id: 'u', full_name: 'A', role: 'user', is_active: false }
-    render(<MemoryRouter><AccessGate email="x@y.vn" /></MemoryRouter>)
+    render(<MemoryRouter><ToastProvider><AccessGate email="x@y.vn" /></ToastProvider></MemoryRouter>)
     expect(screen.getByTestId('access-denied').textContent).toContain('đã bị khóa')
     expect(screen.queryByRole('navigation')).toBeNull()
   })

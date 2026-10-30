@@ -21,7 +21,9 @@ import { Field, Select } from '../components/ui/Input'
 import PageHeader from '../components/ui/PageHeader'
 import Pagination from '../components/ui/Pagination'
 import { useToast } from '../components/ui/Toast'
-import { EDIT_DENIED_HINT, canEditRow } from '../lib/auth'
+import { EDIT_DENIED_HINT, canEditRow, canUpdateRow } from '../lib/auth'
+import { targetLabel, untilLabel, useMyEditRequests } from '../lib/useEditRequests'
+import { EditRequestModal } from '../components/EditRequestModals'
 import { useProfile } from '../lib/useProfile'
 import type { InspectionRow } from '../types/inspection'
 
@@ -44,17 +46,21 @@ const fetchRows: Fetcher = async (p) => {
 }
 
 const DASH = '—' // dòng cũ chưa có số phiếu TK
+const PILL = 'inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold'
 
 export default function InspectionPage() {
   const lookups = useLookups()
   const toast = useToast()
   const { profile } = useProfile()
-  const canEdit = (r: InspectionRow) => canEditRow(profile, r.created_by, r.created_at)
+  const mine = useMyEditRequests(profile?.id)
+  const canEdit = (r: InspectionRow) => canEditRow(profile, r.created_by, r.created_at) // xóa
+  const canUpdate = (r: InspectionRow) => canUpdateRow(profile, r.created_by, r.created_at, mine.unlockOfLine(r.id, r.plan_id)) // sửa (D-019/D-020: mở theo dòng hoặc theo phiếu)
   const list = useListPage<InspectionRow>(CFG, fetchRows, 'inspection_details')
   const { p, update, reload } = list
   const searchRef = useRef<HTMLInputElement>(null)
   const [modal, setModal] = useState<{ row: InspectionRow | null } | null>(null) // null: đóng
   const [deleting, setDeleting] = useState<{ row: InspectionRow; busy: boolean } | null>(null)
+  const [requesting, setRequesting] = useState<InspectionRow | null>(null)
 
   const openNew = useCallback(() => setModal({ row: null }), [])
   const [filtersOpen, setFiltersOpen, toggleFilters] = usePersistentToggle('inspection:filters', () => !isSmallScreen())
@@ -77,7 +83,7 @@ export default function InspectionPage() {
     {
       key: 'tk', header: 'Số phiếu TK', sort: 'tk_number', nowrap: true,
       render: (r) => (r.tk_number ? (
-        <button type="button" onClick={() => setModal({ row: r })} title={canEdit(r) ? 'Sửa dòng này' : 'Xem dòng này'} data-testid={`open-${r.id}`}
+        <button type="button" onClick={() => setModal({ row: r })} title={canUpdate(r) ? 'Sửa dòng này' : 'Xem dòng này'} data-testid={`open-${r.id}`}
           className="rounded font-bold text-primary underline-offset-2 transition-colors duration-150 hover:text-primary-dark hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{r.tk_number}</button>
       ) : DASH),
     },
@@ -101,13 +107,21 @@ export default function InspectionPage() {
     { key: 'audit', header: 'Người tạo / sửa', nowrap: true, render: (r) => <AuditCell row={r} /> },
     {
       key: 'actions', header: 'Thao tác', nowrap: true,
-      render: (r) => (
-        <span className="inline-flex gap-0.5">
-          <IconButton icon="edit" label={canEdit(r) ? 'Sửa dòng' : `Xem dòng (${EDIT_DENIED_HINT})`} onClick={() => setModal({ row: r })} data-testid={`edit-${r.id}`} />
-          <IconButton icon="trash" tone="danger" label={canEdit(r) ? 'Xóa dòng' : `Không xóa được: ${EDIT_DENIED_HINT}`} disabled={!canEdit(r)}
-            className="disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent" onClick={() => setDeleting({ row: r, busy: false })} data-testid={`delete-${r.id}`} />
-        </span>
-      ),
+      render: (r) => {
+        const own = !!profile && r.created_by === profile.id && !canEdit(r) // người tạo, đã quá 24 giờ
+        const until = own ? mine.unlockOfLine(r.id, r.plan_id) : null
+        const pending = own && !until && mine.detailUnlocks.get(r.id)?.status === 'pending'
+        return (
+          <span className="inline-flex items-center gap-0.5">
+            {own && !until && !pending && <Button size="sm" onClick={() => setRequesting(r)} data-testid={`request-edit-${r.id}`}>Yêu cầu sửa</Button>}
+            {pending && <span className={`${PILL} bg-orange-100 text-orange-900`} title="Yêu cầu sửa đang chờ admin duyệt" data-testid={`edit-pending-${r.id}`}>Chờ duyệt</span>}
+            {until && <span className={`${PILL} bg-green-100 text-green-900`} title={`Được sửa đến ${untilLabel(until)}`} data-testid={`edit-unlocked-${r.id}`}>Sửa đến {untilLabel(until)}</span>}
+            <IconButton icon="edit" label={canUpdate(r) ? `Sửa dòng${until ? ` (được sửa đến ${untilLabel(until)})` : ''}` : `Xem dòng (${EDIT_DENIED_HINT})`} onClick={() => setModal({ row: r })} data-testid={`edit-${r.id}`} />
+            <IconButton icon="trash" tone="danger" label={canEdit(r) ? 'Xóa dòng' : `Không xóa được: ${EDIT_DENIED_HINT}`} disabled={!canEdit(r)}
+              className="disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent" onClick={() => setDeleting({ row: r, busy: false })} data-testid={`delete-${r.id}`} />
+          </span>
+        )
+      },
     },
   ]
 
@@ -169,8 +183,12 @@ export default function InspectionPage() {
       )}
 
       {modal && (
-        <InspectionFormModal row={modal.row} readOnly={!!modal.row && !canEdit(modal.row)} lookups={lookups} onClose={() => setModal(null)}
+        <InspectionFormModal row={modal.row} readOnly={!!modal.row && !canUpdate(modal.row)} lookups={lookups} onClose={() => setModal(null)}
           onSaved={(msg, keepOpen) => { if (!keepOpen) setModal(null); toast.success(msg); void reload() }} />
+      )}
+      {requesting && (
+        <EditRequestModal detailId={requesting.id} label={targetLabel({ detail: requesting })} onClose={() => setRequesting(null)}
+          onDone={() => { setRequesting(null); toast.success(`Đã gửi yêu cầu sửa ${targetLabel({ detail: requesting })}. Chờ admin duyệt.`); void mine.reload() }} />
       )}
       {deleting && (
         <ConfirmDialog title="Xóa dòng bảng kiểm?" busy={deleting.busy}

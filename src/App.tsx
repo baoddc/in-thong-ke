@@ -6,6 +6,9 @@ import Icon, { type IconName } from './components/ui/Icon'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import { usePendingCount } from './lib/useAdminUsers'
+import { useEditPendingCount } from './lib/useEditRequests'
+import { useEditRequestNotices } from './lib/useEditRequestNotices'
+import EditRequestsPage from './pages/EditRequestsPage'
 import PlansPage from './pages/PlansPage'
 import InspectionPage from './pages/InspectionPage'
 import PrintPage from './pages/PrintPage'
@@ -28,7 +31,10 @@ const ITEMS: NavItem[] = [
   { to: '/luong-cong-viec', label: 'Luồng công việc', icon: 'workflow' },
   { to: '/gioi-thieu', label: 'Giới thiệu', icon: 'info' },
 ]
-const ADMIN_ITEMS: NavItem[] = [{ to: '/nguoi-dung', label: 'Quản lý người dùng', icon: 'user' }] // D-013/D-014: admin và root
+const ADMIN_ITEMS: NavItem[] = [ // D-013/D-014: admin và root
+  { to: '/yeu-cau-sua', label: 'Yêu cầu sửa', icon: 'edit' }, // D-019
+  { to: '/nguoi-dung', label: 'Quản lý người dùng', icon: 'user' },
+]
 
 function readCollapsed() {
   try { return localStorage.getItem(STORAGE_KEY) === '1' } catch { return false }
@@ -47,6 +53,8 @@ export function Layout({ email }: { email: string }) {
   const { profile, isAdmin } = useProfile()
   const displayName = profile?.full_name || email
   const pending = usePendingCount(isAdmin) // D-015: badge số tài khoản chờ duyệt
+  const pendingEdits = useEditPendingCount(isAdmin) // D-019: badge số yêu cầu sửa chờ duyệt
+  useEditRequestNotices(profile?.id, isAdmin) // D-020: thông báo tức thì khi yêu cầu sửa được duyệt/từ chối
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [drawer, setDrawer] = useState(false) // ngăn kéo trên màn hình nhỏ
   const showLabels = !collapsed || drawer // ngăn kéo luôn hiện nhãn
@@ -95,14 +103,16 @@ export function Layout({ email }: { email: string }) {
         </div>
         <nav aria-label="Menu chính" className="mt-1 flex flex-col gap-1">
           {(isAdmin ? [...ITEMS, ...ADMIN_ITEMS] : ITEMS).map((i) => {
-            const count = i.to === '/nguoi-dung' ? pending : 0
+            const isEdits = i.to === '/yeu-cau-sua'
+            const count = isEdits ? pendingEdits : i.to === '/nguoi-dung' ? pending : 0
+            const what = isEdits ? 'yêu cầu' : 'tài khoản'
             return (
               <NavLink key={i.to} to={i.to} end={i.end} className={link} onClick={() => setDrawer(false)}
                 {...hint(count ? `${i.label} (${count} chờ duyệt)` : i.label)}>
                 <Icon name={i.icon} />
                 {showLabels && <span>{i.label}</span>}
                 {count > 0 && (
-                  <span className={showLabels ? 'ml-auto rounded-full bg-orange-500 px-2 text-xs font-bold text-white' : 'sr-only'} data-testid="pending-badge" title={`${count} tài khoản chờ duyệt`}>{count}</span>
+                  <span className={showLabels ? 'ml-auto rounded-full bg-orange-500 px-2 text-xs font-bold text-white' : 'sr-only'} data-testid={isEdits ? 'edit-pending-badge' : 'pending-badge'} title={`${count} ${what} chờ duyệt`}>{count}</span>
                 )}
               </NavLink>
             )
@@ -176,6 +186,7 @@ export default function App() {
         <Route path="/danh-muc" element={<LookupsPage />} />
         <Route path="/luong-cong-viec" element={<WorkflowPage />} />
         <Route path="/gioi-thieu" element={<AboutPage />} />
+        <Route path="/yeu-cau-sua" element={<AdminOnly><EditRequestsPage /></AdminOnly>} />
         <Route path="/nguoi-dung" element={<AdminOnly><UsersPage /></AdminOnly>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

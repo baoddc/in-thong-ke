@@ -8,13 +8,17 @@ const h = vi.hoisted(() => ({
   calls: [] as { fn: string; args: Record<string, unknown> }[],
   result: { data: { tk_number: 'TK2026/10-005' } as unknown, error: null as null | { code?: string; message: string } },
   delay: 0,
+  hold: [] as string[], // reserve_tk_number / release_tk_reservation đã gọi
   lookups: [] as { id: number; kind: string; name: string }[],
 }))
 
 vi.mock('../lib/supabase', () => ({
   supabase: {
     rpc: (fn: string, args: Record<string, unknown>) => {
-      if (fn === 'next_tk_number') return Promise.resolve({ data: 'TK2026/10-005', error: null })
+      if (fn === 'reserve_tk_number' || fn === 'release_tk_reservation') {
+        h.hold.push(fn)
+        return Promise.resolve({ data: fn === 'reserve_tk_number' ? 'TK2026/10-005' : null, error: null })
+      }
       if (fn === 'search_lookup_items') { // danh mục lớn (xe, tài xế) tìm phía server
         const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
         return Promise.resolve({ data: h.lookups.filter((i) => i.kind === args.p_kind && norm(i.name).includes(norm(String(args.p_q)))), error: null })
@@ -37,7 +41,7 @@ h.lookups = items
 const lookups = { byKind: (k: string) => items.filter((i) => i.kind === k), loading: false, error: '', reload: async () => {} }
 
 beforeAll(() => { HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) { this.setAttribute('open', '') } })
-beforeEach(() => { h.calls.length = 0; h.result = { data: { tk_number: 'TK2026/10-005' }, error: null }; h.delay = 0 })
+beforeEach(() => { h.calls.length = 0; h.hold.length = 0; h.result = { data: { tk_number: 'TK2026/10-005' }, error: null }; h.delay = 0 })
 afterEach(cleanup)
 
 const mount = (plan: PlanRow | null = null, onSaved = vi.fn()) => {
@@ -122,6 +126,98 @@ describe('PlanFormModal - tạo phiếu', () => {
     expect((await screen.findByTestId('plan-error')).textContent).toContain('Đã hết số phiếu thống kê')
     expect(onSaved).not.toHaveBeenCalled()
     expect((screen.getByTestId('plan-save') as HTMLButtonElement).disabled).toBe(false)
+  })
+})
+
+describe('PlanFormModal - giữ chỗ số TK (D-018)', () => {
+  it('mở thêm mới → gọi reserve và hiện số + chú thích; đóng không lưu → release', async () => {
+    const { unmount } = render(<PlanFormModal plan={null} lookups={lookups} onClose={() => {}} onSaved={() => {}} />)
+    await waitFor(() => expect((screen.getByTestId('tk-number') as HTMLInputElement).value).toBe('TK2026/10-005'))
+    expect(h.hold).toEqual(['reserve_tk_number'])
+    expect(screen.getByTestId('tk-hold-note').textContent).toContain('Số này được giữ cho bạn trong 5 phút')
+    unmount()
+    expect(h.hold).toEqual(['reserve_tk_number', 'release_tk_reservation'])
+  })
+
+  it('lưu xong → không gọi release thừa; số trùng số đã giữ → toast thường', async () => {
+    const user = userEvent.setup()
+    const { unmount } = render(<PlanFormModal plan={null} lookups={lookups} onClose={() => {}} onSaved={vi.fn()} />)
+    await waitFor(() => expect((screen.getByTestId('tk-number') as HTMLInputElement).value).toBe('TK2026/10-005'))
+    await user.click(screen.getByTestId('plan-save'))
+    await waitFor(() => expect(h.calls).toHaveLength(1))
+    unmount()
+    expect(h.hold).toEqual(['reserve_tk_number'])
+  })
+
+  it('số lưu khác số đã giữ → báo đã đổi số', async () => {
+    h.result = { data: { tk_number: 'TK2026/10-009' }, error: null }
+    const user = userEvent.setup()
+    const onSaved = vi.fn()
+    render(<PlanFormModal plan={null} lookups={lookups} onClose={() => {}} onSaved={onSaved} />)
+    await waitFor(() => expect((screen.getByTestId('tk-number') as HTMLInputElement).value).toBe('TK2026/10-005'))
+    await user.click(screen.getByTestId('plan-save'))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith('Số phiếu đã đổi thành TK2026/10-009 do hết thời gian giữ'))
+  })
+
+  it('lưu lỗi → vẫn giữ chỗ (chưa release)', async () => {
+    h.result = { data: null, error: { code: 'P0001', message: 'lỗi' } }
+    const user = userEvent.setup()
+    render(<PlanFormModal plan={null} lookups={lookups} onClose={() => {}} onSaved={vi.fn()} />)
+    await waitFor(() => expect((screen.getByTestId('tk-number') as HTMLInputElement).value).toBe('TK2026/10-005'))
+    await user.click(screen.getByTestId('plan-save'))
+    await screen.findByTestId('plan-error')
+    expect(h.hold).toEqual(['reserve_tk_number'])
+  })
+
+  it('chế độ Sửa không gọi reserve/release', () => {
+    const plan = { id: 7, tk_number: 'TK2026/10-001', export_date: '2026-10-28', material_exporters: [] } as unknown as PlanRow
+    const { unmount } = render(<PlanFormModal plan={plan} lookups={lookups} onClose={() => {}} onSaved={vi.fn()} />)
+    unmount()
+    expect(h.hold).toEqual([])
+  })
+
+  describe('đồng hồ đếm ngược', () => {
+    beforeEach(() => { vi.useFakeTimers() })
+    afterEach(() => { vi.useRealTimers() })
+    const timer = () => screen.getByTestId('tk-hold-timer').textContent
+    const advance = (s: number) => act(async () => { await vi.advanceTimersByTimeAsync(s * 1000) })
+
+    it('đếm 05:00 → hết giờ hiện thông báo, không gia hạn khi không thao tác', async () => {
+      render(<PlanFormModal plan={null} lookups={lookups} onClose={() => {}} onSaved={vi.fn()} />)
+      await advance(0)
+      expect(timer()).toBe('05:00')
+      await advance(65)
+      expect(timer()).toBe('03:55')
+      await advance(235)
+      expect(screen.getByTestId('tk-hold-expired').textContent).toContain('Đã hết thời gian giữ số, số sẽ được cấp lại khi lưu')
+      expect(h.hold.filter((f) => f === 'reserve_tk_number')).toHaveLength(1)
+      expect((screen.getByTestId('plan-save') as HTMLButtonElement).disabled).toBe(false)
+    })
+
+    it('còn ≤ 1 phút và người dùng đang thao tác → gọi reserve lại, đồng hồ về 05:00', async () => {
+      render(<PlanFormModal plan={null} lookups={lookups} onClose={() => {}} onSaved={vi.fn()} />)
+      await advance(0)
+      await advance(250)
+      fireEvent.input(screen.getByTestId('order-no'), { target: { value: '1' } })
+      await advance(2)
+      expect(h.hold.filter((f) => f === 'reserve_tk_number')).toHaveLength(2)
+      expect(timer()).toMatch(/^0(5:00|4:59)$/) // mốc đếm lại từ lúc gia hạn
+    })
+  })
+})
+
+describe('PlanFormModal - bố cục', () => {
+  const plan = { id: 7, tk_number: 'TK2026/10-001', export_date: '2026-10-28', material_exporters: [] } as unknown as PlanRow
+  it.each([false, true])('vùng cuộn là div (min-h-0 + overflow-y-auto), fieldset không cuộn, header/chân shrink-0 (readOnly=%s)', (readOnly) => {
+    render(<PlanFormModal plan={plan} readOnly={readOnly} lookups={lookups} onClose={() => {}} onSaved={vi.fn()} />)
+    const body = screen.getByTestId('modal-body')
+    expect(body.className).toMatch(/\bmin-h-0\b/)
+    expect(body.className).toMatch(/\boverflow-y-auto\b/)
+    const fieldset = body.querySelector('fieldset')!
+    expect(fieldset.className).toMatch(/\bmin-w-0\b/)
+    expect(fieldset.className).not.toMatch(/overflow/)
+    expect(screen.getByTestId('plan-cancel').parentElement!.className).toMatch(/\bshrink-0\b/)
+    expect(screen.getByTestId('plan-close').parentElement!.className).toMatch(/\bshrink-0\b/)
   })
 })
 

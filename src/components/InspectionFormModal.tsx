@@ -184,14 +184,16 @@ export default function InspectionFormModal({ row, readOnly = false, lookups, on
       onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.defaultPrevented) { e.preventDefault(); formRef.current?.requestSubmit() } }}
       className="p-0 w-full max-w-[640px] max-h-[90vh] overflow-hidden rounded-2xl border-t-4 border-primary-brand shadow-2xl backdrop:bg-slate-900/60 open:flex flex-col max-sm:max-w-none max-sm:max-h-none max-sm:w-screen max-sm:h-dvh max-sm:rounded-none">
       <form ref={formRef} onSubmit={(e) => { e.preventDefault(); void save(false) }} className="flex flex-col min-h-0 flex-1" data-testid="inspection-form">
-        <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3">
+        <div className="flex shrink-0 items-center justify-between border-b border-stone-200 px-4 py-3">
           <div className="min-w-0">
             <h2 id="inspection-modal-title" className="text-lg font-bold">{row ? (readOnly ? 'Xem dòng bảng kiểm' : 'Sửa dòng bảng kiểm') : 'Thêm dòng bảng kiểm'}</h2>
             {row && <AuditNote row={row} />}
           </div>
           <button type="button" onClick={requestClose} aria-label="Đóng" className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-600 transition-colors duration-150 hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="inspection-close"><Icon name="close" /></button>
         </div>
-        <fieldset disabled={readOnly} className="min-w-0 flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3">
+        {/* Vùng cuộn là <div>, không phải <fieldset>: fieldset có min-size riêng nên không co trong flex → đè lên chân modal. */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3" data-testid="modal-body">
+        <fieldset disabled={readOnly} className="m-0 min-w-0 space-y-3 border-0 p-0">
           {readOnly && <p className="rounded-card border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900" data-testid="readonly-note">{EDIT_DENIED_HINT}. Bạn chỉ xem được dòng này.</p>}
           <label className={labelClass}>Ngày xuất
             <DateInput value={form.exportDate} onChange={(v) => set('exportDate', v)} data-testid="export-date" />
@@ -232,7 +234,8 @@ export default function InspectionFormModal({ row, readOnly = false, lookups, on
           </label>
           {(error || lookupError) && <p role="alert" className="rounded-card border border-danger-line bg-danger-soft p-2 text-danger" data-testid="inspection-error">{error || lookupError}</p>}
         </fieldset>
-        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-stone-200 bg-surface px-4 py-3">
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-stone-200 bg-surface px-4 py-3">
           {saved && <p role="status" className="mr-auto text-sm font-medium text-success" data-testid="inspection-saved">{saved}</p>}
           <Button onClick={requestClose} data-testid="inspection-cancel">{readOnly ? 'Đóng' : 'Hủy'}</Button>
           {!row && (

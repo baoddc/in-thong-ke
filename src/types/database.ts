@@ -152,6 +152,115 @@ export type Database = {
           },
         ]
       }
+      tk_reservations: {
+        Row: {
+          id: number
+          tk_year: number
+          tk_month: number
+          tk_seq: number
+          user_id: string
+          expires_at: string
+          created_at: string
+          updated_at: string
+        }
+        // Chỉ select/delete dòng của mình; thêm/sửa qua RPC reserve_tk_number.
+        Insert: {
+          id?: number
+          tk_year: number
+          tk_month: number
+          tk_seq: number
+          user_id?: string
+          expires_at: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          tk_year?: number
+          tk_month?: number
+          tk_seq?: number
+          user_id?: string
+          expires_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      // D-019: chỉ select (của mình / admin); ghi qua RPC request_plan_edit, decide_edit_request.
+      edit_requests: {
+        Row: {
+          id: number
+          plan_id: number | null
+          detail_id: number | null
+          requested_by: string
+          reason: string
+          status: 'pending' | 'approved' | 'rejected'
+          decided_by: string | null
+          decided_at: string | null
+          decision_note: string | null
+          unlock_until: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: never
+          plan_id?: number | null // đúng một trong plan_id / detail_id (check edit_requests_target_check)
+          detail_id?: number | null
+          requested_by: string
+          reason: string
+          status?: 'pending' | 'approved' | 'rejected'
+          decided_by?: string | null
+          decided_at?: string | null
+          decision_note?: string | null
+          unlock_until?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: never
+          plan_id?: number | null
+          detail_id?: number | null
+          requested_by?: string
+          reason?: string
+          status?: 'pending' | 'approved' | 'rejected'
+          decided_by?: string | null
+          decided_at?: string | null
+          decision_note?: string | null
+          unlock_until?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'edit_requests_plan_id_fkey'
+            columns: ['plan_id']
+            isOneToOne: false
+            referencedRelation: 'transport_plans'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'edit_requests_detail_id_fkey'
+            columns: ['detail_id']
+            isOneToOne: false
+            referencedRelation: 'inspection_details'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'edit_requests_requested_by_fkey'
+            columns: ['requested_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'edit_requests_decided_by_fkey'
+            columns: ['decided_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       inspection_details: {
         Row: {
           id: number
@@ -536,6 +645,22 @@ export type Database = {
         Args: { p_plan_id: number }
         Returns: boolean
       }
+      can_update_row: {
+        Args: { p_created_by: string | null; p_created_at: string | null; p_plan_id: number | null; p_detail_id?: number | null }
+        Returns: boolean
+      }
+      request_plan_edit: {
+        Args: { p_plan_id: number; p_reason: string }
+        Returns: number
+      }
+      request_detail_edit: {
+        Args: { p_detail_id: number; p_reason: string }
+        Returns: number
+      }
+      decide_edit_request: {
+        Args: { p_id: number; p_approve: boolean; p_note?: string | null }
+        Returns: undefined
+      }
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
@@ -573,6 +698,14 @@ export type Database = {
       next_tk_number: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      reserve_tk_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      release_tk_reservation: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       tk_format: {
         Args: { p_year: number; p_month: number; p_seq: number }

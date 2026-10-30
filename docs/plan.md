@@ -67,4 +67,12 @@ Danh mục do người dùng tự nhập trên trang "Danh mục" (D-005).
 | T-042 | FE dùng RPC mới + cache + prefetch trang kế + debounce 200 ms | frontend | Xong — 247 test qua; chưa push |
 | T-043 | Trang Giới thiệu `/gioi-thieu` (10 chức năng nổi bật) | frontend | Xong — 248 test, build qua (Lead chạy lại). Chưa push |
 | T-044 | Review commit e38713b (ponytail-review) | Lead | Ship. Đề xuất: (1) prefetch bỏ đếm lại; (2) sanitizeTerm bỏ `_`; (3) makeUsername FE tách từ như server — chưa làm, chờ người dùng chọn |
+| T-045 | Giữ chỗ số TK 5 phút (D-018): bảng tk_reservations, reserve/release RPC, create dùng số đã giữ — migration 000013 | backend | Xong (đã chạy 30/10) |
+| T-046 | Modal Xem/Sửa không cuộn được (fieldset) + FE dùng giữ chỗ số TK (đếm ngược, trả số khi đóng) | frontend | Xong — chờ người dùng thử trên trình duyệt |
+| T-047 | Yêu cầu sửa phiếu quá 24h (D-019): bảng edit_requests, RPC request/decide, RLS update mở khóa 24h — migration 000014 | backend | Xong — chờ người dùng chạy 000014 |
+| T-048 | FE yêu cầu sửa (D-019): nút "Yêu cầu sửa", trạng thái chờ/mở khóa, trang duyệt cho admin/root | frontend | Xong (000014 đã chạy) |
+| T-049 | Yêu cầu sửa dòng bảng kiểm (detail_id) + Realtime cho edit_requests (D-020) — migration 000015 | backend | Xong (000015 đã chạy) |
+| T-050 | FE: Yêu cầu sửa ở Bảng kiểm + thông báo tức thì khi duyệt/từ chối, admin thấy yêu cầu mới ngay (D-020) | frontend | Xong — chờ thử trên trình duyệt |
+| T-051 | Thiết kế lại trang Giới thiệu (hero, bắt đầu nhanh, cụm tính năng, bảng quyền, phím tắt) | frontend | Xong |
+| T-052 | Vẽ lại sơ đồ Luồng công việc bằng Archify → public/luong-cong-viec.html (nguồn: .archify/workflow-luong-cong-viec-20261030-142358/candidate.json) | Lead | Xong |
 | T-005 | Dọn số xe/tài xế không hợp lệ | Lead | Chờ người dùng chạy SQL — `execute_sql` có xóa/sửa bị từ chối 2 lần |

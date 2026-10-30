@@ -79,3 +79,18 @@ export function canEditRow(
   const age = Number(now) - Date.parse(createdAt)
   return age < EDIT_WINDOW_HOURS * 3_600_000
 }
+
+/**
+ * Được SỬA không (D-019): như canEditRow, hoặc người tạo có yêu cầu sửa đã được duyệt còn hạn (`unlockUntil` > now).
+ * Xóa vẫn dùng canEditRow. Chỉ để ẩn/khóa nút — quyền thật do RLS quyết định.
+ */
+export function canUpdateRow(
+  profile: Pick<Profile, 'id' | 'role' | 'is_active'> | null | undefined,
+  createdBy: string | null | undefined,
+  createdAt: string | null | undefined,
+  unlockUntil: string | null | undefined,
+  now: number | Date = Date.now(),
+): boolean {
+  if (canEditRow(profile, createdBy, createdAt, now)) return true
+  return !!profile?.is_active && !!createdBy && createdBy === profile.id && !!unlockUntil && Date.parse(unlockUntil) > Number(now)
+}

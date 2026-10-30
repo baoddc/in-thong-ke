@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canEditRow, makeUsername, toLoginEmail, userActions, type Profile } from './auth'
+import { canEditRow, canUpdateRow, makeUsername, toLoginEmail, userActions, type Profile } from './auth'
 
 const H = 3_600_000
 const now = Date.parse('2026-10-30T12:00:00Z')
@@ -27,6 +27,27 @@ describe('canEditRow', () => {
   })
   it('nhận cả Date cho now', () => {
     expect(canEditRow(user, 'u1', at(2), new Date(now))).toBe(true)
+  })
+})
+
+describe('canUpdateRow (D-019)', () => {
+  const until = (hoursLeft: number) => new Date(now + hoursLeft * H).toISOString()
+  it('quá 24 giờ: người tạo được sửa khi mở khóa còn hạn; hết hạn, không mở khóa → không', () => {
+    expect(canUpdateRow(user, 'u1', at(30), until(5), now)).toBe(true)
+    expect(canUpdateRow(user, 'u1', at(30), until(-1), now)).toBe(false)
+    expect(canUpdateRow(user, 'u1', at(30), until(0), now)).toBe(false)
+    expect(canUpdateRow(user, 'u1', at(30), null, now)).toBe(false)
+    expect(canUpdateRow(user, 'u1', at(30), 'không phải ngày', now)).toBe(false)
+  })
+  it('mở khóa chỉ có hiệu lực với người tạo đang hoạt động', () => {
+    expect(canUpdateRow(user, 'u2', at(30), until(5), now)).toBe(false)
+    expect(canUpdateRow(user, null, at(30), until(5), now)).toBe(false)
+    expect(canUpdateRow({ ...user, is_active: false }, 'u1', at(30), until(5), now)).toBe(false)
+    expect(canUpdateRow(null, 'u1', at(30), until(5), now)).toBe(false)
+  })
+  it('vẫn theo canEditRow: trong 24 giờ không cần mở khóa; admin luôn được', () => {
+    expect(canUpdateRow(user, 'u1', at(1), null, now)).toBe(true)
+    expect(canUpdateRow(admin, 'u1', at(1000), undefined, now)).toBe(true)
   })
 })
 

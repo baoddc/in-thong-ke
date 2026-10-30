@@ -103,6 +103,17 @@ describe('InspectionFormModal - dòng cũ chưa có số TK', () => {
     expect(inserted).toHaveLength(0)
   })
 
+  it.each([false, true])('bố cục: vùng cuộn là div (min-h-0 + overflow-y-auto), fieldset không phải vùng cuộn, chân không co (readOnly=%s)', (readOnly) => {
+    render(<InspectionFormModal row={oldRow} readOnly={readOnly} lookups={lookups} onClose={() => {}} onSaved={() => {}} />)
+    const body = screen.getByTestId('modal-body')
+    expect(body.className).toMatch(/\bmin-h-0\b/)
+    expect(body.className).toMatch(/\boverflow-y-auto\b/)
+    const fieldset = body.querySelector('fieldset')!
+    expect(fieldset.className).toMatch(/\bmin-w-0\b/)
+    expect(fieldset.className).not.toMatch(/overflow/)
+    expect(screen.getByTestId('inspection-cancel').parentElement!.className).toMatch(/\bshrink-0\b/)
+  })
+
   it('Ctrl+Enter trong hộp thoại = Lưu', async () => {
     render(<InspectionFormModal row={oldRow} lookups={lookups} onClose={() => {}} onSaved={() => {}} />)
     await userEvent.click(screen.getByTestId('slip-no'))

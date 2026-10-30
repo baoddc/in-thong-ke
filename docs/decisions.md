@@ -88,5 +88,22 @@ Mục tiêu: `inspection_details` ≥ 1–5 triệu dòng, `transport_plans` ≥
 - Đếm vẫn trên bảng gốc (đã nhanh).
 - FE: cache kết quả theo (bảng, bộ lọc, trang); hiện ngay dữ liệu cũ khi quay lại; prefetch trang kế; debounce ô tìm 200 ms.
 
+## D-018 — Giữ chỗ số phiếu TK 5 phút (30/10/2026) — bổ sung D-004
+- Mở form "Thêm phiếu" → RPC `reserve_tk_number()` giữ cho **người gọi** số nhỏ nhất còn trống trong tháng (không trùng phiếu đã có và không trùng chỗ đang giữ của người khác), hết hạn **5 phút**. Gọi lại khi còn hạn → trả đúng số đang giữ (gia hạn thêm 5 phút).
+- Lưu (`create_transport_plan`): dùng số người gọi đang giữ nếu còn hạn; hết hạn/không có → cấp số mới (vẫn né chỗ người khác giữ), FE báo "số phiếu đã đổi thành …". Lưu xong xóa chỗ giữ.
+- Hủy/đóng form → `release_tk_reservation()` trả số ngay. Chỗ giữ quá hạn coi như không tồn tại (không cần job dọn; dọn khi gọi các RPC trên).
+- Số khuyết vẫn được lấp (D-004), không bao giờ trùng (unique + khóa advisory như cũ).
+
+## D-019 — Yêu cầu sửa phiếu quá 24 giờ (30/10/2026) — bổ sung D-013
+- Người tạo phiếu đã quá 24 giờ bấm **"Yêu cầu sửa"** + ghi lý do. Mỗi phiếu chỉ một yêu cầu đang chờ cho mỗi người.
+- Admin/root **duyệt** hoặc **từ chối** (ghi chú tùy chọn). Duyệt → người tạo được **sửa** (không xóa) phiếu đó và các dòng bảng kiểm *do chính họ tạo* thuộc phiếu đó trong **24 giờ** kể từ lúc duyệt.
+- Xóa phiếu/dòng quá 24 giờ vẫn chỉ admin/root. Dòng bảng kiểm không gắn phiếu không áp dụng.
+- Kiểm quyền ở DB (RLS policy update), FE chỉ ẩn/hiện nút. Lưu người duyệt + thời điểm để hiển thị.
+
+## D-020 — Yêu cầu sửa dòng bảng kiểm + thông báo tức thì (30/10/2026) — bổ sung D-019
+- Bảng kiểm cũng có "Yêu cầu sửa" cho **từng dòng** (kể cả dòng không gắn phiếu): `edit_requests` có `plan_id` **hoặc** `detail_id` (đúng một). Duyệt dòng → người tạo sửa dòng đó 24 giờ. Duyệt phiếu vẫn mở cả các dòng của mình trong phiếu (D-019).
+- Duyệt/từ chối → người yêu cầu nhận thông báo **ngay** qua Supabase Realtime (`edit_requests` vào publication `supabase_realtime`, RLS vẫn áp dụng), trang tự cập nhật nút Sửa. Admin/root thấy yêu cầu mới ngay (badge + danh sách).
+- Không làm: thông báo cho người đang offline (họ thấy trạng thái khi mở trang), email/push.
+
 ## D-006 — Supabase project
 Project riêng `in-thong-ke` (ref `sybzvaybffgkgiyvevsp`, ap-southeast-1), tạo 29/10/2026.
