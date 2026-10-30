@@ -79,5 +79,6 @@ Danh mục do người dùng tự nhập trên trang "Danh mục" (D-005).
 | T-055 | Dữ liệu thử tải (LOADTEST-*, tk_year ≥ 2100) ~470k dòng bảng kiểm, DB ~472 MB theo dashboard — cần xóa sau khi thử | Lead | Đang thử |
 | T-056 | D-021: list_* security definer + count_* RPC — migration 000016 | backend | Xong (đã chạy; tìm 470k dòng: list 41 ms, đếm 18 ms) |
 | T-057 | D-021: FE đếm bằng count_* RPC thay cho count exact | frontend | Xong |
+| T-058 | D-021 cho ô Số phiếu TK (In thống kê) + tìm danh mục: search_plan_numbers 5,9 s → security definer — migration 000017 | backend | Xong (đã chạy; search_plan_numbers 29 ms, search_lookup_items 89 ms) |
 | T-052 | Vẽ lại sơ đồ Luồng công việc bằng Archify → public/luong-cong-viec.html (nguồn: .archify/workflow-luong-cong-viec-20261030-142358/candidate.json) | Lead | Xong |
 | T-005 | Dọn số xe/tài xế không hợp lệ | Lead | Chờ người dùng chạy SQL — `execute_sql` có xóa/sửa bị từ chối 2 lần |
