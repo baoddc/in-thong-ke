@@ -101,10 +101,10 @@ describe('Quyền người dùng (D-013)', () => {
 })
 
 describe('Layout sidebar', () => {
-  it('có 5 mục theo thứ tự, Luồng công việc sau Danh mục', () => {
+  it('có 6 mục theo thứ tự, Giới thiệu cuối nhóm mục chính (sau Luồng công việc)', () => {
     renderLayout()
     const labels = screen.getByRole('navigation', { name: 'Menu chính' }).textContent
-    expect(labels).toBe('Nhập phiếuBảng kiểmIn thống kêDanh mụcLuồng công việc')
+    expect(labels).toBe('Nhập phiếuBảng kiểmIn thống kêDanh mụcLuồng công việcGiới thiệu')
   })
 
   it('khung đúng bằng màn hình từ md (không cuộn cả trang), vẫn cuộn bình thường trên điện thoại và khi in', () => {
@@ -118,13 +118,13 @@ describe('Layout sidebar', () => {
     expect(root.className).not.toMatch(/(^|\s)(h-dvh|overflow-hidden)(\s|$)/) // không khóa cuộn ở mobile
   })
 
-  it('đủ 5 mục, mỗi mục là liên kết có nhãn đọc được (kể cả mục đang chọn "Nhập phiếu")', () => {
+  it('đủ 6 mục, mỗi mục là liên kết có nhãn đọc được (kể cả mục đang chọn "Nhập phiếu")', () => {
     renderLayout()
     const nav = screen.getByRole('navigation', { name: 'Menu chính' })
     const links = Array.from(nav.querySelectorAll('a'))
-    expect(links.map((a) => a.textContent)).toEqual(['Nhập phiếu', 'Bảng kiểm', 'In thống kê', 'Danh mục', 'Luồng công việc'])
-    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/', '/bang-kiem', '/in-thong-ke', '/danh-muc', '/luong-cong-viec'])
-    for (const name of ['Nhập phiếu', 'Bảng kiểm', 'In thống kê', 'Danh mục', 'Luồng công việc']) expect(screen.getByRole('link', { name })).toBeTruthy()
+    expect(links.map((a) => a.textContent)).toEqual(['Nhập phiếu', 'Bảng kiểm', 'In thống kê', 'Danh mục', 'Luồng công việc', 'Giới thiệu'])
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/', '/bang-kiem', '/in-thong-ke', '/danh-muc', '/luong-cong-viec', '/gioi-thieu'])
+    for (const name of ['Nhập phiếu', 'Bảng kiểm', 'In thống kê', 'Danh mục', 'Luồng công việc', 'Giới thiệu']) expect(screen.getByRole('link', { name })).toBeTruthy()
     // mục đang chọn: chữ trắng trên nền sidebar tối, không phụ thuộc nền riêng (lỗi cũ: chữ trắng + nền primary không vẽ → "mất" mục)
     const active = screen.getByRole('link', { name: 'Nhập phiếu' })
     expect(active.getAttribute('aria-current')).toBe('page')

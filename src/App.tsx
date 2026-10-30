@@ -11,6 +11,7 @@ import InspectionPage from './pages/InspectionPage'
 import PrintPage from './pages/PrintPage'
 import LookupsPage from './pages/LookupsPage'
 import WorkflowPage from './pages/WorkflowPage'
+import AboutPage from './pages/AboutPage'
 import UsersPage from './pages/UsersPage'
 import { ProfileProvider, useProfile } from './lib/useProfile'
 import { ROLE_LABEL } from './lib/auth'
@@ -25,6 +26,7 @@ const ITEMS: NavItem[] = [
   { to: '/in-thong-ke', label: 'In thống kê', icon: 'print' },
   { to: '/danh-muc', label: 'Danh mục', icon: 'lookup' },
   { to: '/luong-cong-viec', label: 'Luồng công việc', icon: 'workflow' },
+  { to: '/gioi-thieu', label: 'Giới thiệu', icon: 'info' },
 ]
 const ADMIN_ITEMS: NavItem[] = [{ to: '/nguoi-dung', label: 'Quản lý người dùng', icon: 'user' }] // D-013/D-014: admin và root
 
@@ -173,6 +175,7 @@ export default function App() {
         <Route path="/in-thong-ke" element={<PrintPage />} />
         <Route path="/danh-muc" element={<LookupsPage />} />
         <Route path="/luong-cong-viec" element={<WorkflowPage />} />
+        <Route path="/gioi-thieu" element={<AboutPage />} />
         <Route path="/nguoi-dung" element={<AdminOnly><UsersPage /></AdminOnly>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

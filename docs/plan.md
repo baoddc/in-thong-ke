@@ -65,4 +65,6 @@ Danh mục do người dùng tự nhập trên trang "Danh mục" (D-005).
 | T-040 | Trang Đăng ký + Duyệt/Từ chối + hiện người duyệt/người tạo/người sửa | frontend | Xong — 242 test qua; chưa thử với backend thật. TODO nhỏ: gỡ ép kiểu `get_user_names` trong useUserNames.ts (database.ts đã có). Chưa push |
 | T-041 | RPC `list_inspection_details` / `list_transport_plans` (planning nhanh, kèm tên người) — migration 000012 | backend | Xong — đã áp. Lead đo (RLS bao.lt): BK trang đầu 23 ms tổng (trước ~173 ms = 150 planning + 23), BK lọc q+ngày 57 ms (trước ~93), Phiếu 13 ms |
 | T-042 | FE dùng RPC mới + cache + prefetch trang kế + debounce 200 ms | frontend | Xong — 247 test qua; chưa push |
+| T-043 | Trang Giới thiệu `/gioi-thieu` (10 chức năng nổi bật) | frontend | Xong — 248 test, build qua (Lead chạy lại). Chưa push |
+| T-044 | Review commit e38713b (ponytail-review) | Lead | Ship. Đề xuất: (1) prefetch bỏ đếm lại; (2) sanitizeTerm bỏ `_`; (3) makeUsername FE tách từ như server — chưa làm, chờ người dùng chọn |
 | T-005 | Dọn số xe/tài xế không hợp lệ | Lead | Chờ người dùng chạy SQL — `execute_sql` có xóa/sửa bị từ chối 2 lần |
