@@ -9,14 +9,13 @@ afterEach(cleanup)
 const renderPage = () => render(<MemoryRouter><AboutPage /></MemoryRouter>)
 
 describe('Trang Giới thiệu', () => {
-  it('có tiêu đề, tên ứng dụng, 4 ô số liệu, 3 cụm với 11 thẻ chức năng và dòng phiên bản', () => {
+  it('có tiêu đề, tên ứng dụng, 3 cụm với 10 thẻ chức năng và dòng phiên bản', () => {
     renderPage()
     expect(screen.getByRole('heading', { level: 1, name: 'Giới thiệu' })).toBeTruthy()
     expect(screen.getByText('In thống kê — Kho An Hạ')).toBeTruthy()
-    expect(screen.getAllByTestId('stat-tile')).toHaveLength(4)
-    expect(screen.getByText('246.043.357,56')).toBeTruthy()
+    expect(screen.queryByTestId('stat-tile')).toBeNull()
     expect(screen.getAllByTestId('feature-group')).toHaveLength(3)
-    expect(screen.getAllByTestId('feature-card')).toHaveLength(11)
+    expect(screen.getAllByTestId('feature-card')).toHaveLength(10)
     expect(screen.getByRole('heading', { name: 'Giữ chỗ số phiếu TK' })).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Yêu cầu sửa sau 24 giờ' })).toBeTruthy()
     expect(screen.getByText('Phiên bản 30/10/2026')).toBeTruthy()

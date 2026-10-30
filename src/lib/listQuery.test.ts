@@ -1,19 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { applyFilters, applyList, hasActiveFilters, monthRange, nextSort, pageCount, pageRange, parseListParams, sanitizeTerm, toSearchParams, type ListConfig } from './listQuery'
+import { hasActiveFilters, monthRange, nextSort, pageCount, pageRange, parseListParams, sanitizeTerm, toSearchParams, type ListConfig } from './listQuery'
 
 const cfg: ListConfig = {
   sorts: ['created_at', 'export_date', 'tk_number'], defaultSort: 'created_at', defaultDir: 'desc', descFirst: ['export_date'],
-  searchCols: ['tk_number', 'construction_name'], dateCol: 'export_date', filterCols: { type: 'export_type_id' }, tiebreak: 'id',
+  filterCols: { type: 'export_type_id' },
 }
 const parse = (qs: string) => parseListParams(new URLSearchParams(qs), cfg)
-
-// Builder giả ghi lại các lời gọi theo thứ tự.
-function fakeBuilder() {
-  const calls: unknown[][] = []
-  const b: Record<string, unknown> = {}
-  for (const m of ['or', 'gte', 'lte', 'eq', 'order', 'range']) b[m] = (...a: unknown[]) => { calls.push([m, ...a]); return b }
-  return { b, calls }
-}
 
 describe('parseListParams / toSearchParams', () => {
   it('mặc định: trang 1, 50 dòng, sắp theo mặc định', () => {
@@ -43,46 +35,6 @@ describe('parseListParams / toSearchParams', () => {
     expect(hasActiveFilters(parse('page=2&sort=tk_number'))).toBe(false)
     expect(hasActiveFilters(parse('q=a'))).toBe(true)
     expect(hasActiveFilters(parse('type=3'))).toBe(true)
-  })
-})
-
-describe('applyList', () => {
-  it('mặc định chỉ sắp xếp + phân trang trang 1 (0..49)', () => {
-    const { b, calls } = fakeBuilder()
-    applyList(b, parse(''), cfg)
-    expect(calls).toEqual([
-      ['order', 'created_at', { ascending: false, nullsFirst: false }],
-      ['order', 'id', { ascending: false }],
-      ['range', 0, 49],
-    ])
-  })
-
-  it('tìm nhanh = ilike trên mọi cột, khoảng ngày, lọc id, trang 3 cỡ 25', () => {
-    const { b, calls } = fakeBuilder()
-    applyList(b, parse('q=TK01&from=2026-10-01&to=2026-10-31&type=5&sort=tk_number&dir=asc&page=3&size=25'), cfg)
-    expect(calls).toEqual([
-      ['or', 'tk_number.ilike.%TK01%,construction_name.ilike.%TK01%'],
-      ['gte', 'export_date', '2026-10-01'],
-      ['lte', 'export_date', '2026-10-31'],
-      ['eq', 'export_type_id', 5],
-      ['order', 'tk_number', { ascending: true, nullsFirst: false }],
-      ['order', 'id', { ascending: true }], // khóa phụ cùng chiều với cột sắp xếp
-      ['range', 50, 74],
-    ])
-  })
-
-  it('applyFilters (dùng cho request đếm) chỉ lọc, không sắp xếp/phân trang; khớp phần lọc của applyList', () => {
-    const qs = 'q=TK01&from=2026-10-01&to=2026-10-31&type=5&page=3&size=25'
-    const a = fakeBuilder(); applyFilters(a.b, parse(qs), cfg)
-    const l = fakeBuilder(); applyList(l.b, parse(qs), cfg)
-    expect(a.calls.map((c) => c[0])).toEqual(['or', 'gte', 'lte', 'eq'])
-    expect(l.calls.slice(0, 4)).toEqual(a.calls)
-  })
-
-  it('chuỗi tìm chỉ toàn ký tự đặc biệt thì không thêm điều kiện or', () => {
-    const { b, calls } = fakeBuilder()
-    applyList(b, { ...parse(''), q: ',(%)' }, cfg)
-    expect(calls.some((c) => c[0] === 'or')).toBe(false)
   })
 })
 

@@ -6,13 +6,6 @@ import Icon, { type IconName } from '../components/ui/Icon'
 type Feature = { icon: IconName; color: string; title: string; points: string[] }
 type FeatureGroup = { id: string; title: string; features: Feature[] }
 
-const STATS = [
-  { value: '~22.000', label: 'phiếu thống kê đã nạp' },
-  { value: '~42.000', label: 'dòng bảng kiểm' },
-  { value: '246.043.357,56', label: 'kg đã đối chiếu khớp' },
-  { value: 'Tích tắc', label: 'mở trang dù dữ liệu lớn' },
-]
-
 const STEPS = [
   { to: '/', title: 'Nhập phiếu', desc: 'Tạo phiếu thống kê, số TK tự cấp.' },
   { to: '/bang-kiem', title: 'Bảng kiểm', desc: 'Nhập từng mặt hàng của phiếu.' },
@@ -81,14 +74,6 @@ const GROUPS: FeatureGroup[] = [
         points: [
           'Thẻ số phiếu, số dòng bảng kiểm và tổng khối lượng (kg) của tháng.',
           'Thống kê được tính sẵn trong cơ sở dữ liệu.',
-        ],
-      },
-      {
-        icon: 'file', color: 'bg-orange-50 text-orange-700', title: 'Dữ liệu chuyển từ Google Sheets',
-        points: [
-          'Đã nạp ~22.000 phiếu và ~42.000 dòng bảng kiểm từ Kho An Hạ.',
-          'Chuẩn hóa danh mục, sửa ngày bị đảo.',
-          'Đối chiếu tổng khối lượng khớp 246.043.357,56 kg.',
         ],
       },
     ],
@@ -169,14 +154,6 @@ export default function AboutPage() {
               </p>
             </div>
           </div>
-          <dl className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4" data-testid="about-stats">
-            {STATS.map((s) => (
-              <div key={s.label} className="min-w-0 rounded-lg border border-primary-line bg-primary-soft px-3 py-2" data-testid="stat-tile">
-                <dd className="truncate text-lg font-bold text-primary">{s.value}</dd>
-                <dt className="text-xs text-gray-700">{s.label}</dt>
-              </div>
-            ))}
-          </dl>
         </div>
       </section>
 

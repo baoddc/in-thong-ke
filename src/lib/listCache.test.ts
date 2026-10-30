@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cacheGeneration, cacheGet, cacheKey, cacheSet, clearListCache } from './listCache'
 import { parseListParams, type ListConfig } from './listQuery'
 
-const cfg: ListConfig = { sorts: ['created_at'], defaultSort: 'created_at', defaultDir: 'desc', searchCols: [], dateCol: 'd', filterCols: {}, tiebreak: 'id' }
+const cfg: ListConfig = { sorts: ['created_at'], defaultSort: 'created_at', defaultDir: 'desc', filterCols: {} }
 const params = (qs: string) => parseListParams(new URLSearchParams(qs), cfg)
 const page = (n: number) => ({ rows: [n], total: n })
 

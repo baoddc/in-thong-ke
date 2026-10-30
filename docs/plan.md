@@ -74,5 +74,10 @@ Danh mục do người dùng tự nhập trên trang "Danh mục" (D-005).
 | T-049 | Yêu cầu sửa dòng bảng kiểm (detail_id) + Realtime cho edit_requests (D-020) — migration 000015 | backend | Xong (000015 đã chạy) |
 | T-050 | FE: Yêu cầu sửa ở Bảng kiểm + thông báo tức thì khi duyệt/từ chối, admin thấy yêu cầu mới ngay (D-020) | frontend | Xong — chờ thử trên trình duyệt |
 | T-051 | Thiết kế lại trang Giới thiệu (hero, bắt đầu nhanh, cụm tính năng, bảng quyền, phím tắt) | frontend | Xong |
+| T-053 | Giới thiệu: bỏ dải số liệu nạp + thẻ "Dữ liệu chuyển từ Google Sheets" | frontend | Xong |
+| T-054 | Bảng kiểm: bỏ bộ lọc Công trình, Đơn vị nhận | frontend | Xong |
+| T-055 | Dữ liệu thử tải (LOADTEST-*, tk_year ≥ 2100) ~470k dòng bảng kiểm, DB ~472 MB theo dashboard — cần xóa sau khi thử | Lead | Đang thử |
+| T-056 | D-021: list_* security definer + count_* RPC — migration 000016 | backend | Xong (đã chạy; tìm 470k dòng: list 41 ms, đếm 18 ms) |
+| T-057 | D-021: FE đếm bằng count_* RPC thay cho count exact | frontend | Xong |
 | T-052 | Vẽ lại sơ đồ Luồng công việc bằng Archify → public/luong-cong-viec.html (nguồn: .archify/workflow-luong-cong-viec-20261030-142358/candidate.json) | Lead | Xong |
 | T-005 | Dọn số xe/tài xế không hợp lệ | Lead | Chờ người dùng chạy SQL — `execute_sql` có xóa/sửa bị từ chối 2 lần |

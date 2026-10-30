@@ -15,10 +15,7 @@ export type ListConfig = {
   defaultSort: string
   defaultDir: SortDir
   descFirst?: readonly string[] // cột bấm lần đầu thì giảm dần (ngày, số lượng…)
-  searchCols: readonly string[] // ô tìm nhanh: ilike trên các cột này
-  dateCol: string
-  filterCols: Record<string, string> // khóa URL -> tên cột lọc bằng
-  tiebreak: string // cột phụ giữ thứ tự ổn định khi phân trang
+  filterCols: Record<string, string> // khóa URL -> id (chỉ khóa được dùng; lọc thật nằm trong tham số RPC)
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -77,35 +74,6 @@ export const sanitizeTerm = (s: string) => s.replace(/[,()"\\%*]/g, ' ').replace
 
 export const pageCount = (total: number, size: number) => Math.max(1, Math.ceil(total / size))
 export const pageRange = (page: number, size: number): [number, number] => [(page - 1) * size, page * size - 1]
-
-// Phần của PostgREST filter builder mà hàm này dùng (khai báo hẹp để không phụ thuộc kiểu sinh phức tạp của từng bảng/view).
-type Builder = {
-  or(filter: string): Builder
-  gte(col: string, v: string): Builder
-  lte(col: string, v: string): Builder
-  eq(col: string, v: number): Builder
-  order(col: string, o: { ascending: boolean; nullsFirst?: boolean }): Builder
-  range(from: number, to: number): Builder
-}
-
-/** Chỉ phần lọc (tìm nhanh + khoảng ngày + lọc id): dùng chung cho truy vấn dữ liệu và truy vấn đếm riêng để không lệch nhau. */
-export function applyFilters<T>(query: T, p: ListParams, cfg: ListConfig): T {
-  let q = query as unknown as Builder // shortcut: ép kiểu hẹp ở đây thay vì cho từng bảng/view
-  const term = sanitizeTerm(p.q)
-  if (term) q = q.or(cfg.searchCols.map((c) => `${c}.ilike.%${term}%`).join(','))
-  if (p.from) q = q.gte(cfg.dateCol, p.from)
-  if (p.to) q = q.lte(cfg.dateCol, p.to)
-  for (const [key, col] of Object.entries(cfg.filterCols)) if (p.filters[key]) q = q.eq(col, Number(p.filters[key]))
-  return q as unknown as T
-}
-
-/** Áp lọc + sắp xếp + phân trang lên một truy vấn (đếm `count: 'exact'` do nơi gọi chọn). */
-export function applyList<T>(query: T, p: ListParams, cfg: ListConfig): T {
-  let q = applyFilters(query, p, cfg) as unknown as Builder
-  q = q.order(p.sort, { ascending: p.dir === 'asc', nullsFirst: false }).order(cfg.tiebreak, { ascending: p.dir === 'asc' })
-  const [a, b] = pageRange(p.page, p.size)
-  return q.range(a, b) as unknown as T
-}
 
 /** [đầu tháng, đầu tháng sau) của ngày `today` (yyyy-mm-dd). */
 export function monthRange(today: string): [string, string] {

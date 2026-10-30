@@ -10,7 +10,9 @@ const plan = {
   vehicle_id: null, driver_id: null, fg_exporter_id: null, note: null, transport_type_name: null, vehicle_name: null,
   driver_name: null, fg_exporter_name: null, material_exporters: [{ id: 12, name: 'Bình', sort_order: 1 }, { id: 11, name: 'An', sort_order: 0 }],
 }
-const calls: unknown[][] = [] // mọi lời gọi lên transport_plans (đếm/xóa), theo thứ tự
+const calls: unknown[][] = [] // mọi lời gọi lên transport_plans (xóa...), theo thứ tự
+const countCalls: Record<string, unknown>[] = [] // tham số mỗi lần gọi count_transport_plans (D-021)
+let countError = false
 const rpcCalls: Record<string, unknown>[] = [] // tham số mỗi lần gọi list_transport_plans
 const offsets = () => rpcCalls.map((a) => a.p_offset)
 let total: number | undefined
@@ -29,7 +31,7 @@ vi.mock('../lib/supabase', () => {
   return {
     supabase: {
       from: (t: string) => chain(t, t === 'transport_plans' ? [plan] : t === 'edit_requests' ? editRows : []),
-      rpc: (fn: string, args: Record<string, unknown>) => fn === 'request_plan_edit' ? (editRpc.push([fn, args]), Promise.resolve({ data: 7, error: null })) : fn === 'list_transport_plans' ? (rpcCalls.push(args), Promise.resolve({ data: [plan], error: null })) : fn === 'inspection_weight_total' ? Promise.resolve(weightRpc) : Promise.resolve({ data: fn === 'reserve_tk_number' ? 'TK0002' : { tk_number: 'TK0002' }, error: null }),
+      rpc: (fn: string, args: Record<string, unknown>) => fn === 'request_plan_edit' ? (editRpc.push([fn, args]), Promise.resolve({ data: 7, error: null })) : fn === 'count_transport_plans' ? (countCalls.push(args), Promise.resolve(countError ? { data: null, error: { message: 'boom' } } : { data: total ?? null, error: null })) : fn === 'list_transport_plans' ? (rpcCalls.push(args), Promise.resolve({ data: [plan], error: null })) : fn === 'inspection_weight_total' ? Promise.resolve(weightRpc) : Promise.resolve({ data: fn === 'reserve_tk_number' ? 'TK0002' : { tk_number: 'TK0002' }, error: null }),
     },
   }
 })
@@ -47,7 +49,7 @@ beforeAll(() => {
   // jsdom chưa có showModal/close → polyfill tối thiểu
   HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) { this.setAttribute('open', '') }
 })
-beforeEach(() => { editRows = []; editRpc.length = 0; Object.assign(me, { id: 'a1', role: 'admin' }); Object.assign(plan, { created_by: null, created_at: '2026-10-01T00:00:00Z' }); deleteData = null; localStorage.clear(); clearListCache(); calls.length = 0; rpcCalls.length = 0; total = undefined; weightRpc = { data: 246043357.56, error: null } })
+beforeEach(() => { editRows = []; editRpc.length = 0; Object.assign(me, { id: 'a1', role: 'admin' }); Object.assign(plan, { created_by: null, created_at: '2026-10-01T00:00:00Z' }); deleteData = null; localStorage.clear(); clearListCache(); calls.length = 0; rpcCalls.length = 0; countCalls.length = 0; countError = false; total = undefined; weightRpc = { data: 246043357.56, error: null } })
 afterEach(cleanup)
 
 describe('PlansPage', () => {
@@ -87,7 +89,7 @@ describe('PlansPage', () => {
     renderPage()
     await screen.findByTestId('plan-table')
     expect(rpcCalls[0]).toEqual({ p_q: null, p_from: null, p_to: null, p_sort: 'created_at', p_desc: true, p_limit: 50, p_offset: 0 })
-    expect(calls).toContainEqual(['select', 'id', { count: 'exact', head: true }]) // đếm chính xác trên bảng gốc, chạy song song với RPC
+    expect(countCalls[0]).toEqual({ p_q: null, p_from: null, p_to: null }) // đếm qua RPC, cùng bộ lọc, chạy song song với RPC dữ liệu
     expect((screen.getByTestId('page-input') as HTMLInputElement).value).toBe('1')
     expect(screen.getByTestId('page-count').textContent).toBe('/330')
     expect(screen.getByTestId('page-total').textContent).toBe('· tổng 16.500 dòng')
@@ -98,8 +100,7 @@ describe('PlansPage', () => {
     total = 300
     renderPage('/?q=TK01&from=2026-10-01&page=2&size=25&sort=tk_number&dir=asc')
     await screen.findByTestId('plan-table')
-    expect(calls).toContainEqual(['or', 'tk_number.ilike.%TK01%,transport_order_no.ilike.%TK01%']) // request đếm cùng bộ lọc
-    expect(calls).toContainEqual(['gte', 'export_date', '2026-10-01'])
+    expect(countCalls[0]).toEqual({ p_q: 'TK01', p_from: '2026-10-01', p_to: null }) // request đếm cùng bộ lọc
     expect(rpcCalls[0]).toEqual({ p_q: 'TK01', p_from: '2026-10-01', p_to: null, p_sort: 'tk_number', p_desc: false, p_limit: 25, p_offset: 25 })
     expect((screen.getByTestId('search') as HTMLInputElement).value).toBe('TK01')
     expect((screen.getByTestId('page-input') as HTMLInputElement).value).toBe('2')
@@ -162,6 +163,15 @@ describe('PlansPage', () => {
     await waitFor(() => expect(offsets()).toEqual([50, 100, 50, 100])) // tải lại trang 2 + prefetch lại trang 3 (cache 100 đã bị xóa)
     await userEvent.click(screen.getByTestId('page-prev'))
     await waitFor(() => expect(offsets()).toEqual([50, 100, 50, 100, 0])) // trang 1 không còn trong cache; trang 2 mới tải lại nên đã có sẵn
+  })
+
+  it('lỗi RPC đếm → vẫn hiện dòng, chỉ "Trang x" không có tổng', async () => {
+    countError = true
+    renderPage()
+    expect((await screen.findByTestId('plan-table')).textContent).toContain('TK0001')
+    expect(countCalls.length).toBeGreaterThan(0)
+    expect(screen.queryByTestId('page-total')).toBeNull()
+    expect(screen.queryByTestId('page-count')).toBeNull()
   })
 
   it('không có số đếm → chỉ "Trang x", nút Sau tắt vì trang chưa đầy', async () => {

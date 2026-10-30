@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { errorMessage, formatDate, formatNumber } from '../lib/format'
 import { useLookups } from '../lib/useLookups'
-import { applyFilters, countActiveFilters, type ListConfig } from '../lib/listQuery'
-import { rpcList } from '../lib/listRpc'
+import { countActiveFilters, type ListConfig } from '../lib/listQuery'
+import { rpcCount, rpcList } from '../lib/listRpc'
 import { useListPage, type Fetcher } from '../lib/useListPage'
 import { useMonthStats } from '../lib/useMonthStats'
 import { useShortcuts } from '../lib/useShortcuts'
@@ -32,15 +32,12 @@ import type { PlanRow } from '../types/plan'
 const CFG: ListConfig = {
   sorts: ['created_at', 'export_date', 'tk_number', 'transport_order_no'],
   defaultSort: 'created_at', defaultDir: 'desc', descFirst: ['created_at', 'export_date'],
-  searchCols: ['tk_number', 'transport_order_no'], dateCol: 'export_date', filterCols: {}, tiebreak: 'id',
+  filterCols: {},
 }
-// Dữ liệu trang qua RPC (planning nhanh, kèm tên người tạo/sửa — D-017) + đếm exact trên bảng gốc cùng bộ lọc, chạy song song.
+// Dữ liệu trang qua RPC (planning nhanh, kèm tên người tạo/sửa — D-017) + đếm qua RPC cùng bộ lọc (D-021), chạy song song.
 const fetchPlans: Fetcher = async (p) => {
-  const [rows, cnt] = await Promise.all([
-    rpcList('list_transport_plans', p),
-    applyFilters(supabase.from('transport_plans').select('id', { count: 'exact', head: true }), p, CFG),
-  ])
-  return { data: rows.error ? null : ((rows.data ?? []) as PlanRpcRow[]).map(fromRpcPlan), error: rows.error, count: cnt.error ? null : cnt.count }
+  const [rows, count] = await Promise.all([rpcList('list_transport_plans', p), rpcCount('count_transport_plans', p)])
+  return { data: rows.error ? null : ((rows.data ?? []) as PlanRpcRow[]).map(fromRpcPlan), error: rows.error, count }
 }
 
 const PILL = 'inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold'

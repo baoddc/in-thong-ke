@@ -13,21 +13,22 @@ const lookups = [
 const oldRow = { id: 9, plan_id: null, tk_number: null, transport_order_no: null, export_date: '2026-09-30', product_name: 'Thép tấm', quantity: 1234.5, total_weight_kg: 5422 }
 
 // Mọi chuỗi gọi trả về chính nó và có thể await; lookup_items và inspection_details_view có dữ liệu.
-// calls: lệnh gọi lên inspection_details_view (dữ liệu); countCalls: lên inspection_details (đếm riêng)
+// countCalls: tham số mỗi lần gọi RPC count_inspection_details (D-021)
 // rpcCalls: tham số mỗi lần gọi RPC list_inspection_details (dữ liệu trang, D-017)
-const h = vi.hoisted(() => ({ rpcCalls: [] as Record<string, unknown>[], countCalls: [] as unknown[][], count: 41800 as number | null, countError: null as { message: string } | null, rows: [] as unknown[], editRows: [] as unknown[], editRpc: [] as [string, unknown][] }))
+const h = vi.hoisted(() => ({ rpcCalls: [] as Record<string, unknown>[], countCalls: [] as Record<string, unknown>[], count: 41800 as number | null, countError: null as { message: string } | null, rows: [] as unknown[], editRows: [] as unknown[], editRpc: [] as [string, unknown][] }))
 vi.mock('../lib/supabase', () => {
-  const chain = (data: unknown, t: string) => {
-    const c: Record<string, unknown> = { then: (r: (v: unknown) => unknown) => r(t === 'inspection_details' ? { data: null, error: h.countError, count: h.countError ? null : h.count } : { data, error: null }) }
-    for (const m of ['select', 'order', 'limit', 'range', 'eq', 'in', 'or', 'gte', 'lte']) c[m] = (...a: unknown[]) => { if (t === 'inspection_details') h.countCalls.push([m, ...a]); return c }
+  const chain = (data: unknown) => {
+    const c: Record<string, unknown> = { then: (r: (v: unknown) => unknown) => r({ data, error: null }) }
+    for (const m of ['select', 'order', 'limit', 'range', 'eq', 'in', 'or', 'gte', 'lte']) c[m] = () => c
     c.maybeSingle = () => Promise.resolve({ data: null, error: null }) // tra phiếu của dòng khi mở modal
     return c
   }
   return {
     supabase: {
-      from: (t: string) => chain(t === 'lookup_items' ? lookups : t === 'edit_requests' ? h.editRows : [], t),
+      from: (t: string) => chain(t === 'lookup_items' ? lookups : t === 'edit_requests' ? h.editRows : []),
       rpc: (fn: string, args: Record<string, unknown>) => {
         if (fn === 'request_detail_edit') { h.editRpc.push([fn, args]); return Promise.resolve({ data: 5, error: null }) }
+        if (fn === 'count_inspection_details') { h.countCalls.push(args); return Promise.resolve(h.countError ? { data: null, error: h.countError } : { data: h.count, error: null }) }
         if (fn === 'list_inspection_details') { h.rpcCalls.push(args); return Promise.resolve({ data: h.rows.length ? h.rows : [oldRow], error: null }) }
         return Promise.resolve({ data: fn === 'get_lookup_items' ? [{ id: 77, kind: 'construction', name: 'Nhà máy Bình Dương', code: 'CT77' }] : [], error: null })
       },
@@ -62,11 +63,12 @@ describe('InspectionPage', () => {
     expect(screen.getByTestId('page-total').textContent).toBe('· tổng 41.800 dòng')
   })
 
-  it('đếm chính xác trên bảng gốc, dữ liệu trang qua RPC; lỗi đếm vẫn hiện dữ liệu, chỉ "Trang x"', async () => {
+  it('đếm và dữ liệu trang đều qua RPC; lỗi đếm vẫn hiện dòng, chỉ "Trang x"', async () => {
     h.countError = { message: 'boom' }
     renderPage()
     await screen.findByTestId('row-9')
     expect(h.rpcCalls[0]).toMatchObject({ p_sort: 'created_at', p_desc: true, p_limit: 50, p_offset: 0 })
+    expect(h.countCalls[0]).toEqual({ p_q: null, p_from: null, p_to: null, p_export_type_id: null, p_product_id: null })
     expect(screen.queryByTestId('page-total')).toBeNull()
     expect(screen.queryByTestId('page-count')).toBeNull()
     expect((screen.getByTestId('page-input') as HTMLInputElement).value).toBe('1')
@@ -82,23 +84,19 @@ describe('InspectionPage', () => {
     expect((screen.getByTestId('page-next') as HTMLButtonElement).disabled).toBe(false)
   })
 
-  it('D-012: tìm nhanh chỉ trên TK + số phiếu; lọc công trình/đơn vị nhận theo id; đếm exact trên bảng gốc cùng bộ lọc; hiện tên công trình từ id', async () => {
-    renderPage('/?q=49001&cons=77&recv=8')
+  it('D-012: tìm nhanh chỉ trên TK + số phiếu; lọc loại hình xuất theo id; RPC đếm cùng bộ lọc; không còn lọc công trình/đơn vị nhận (T-054)', async () => {
+    renderPage('/?q=49001&type=3&cons=77&recv=8') // cons/recv cũ trên URL bị bỏ qua
     await screen.findByTestId('row-9')
     expect(h.rpcCalls[0]).toEqual({
-      p_q: '49001', p_from: null, p_to: null, p_export_type_id: null, p_product_id: null, p_construction_id: 77, p_receiving_unit_id: 8,
+      p_q: '49001', p_from: null, p_to: null, p_export_type_id: 3, p_product_id: null,
       p_sort: 'created_at', p_desc: true, p_limit: 50, p_offset: 0,
     })
-    // request đếm: bảng gốc, head + exact, cùng bộ lọc, không sắp xếp/phân trang
-    expect(h.countCalls.slice(0, 4)).toEqual([ // (các lần sau là request prefetch trang kế)
-      ['select', 'id', { count: 'exact', head: true }],
-      ['or', 'tk_number.ilike.%49001%,warehouse_slip_no.ilike.%49001%'],
-      ['eq', 'construction_id', 77],
-      ['eq', 'receiving_unit_id', 8],
-    ])
-    await waitFor(() => expect((screen.getByTestId('filter-construction') as HTMLInputElement).value).toBe('Nhà máy Bình Dương'))
+    // RPC đếm: cùng tham số lọc với RPC dữ liệu, không sắp xếp/phân trang (các lần sau là prefetch trang kế)
+    expect(h.countCalls[0]).toEqual({ p_q: '49001', p_from: null, p_to: null, p_export_type_id: 3, p_product_id: null })
+    expect(screen.queryByTestId('filter-construction')).toBeNull()
+    expect(screen.queryByTestId('filter-receiving')).toBeNull()
     await userEvent.click(screen.getByTestId('toggle-filters')) // ẩn bộ lọc → hiện số bộ lọc đang bật
-    expect(screen.getByTestId('toggle-filters').textContent).toContain('3') // q + cons + recv
+    expect(screen.getByTestId('toggle-filters').textContent).toContain('2') // q + type
   })
 
   it('Thêm dòng mở modal, Đơn vị giao hàng mặc định "An Hạ"', async () => {

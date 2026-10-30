@@ -629,6 +629,24 @@ export type Database = {
           updated_at: string
         }[]
       }
+      count_inspection_details: {
+        Args: {
+          p_q?: string | null
+          p_from?: string | null
+          p_to?: string | null
+          p_export_type_id?: number | null
+          p_product_id?: number | null
+        }
+        Returns: number
+      }
+      count_transport_plans: {
+        Args: {
+          p_q?: string | null
+          p_from?: string | null
+          p_to?: string | null
+        }
+        Returns: number
+      }
       get_user_names: {
         Args: { p_ids: string[] }
         Returns: { id: string; full_name: string; username: string }[]

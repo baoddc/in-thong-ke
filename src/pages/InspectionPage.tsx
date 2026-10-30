@@ -2,13 +2,12 @@ import { useCallback, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { errorMessage, formatDate, formatNumber } from '../lib/format'
 import { useLookups } from '../lib/useLookups'
-import { applyFilters, countActiveFilters, type ListConfig } from '../lib/listQuery'
-import { idOrNull, rpcList } from '../lib/listRpc'
+import { countActiveFilters, type ListConfig } from '../lib/listQuery'
+import { idOrNull, rpcCount, rpcList } from '../lib/listRpc'
 import { useListPage, type Fetcher } from '../lib/useListPage'
 import { useShortcuts } from '../lib/useShortcuts'
 import { isSmallScreen, usePersistentToggle } from '../lib/usePersistentToggle'
 import { AuditCell } from '../components/AuditInfo'
-import LookupCombobox from '../components/LookupCombobox'
 import InspectionFormModal from '../components/InspectionFormModal'
 import ListToolbar from '../components/ListToolbar'
 import { Badge, PersonChip } from '../components/ui/Badge'
@@ -30,19 +29,13 @@ import type { InspectionRow } from '../types/inspection'
 const CFG: ListConfig = {
   sorts: ['created_at', 'export_date', 'tk_number', 'warehouse_slip_no', 'construction_code', 'construction_name', 'export_type_name', 'product_name', 'quantity', 'total_weight_kg'],
   defaultSort: 'created_at', defaultDir: 'desc', descFirst: ['created_at', 'export_date', 'quantity', 'total_weight_kg'],
-  searchCols: ['tk_number', 'warehouse_slip_no'], // chỉ cột có index trigram (D-012)
-  dateCol: 'export_date', filterCols: { type: 'export_type_id', product: 'product_id', cons: 'construction_id', recv: 'receiving_unit_id' }, tiebreak: 'id',
+  filterCols: { type: 'export_type_id', product: 'product_id' },
 }
-// Dữ liệu trang qua RPC (không qua view trực tiếp: planning chậm; kèm tên người tạo/sửa — D-017); đếm chính xác riêng trên bảng gốc, cùng bộ lọc, chạy song song.
+// Dữ liệu trang qua RPC (không qua view trực tiếp: planning chậm; kèm tên người tạo/sửa — D-017); đếm qua RPC cùng bộ lọc (D-021), chạy song song.
 const fetchRows: Fetcher = async (p) => {
-  const [rows, cnt] = await Promise.all([
-    rpcList('list_inspection_details', p, {
-      p_export_type_id: idOrNull(p.filters.type), p_product_id: idOrNull(p.filters.product),
-      p_construction_id: idOrNull(p.filters.cons), p_receiving_unit_id: idOrNull(p.filters.recv),
-    }),
-    applyFilters(supabase.from('inspection_details').select('id', { count: 'exact', head: true }), p, CFG),
-  ])
-  return { data: rows.data, error: rows.error, count: cnt.error ? null : cnt.count }
+  const extra = { p_export_type_id: idOrNull(p.filters.type), p_product_id: idOrNull(p.filters.product) }
+  const [rows, count] = await Promise.all([rpcList('list_inspection_details', p, extra), rpcCount('count_inspection_details', p, extra)])
+  return { data: rows.data, error: rows.error, count }
 }
 
 const DASH = '—' // dòng cũ chưa có số phiếu TK
@@ -126,14 +119,7 @@ export default function InspectionPage() {
   ]
 
   const setFilter = (key: string, value: string) => update({ filters: { ...p.filters, [key]: value } })
-  const [clearTick, setClearTick] = useState(0) // ô Công trình/Đơn vị nhận gõ sẵn chữ → khởi tạo lại khi xóa bộ lọc
-  const clearFilters = () => { list.clearFilters(); setClearTick((t) => t + 1) }
-  const serverFilter = (label: string, kind: string, key: string, testId: string) => (
-    <div className="col-span-2 sm:col-span-1 sm:w-44">
-      <LookupCombobox key={`${key}-${clearTick}`} inputSize="sm" label={label} kind={kind} server allowAdd={false}
-        selectedIds={p.filters[key] ? [Number(p.filters[key])] : []} onChange={(ids) => { const v = ids[0] ? String(ids[0]) : ''; if (v !== p.filters[key]) setFilter(key, v) }} testId={testId} />
-    </div>
-  )
+  const clearFilters = list.clearFilters
   const activeCount = countActiveFilters(p)
   const filtered = activeCount > 0
   return (
@@ -160,8 +146,6 @@ export default function InspectionPage() {
             {lookups.byKind('product').map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
           </Select>
         </Field>
-        {serverFilter('Công trình', 'construction', 'cons', 'filter-construction')}
-        {serverFilter('Đơn vị nhận', 'receiving_unit', 'recv', 'filter-receiving')}
       </ListToolbar>
       </Collapsible>
 

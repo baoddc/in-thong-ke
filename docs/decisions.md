@@ -105,5 +105,11 @@ Mục tiêu: `inspection_details` ≥ 1–5 triệu dòng, `transport_plans` ≥
 - Duyệt/từ chối → người yêu cầu nhận thông báo **ngay** qua Supabase Realtime (`edit_requests` vào publication `supabase_realtime`, RLS vẫn áp dụng), trang tự cập nhật nút Sửa. Admin/root thấy yêu cầu mới ngay (badge + danh sách).
 - Không làm: thông báo cho người đang offline (họ thấy trạng thái khi mở trang), email/push.
 
+## D-021 — Tìm nhanh dùng được index trigram dưới RLS (30/10/2026) — bổ sung D-017
+- Đo ở 470k dòng (dữ liệu LOADTEST): ô Tìm nhanh 2–5 s vì `ilike` không leakproof nên dưới RLS Postgres không dùng index trigram (quét cả bảng). Không RLS: 23 ms.
+- `list_transport_plans` / `list_inspection_details` → `security definer`, đầu hàm kiểm `is_active_user()` (đúng điều kiện policy select hiện có) → quyền xem không đổi.
+- Thêm `count_transport_plans` / `count_inspection_details` (security definer, cùng bộ lọc với list) thay cho request đếm `count: 'exact'` qua PostgREST.
+- Sau nạp/nhân dữ liệu lớn phải `VACUUM ANALYZE` (dọn pending list của GIN): trước 1.006 ms, sau 23 ms.
+
 ## D-006 — Supabase project
 Project riêng `in-thong-ke` (ref `sybzvaybffgkgiyvevsp`, ap-southeast-1), tạo 29/10/2026.

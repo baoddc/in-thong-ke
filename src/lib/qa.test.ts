@@ -93,7 +93,7 @@ describe('thông báo lỗi', () => {
 })
 
 describe('phân trang - ca biên', () => {
-  const cfg: ListConfig = { sorts: ['created_at'], defaultSort: 'created_at', defaultDir: 'desc', searchCols: ['a'], dateCol: 'export_date', filterCols: {}, tiebreak: 'id' }
+  const cfg: ListConfig = { sorts: ['created_at'], defaultSort: 'created_at', defaultDir: 'desc', filterCols: {} }
   const parse = (qs: string) => parseListParams(new URLSearchParams(qs), cfg)
   it('page=0, âm, chữ → về trang 1; size ngoài danh sách → 50', () => {
     for (const q of ['page=0', 'page=-1', 'page=abc', 'page=']) expect(parse(q).page).toBe(1)
