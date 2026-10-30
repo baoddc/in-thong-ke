@@ -14,30 +14,35 @@ const oldRow = { id: 9, plan_id: null, tk_number: null, transport_order_no: null
 
 // Mọi chuỗi gọi trả về chính nó và có thể await; lookup_items và inspection_details_view có dữ liệu.
 // calls: lệnh gọi lên inspection_details_view (dữ liệu); countCalls: lên inspection_details (đếm riêng)
-const h = vi.hoisted(() => ({ calls: [] as unknown[][], countCalls: [] as unknown[][], count: 41800 as number | null, countError: null as { message: string } | null, rows: [] as unknown[] }))
+// rpcCalls: tham số mỗi lần gọi RPC list_inspection_details (dữ liệu trang, D-017)
+const h = vi.hoisted(() => ({ rpcCalls: [] as Record<string, unknown>[], countCalls: [] as unknown[][], count: 41800 as number | null, countError: null as { message: string } | null, rows: [] as unknown[] }))
 vi.mock('../lib/supabase', () => {
   const chain = (data: unknown, t: string) => {
     const c: Record<string, unknown> = { then: (r: (v: unknown) => unknown) => r(t === 'inspection_details' ? { data: null, error: h.countError, count: h.countError ? null : h.count } : { data, error: null }) }
-    for (const m of ['select', 'order', 'limit', 'range', 'eq', 'in', 'or', 'gte', 'lte']) c[m] = (...a: unknown[]) => { if (t === 'inspection_details_view') h.calls.push([m, ...a]); if (t === 'inspection_details') h.countCalls.push([m, ...a]); return c }
+    for (const m of ['select', 'order', 'limit', 'range', 'eq', 'in', 'or', 'gte', 'lte']) c[m] = (...a: unknown[]) => { if (t === 'inspection_details') h.countCalls.push([m, ...a]); return c }
     return c
   }
   return {
     supabase: {
-      from: (t: string) => chain(t === 'lookup_items' ? lookups : t === 'inspection_details_view' ? (h.rows.length ? h.rows : [oldRow]) : [], t),
-      rpc: (fn: string) => Promise.resolve({ data: fn === 'get_lookup_items' ? [{ id: 77, kind: 'construction', name: 'Nhà máy Bình Dương', code: 'CT77' }] : [], error: null }),
+      from: (t: string) => chain(t === 'lookup_items' ? lookups : [], t),
+      rpc: (fn: string, args: Record<string, unknown>) => {
+        if (fn === 'list_inspection_details') { h.rpcCalls.push(args); return Promise.resolve({ data: h.rows.length ? h.rows : [oldRow], error: null }) }
+        return Promise.resolve({ data: fn === 'get_lookup_items' ? [{ id: 77, kind: 'construction', name: 'Nhà máy Bình Dương', code: 'CT77' }] : [], error: null })
+      },
     },
   }
 })
 
 import InspectionPage from './InspectionPage'
 import { ToastProvider } from '../components/ui/Toast'
+import { clearListCache } from '../lib/listCache'
 
 const renderPage = (url = '/') => render(<MemoryRouter initialEntries={[url]}><ToastProvider><InspectionPage /></ToastProvider></MemoryRouter>)
 
 beforeAll(() => {
   HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) { this.setAttribute('open', '') }
 })
-beforeEach(() => { localStorage.clear(); h.calls.length = 0; h.countCalls.length = 0; h.count = 41800; h.countError = null; h.rows = [] })
+beforeEach(() => { localStorage.clear(); clearListCache(); h.rpcCalls.length = 0; h.countCalls.length = 0; h.count = 41800; h.countError = null; h.rows = [] })
 afterEach(cleanup)
 
 describe('InspectionPage', () => {
@@ -52,11 +57,11 @@ describe('InspectionPage', () => {
     expect(screen.getByTestId('page-total').textContent).toBe('· tổng 41.800 dòng')
   })
 
-  it('đếm chính xác trên bảng gốc, view không đếm; lỗi đếm vẫn hiện dữ liệu, chỉ "Trang x"', async () => {
+  it('đếm chính xác trên bảng gốc, dữ liệu trang qua RPC; lỗi đếm vẫn hiện dữ liệu, chỉ "Trang x"', async () => {
     h.countError = { message: 'boom' }
     renderPage()
     await screen.findByTestId('row-9')
-    expect(h.calls).toContainEqual(['select', '*'])
+    expect(h.rpcCalls[0]).toMatchObject({ p_sort: 'created_at', p_desc: true, p_limit: 50, p_offset: 0 })
     expect(screen.queryByTestId('page-total')).toBeNull()
     expect(screen.queryByTestId('page-count')).toBeNull()
     expect((screen.getByTestId('page-input') as HTMLInputElement).value).toBe('1')
@@ -75,15 +80,12 @@ describe('InspectionPage', () => {
   it('D-012: tìm nhanh chỉ trên TK + số phiếu; lọc công trình/đơn vị nhận theo id; đếm exact trên bảng gốc cùng bộ lọc; hiện tên công trình từ id', async () => {
     renderPage('/?q=49001&cons=77&recv=8')
     await screen.findByTestId('row-9')
-    const or = h.calls.find((c) => c[0] === 'or')
-    expect(or).toEqual(['or', 'tk_number.ilike.%49001%,warehouse_slip_no.ilike.%49001%'])
-    expect(String(or?.[1])).not.toContain('construction')
-    expect(h.calls).toContainEqual(['eq', 'construction_id', 77])
-    expect(h.calls).toContainEqual(['eq', 'receiving_unit_id', 8])
-    expect(h.calls).toContainEqual(['select', '*'])
-    expect(h.calls).toContainEqual(['order', 'id', { ascending: false }])
+    expect(h.rpcCalls[0]).toEqual({
+      p_q: '49001', p_from: null, p_to: null, p_export_type_id: null, p_product_id: null, p_construction_id: 77, p_receiving_unit_id: 8,
+      p_sort: 'created_at', p_desc: true, p_limit: 50, p_offset: 0,
+    })
     // request đếm: bảng gốc, head + exact, cùng bộ lọc, không sắp xếp/phân trang
-    expect(h.countCalls).toEqual([
+    expect(h.countCalls.slice(0, 4)).toEqual([ // (các lần sau là request prefetch trang kế)
       ['select', 'id', { count: 'exact', head: true }],
       ['or', 'tk_number.ilike.%49001%,warehouse_slip_no.ilike.%49001%'],
       ['eq', 'construction_id', 77],

@@ -15,6 +15,12 @@ export function formatDateTime(value: string | null | undefined): string {
   return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}`
 }
 
+/** ISO timestamp -> "30/10 14:05" (giờ VN, bỏ năm) cho ô bảng gọn. */
+export function formatShortDateTime(value: string | null | undefined): string {
+  const s = formatDateTime(value)
+  return s && `${s.slice(0, 5)} ${s.slice(11)}`
+}
+
 export function todayISO(): string {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date())
 }

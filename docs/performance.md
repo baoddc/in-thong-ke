@@ -62,6 +62,12 @@ Mỗi index thừa trên bảng 1–5 triệu dòng tốn vài chục–trăm MB
 
 Sửa ở 000008: sao chép `tk_number` vào `inspection_details` (trigger điền, bất biến nhờ `lock_tk_fields`), view dùng `d.tk_number`, thêm GIN trigram -> BitmapOr trên một bảng. Cần đo lại sau khi áp (câu mẫu ở cuối file migration; kỳ vọng Bitmap Index Scan trên 2 index trigram của `inspection_details`, không Seq Scan). Chi phí ghi: thêm 1 index GIN và 1 tra cứu khóa chính mỗi lần insert/đổi `plan_id`. Backfill trong migration tạm tắt trigger `updated_at` và trigger thống kê để không đổi `updated_at` và không chạy upsert thống kê thừa.
 
+## Danh sách qua RPC (T-041, D-017)
+- Số đo trước (DB thật, RLS như người dùng, 50 dòng): `inspection_details_view` **planning 82–150 ms**, execution 11–23 ms; đếm trên bảng gốc 14 ms. View ghép 15 bảng nên planner tốn thời gian mỗi request (pooler không giữ prepared plan).
+- Cách sửa (000012): `list_inspection_details(...)` / `list_transport_plans(...)` lấy id của trang từ bảng gốc (index created_at/export_date, trigram cho `q`), rồi mới join danh mục cho <= 200 dòng theo thứ tự cố định (`join_collapse_limit = 1`); `plan_cache_mode = force_custom_plan` để tham số null được rút gọn (tránh kế hoạch chung làm mất index trigram).
+- Ngưỡng mong đợi ở ~42.000 dòng: **planning < 10 ms, execution < 30 ms** cho trang mặc định, tìm nhanh và sắp theo `export_date`. Sắp theo cột còn lại (`tk_number`, `warehouse_slip_no`, tên danh mục, số lượng, khối lượng) không có index nên có thể chậm hơn (top-N trên tập đã lọc).
+- Số đo sau: (chưa đo - Lead đo sau khi áp 000012; câu mẫu ở cuối file migration).
+
 ## Vận hành khi dữ liệu lớn
 - Tạo index trên bảng đang chạy: dùng `create index concurrently` (ngoài giao dịch) khi bảng > vài trăm nghìn dòng; migration 000007 tạo thường vì 42.000 dòng chỉ khóa ghi chưa tới vài giây.
 - Sau nạp lớn: `analyze` các bảng (nhất là trước khi đo `explain`).

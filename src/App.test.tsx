@@ -4,8 +4,9 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('./lib/supabase', () => ({ supabase: { auth: { signOut: vi.fn() } } }))
 vi.mock('./pages/UsersPage', () => ({ default: () => <p>Trang người dùng</p> }))
+const invoke = vi.fn()
+vi.mock('./lib/supabase', () => ({ supabase: { auth: { signOut: vi.fn() }, functions: { invoke: (n: string, o: unknown) => invoke(n, o) } } }))
 const prof: { value: { id: string; full_name: string; role: 'root' | 'admin' | 'user'; is_active: boolean } | null } = { value: null }
 vi.mock('./lib/useProfile', () => ({
   ProfileProvider: ({ children }: { children: unknown }) => children,
@@ -48,6 +49,20 @@ describe('Quyền người dùng (D-013)', () => {
     const badge = screen.getByTestId('user-role')
     expect(badge.textContent).toBe('Root')
     expect(badge.className).toContain('bg-amber-400')
+  })
+
+  it('admin: badge số tài khoản chờ duyệt ở mục Quản lý người dùng; user thường không gọi list', async () => {
+    invoke.mockResolvedValue({ data: [{ is_pending: true }, { is_pending: true }, { is_pending: false }], error: null })
+    prof.value = { id: 'a', full_name: 'Quản trị', role: 'admin', is_active: true }
+    renderLayout()
+    expect((await screen.findByTestId('pending-badge')).textContent).toBe('2')
+    expect(invoke).toHaveBeenCalledWith('admin-users', { body: { action: 'list' } })
+    cleanup()
+    invoke.mockClear()
+    prof.value = { id: 'u', full_name: 'A', role: 'user', is_active: true }
+    renderLayout()
+    expect(screen.queryByTestId('pending-badge')).toBeNull()
+    expect(invoke).not.toHaveBeenCalled()
   })
 
   it('route /nguoi-dung chặn user thường (chuyển về /), admin vào được', () => {

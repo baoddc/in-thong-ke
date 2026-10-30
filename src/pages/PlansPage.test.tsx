@@ -4,12 +4,15 @@ import { MemoryRouter } from 'react-router-dom'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
+// Dòng phẳng như RPC list_transport_plans trả về (D-017)
 const plan = {
   id: 1, tk_number: 'TK0001', export_date: '2026-10-01', transport_order_no: 'L1', transport_type_id: null,
-  vehicle_id: null, driver_id: null, fg_exporter_id: null, note: null, transport_type: null, vehicle: null,
-  driver: null, fg_exporter: null, material_exporters: [{ lookup: { id: 11, name: 'An' } }, { lookup: { id: 12, name: 'Bình' } }],
+  vehicle_id: null, driver_id: null, fg_exporter_id: null, note: null, transport_type_name: null, vehicle_name: null,
+  driver_name: null, fg_exporter_name: null, material_exporters: [{ id: 12, name: 'Bình', sort_order: 1 }, { id: 11, name: 'An', sort_order: 0 }],
 }
-const calls: unknown[][] = [] // mọi lời gọi lên transport_plans, theo thứ tự
+const calls: unknown[][] = [] // mọi lời gọi lên transport_plans (đếm/xóa), theo thứ tự
+const rpcCalls: Record<string, unknown>[] = [] // tham số mỗi lần gọi list_transport_plans
+const offsets = () => rpcCalls.map((a) => a.p_offset)
 let total: number | undefined
 let weightRpc: { data: unknown; error: { message: string } | null } = { data: 246043357.56, error: null }
 let deleteData: unknown[] | null = null // kết quả `.delete().select()`; null: trả về phiếu (xóa được)
@@ -24,7 +27,7 @@ vi.mock('../lib/supabase', () => {
   return {
     supabase: {
       from: (t: string) => chain(t, t === 'transport_plans' ? [plan] : []),
-      rpc: (fn: string) => fn === 'inspection_weight_total' ? Promise.resolve(weightRpc) : Promise.resolve({ data: fn === 'next_tk_number' ? 'TK0002' : { tk_number: 'TK0002' }, error: null }),
+      rpc: (fn: string, args: Record<string, unknown>) => fn === 'list_transport_plans' ? (rpcCalls.push(args), Promise.resolve({ data: [plan], error: null })) : fn === 'inspection_weight_total' ? Promise.resolve(weightRpc) : Promise.resolve({ data: fn === 'next_tk_number' ? 'TK0002' : { tk_number: 'TK0002' }, error: null }),
     },
   }
 })
@@ -34,6 +37,7 @@ vi.mock('../lib/useProfile', () => ({ useProfile: () => ({ profile: me, isAdmin:
 
 import PlansPage from './PlansPage'
 import { ToastProvider } from '../components/ui/Toast'
+import { clearListCache } from '../lib/listCache'
 
 const renderPage = (url = '/') => render(<MemoryRouter initialEntries={[url]}><ToastProvider><PlansPage /></ToastProvider></MemoryRouter>)
 
@@ -41,7 +45,7 @@ beforeAll(() => {
   // jsdom chưa có showModal/close → polyfill tối thiểu
   HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) { this.setAttribute('open', '') }
 })
-beforeEach(() => { Object.assign(me, { id: 'a1', role: 'admin' }); Object.assign(plan, { created_by: null, created_at: '2026-10-01T00:00:00Z' }); deleteData = null; localStorage.clear(); calls.length = 0; total = undefined; weightRpc = { data: 246043357.56, error: null } })
+beforeEach(() => { Object.assign(me, { id: 'a1', role: 'admin' }); Object.assign(plan, { created_by: null, created_at: '2026-10-01T00:00:00Z' }); deleteData = null; localStorage.clear(); clearListCache(); calls.length = 0; rpcCalls.length = 0; total = undefined; weightRpc = { data: 246043357.56, error: null } })
 afterEach(cleanup)
 
 describe('PlansPage', () => {
@@ -76,13 +80,12 @@ describe('PlansPage', () => {
     expect(screen.queryByTestId('plan-modal')).not.toBeNull()
   })
 
-  it('phân trang phía server: trang 1 = range(0,49), thanh trang hiện tổng số dòng', async () => {
+  it('phân trang phía server: trang 1 = limit 50 offset 0 qua RPC, thanh trang hiện tổng số dòng', async () => {
     total = 16500
     renderPage()
     await screen.findByTestId('plan-table')
-    expect(calls).toContainEqual(['range', 0, 49])
-    expect(calls).toContainEqual(['select', expect.any(String), { count: 'exact' }]) // đếm chính xác (index-only, nhanh)
-    expect(calls).toContainEqual(['order', 'id', { ascending: false }]) // khóa phụ cùng chiều (created_at giảm dần)
+    expect(rpcCalls[0]).toEqual({ p_q: null, p_from: null, p_to: null, p_sort: 'created_at', p_desc: true, p_limit: 50, p_offset: 0 })
+    expect(calls).toContainEqual(['select', 'id', { count: 'exact', head: true }]) // đếm chính xác trên bảng gốc, chạy song song với RPC
     expect((screen.getByTestId('page-input') as HTMLInputElement).value).toBe('1')
     expect(screen.getByTestId('page-count').textContent).toBe('/330')
     expect(screen.getByTestId('page-total').textContent).toBe('· tổng 16.500 dòng')
@@ -93,9 +96,9 @@ describe('PlansPage', () => {
     total = 300
     renderPage('/?q=TK01&from=2026-10-01&page=2&size=25&sort=tk_number&dir=asc')
     await screen.findByTestId('plan-table')
-    expect(calls).toContainEqual(['or', 'tk_number.ilike.%TK01%,transport_order_no.ilike.%TK01%'])
+    expect(calls).toContainEqual(['or', 'tk_number.ilike.%TK01%,transport_order_no.ilike.%TK01%']) // request đếm cùng bộ lọc
     expect(calls).toContainEqual(['gte', 'export_date', '2026-10-01'])
-    expect(calls).toContainEqual(['range', 25, 49])
+    expect(rpcCalls[0]).toEqual({ p_q: 'TK01', p_from: '2026-10-01', p_to: null, p_sort: 'tk_number', p_desc: false, p_limit: 25, p_offset: 25 })
     expect((screen.getByTestId('search') as HTMLInputElement).value).toBe('TK01')
     expect((screen.getByTestId('page-input') as HTMLInputElement).value).toBe('2')
     expect(screen.getByTestId('page-count').textContent).toBe('/12')
@@ -109,18 +112,54 @@ describe('PlansPage', () => {
     const input = screen.getByTestId('page-input')
     await userEvent.clear(input)
     await userEvent.type(input, '3{Enter}')
-    await waitFor(() => expect(calls).toContainEqual(['range', 100, 149]))
+    await waitFor(() => expect(offsets()).toContain(100))
     await userEvent.clear(input)
     await userEvent.type(input, '999{Enter}')
-    await waitFor(() => expect(calls).toContainEqual(['range', 250, 299]))
+    await waitFor(() => expect(offsets()).toContain(250))
   })
 
-  it('bấm Trang sau tải trang kế (range 50..99)', async () => {
+  it('bấm Trang sau tải trang kế (offset 50)', async () => {
     total = 120
     renderPage()
     await screen.findByTestId('plan-table')
     await userEvent.click(screen.getByTestId('page-next'))
-    await waitFor(() => expect(calls).toContainEqual(['range', 50, 99]))
+    await waitFor(() => expect(offsets()).toContain(50))
+  })
+
+  it('prefetch: tải xong trang 1 thì tải sẵn trang 2; không prefetch khi đã là trang cuối', async () => {
+    total = 120
+    renderPage()
+    await waitFor(() => expect(offsets()).toEqual([0, 50]))
+    cleanup(); clearListCache(); rpcCalls.length = 0
+    total = 40 // chỉ 1 trang
+    renderPage()
+    await screen.findByTestId('plan-table')
+    await new Promise((r) => setTimeout(r, 20))
+    expect(offsets()).toEqual([0])
+  })
+
+  it('cache: sang trang đã prefetch và quay lại trang đã xem hiện ngay, không gọi lại server', async () => {
+    total = 120
+    renderPage()
+    await waitFor(() => expect(offsets()).toEqual([0, 50]))
+    await userEvent.click(screen.getByTestId('page-next'))
+    await waitFor(() => expect((screen.getByTestId('page-input') as HTMLInputElement).value).toBe('2'))
+    await waitFor(() => expect(offsets()).toEqual([0, 50, 100])) // trang 2 lấy từ cache, chỉ prefetch tiếp trang 3
+    await userEvent.click(screen.getByTestId('page-prev'))
+    await waitFor(() => expect((screen.getByTestId('page-input') as HTMLInputElement).value).toBe('1'))
+    expect(offsets()).toEqual([0, 50, 100]) // trang 1 từ cache, không có request mới
+  })
+
+  it('xóa phiếu → xóa cache: quay lại trang đã xem phải tải lại từ server', async () => {
+    total = 120
+    renderPage('/?page=2')
+    await waitFor(() => expect(offsets()).toEqual([50, 100]))
+    await userEvent.click(await screen.findByTestId('delete-TK0001'))
+    await userEvent.click(screen.getByTestId('confirm-ok'))
+    await screen.findByTestId('toast-success')
+    await waitFor(() => expect(offsets()).toEqual([50, 100, 50, 100])) // tải lại trang 2 + prefetch lại trang 3 (cache 100 đã bị xóa)
+    await userEvent.click(screen.getByTestId('page-prev'))
+    await waitFor(() => expect(offsets()).toEqual([50, 100, 50, 100, 0])) // trang 1 không còn trong cache; trang 2 mới tải lại nên đã có sẵn
   })
 
   it('không có số đếm → chỉ "Trang x", nút Sau tắt vì trang chưa đầy', async () => {

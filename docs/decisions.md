@@ -72,5 +72,21 @@ Mục tiêu: `inspection_details` ≥ 1–5 triệu dòng, `transport_plans` ≥
 - **Dữ liệu:** admin = root (sửa/xóa mọi phiếu, dòng bảng kiểm kể cả quá 24h; quản lý Danh mục). User như D-013.
 - **Quản lý tài khoản:** admin chỉ quản lý tài khoản **user** (tạo user, sửa họ tên, đặt lại mật khẩu, khóa/mở khóa); admin chỉ thấy tài khoản user và chính mình; không tạo admin, không đổi vai trò, không đụng admin khác/root. **Root**: tạo user hoặc admin, đổi vai trò user ↔ admin, khóa/mở khóa, đặt lại mật khẩu mọi tài khoản trừ root; không ai tạo thêm root qua giao diện.
 
+## D-015 — Tự đăng ký tài khoản, chờ duyệt (30/10/2026)
+- Trang **Đăng ký** (công khai, link từ trang Đăng nhập): nhập Họ tên + Mật khẩu (≥ 6) → cấp tên đăng nhập theo D-013 (vd `bao.lt`) → tài khoản vai trò **user**, trạng thái **Chờ duyệt**: chưa đăng nhập được (ban trong Auth) và RLS chặn.
+- **Admin/root** duyệt trong Quản lý người dùng: **Duyệt** (kích hoạt) hoặc **Từ chối** (xóa hẳn tài khoản chờ duyệt — chỉ áp cho tài khoản đang chờ, chưa có dữ liệu).
+- Thực hiện qua Edge Function công khai `register` (service role phía server, không cần đăng nhập); signup công khai của Supabase Auth vẫn TẮT. Chống spam tối thiểu: giới hạn số tài khoản chờ duyệt cùng lúc; mật khẩu & họ tên kiểm như `admin-users`.
+
+## D-016 — Hiển thị người duyệt & người sửa (30/10/2026)
+- **Tài khoản:** lưu `approved_by`, `approved_at` (người duyệt đăng ký) và `created_by` (admin/root tạo tài khoản) trong `profiles`; hiện ở Quản lý người dùng ("Duyệt bởi … lúc …" / "Tạo bởi …").
+- **Dữ liệu:** phiếu và dòng bảng kiểm hiện **người tạo** + **người sửa lần cuối** (cột `updated_by` do trigger đặt = auth.uid() khi sửa, kèm `updated_at`). Không lưu lịch sử đầy đủ (người dùng chọn mức gọn).
+- Tên người hiển thị qua RPC `get_user_names(uuid[])` (security definer, chỉ trả id + họ tên + tên đăng nhập) vì RLS `profiles` không cho user thường đọc hồ sơ người khác.
+
+## D-017 — Tăng tốc danh sách Phiếu & Bảng kiểm (30/10/2026)
+Đo trên DB thật (RLS như người dùng): `inspection_details_view` 50 dòng — **planning 82–150 ms**, execution 11–23 ms; đếm trên bảng gốc 14 ms. View ghép 15 bảng nên planner tốn thời gian mỗi request (pooler không giữ prepared plan).
+- Đọc danh sách qua RPC `list_inspection_details(...)` và `list_transport_plans(...)`: ghép theo thứ tự cố định (`set join_collapse_limit = 1`, `from_collapse_limit = 1` trong hàm) → planning vài ms; trả kèm tên người tạo/sửa (bỏ round-trip `get_user_names`). Security invoker (RLS giữ nguyên).
+- Đếm vẫn trên bảng gốc (đã nhanh).
+- FE: cache kết quả theo (bảng, bộ lọc, trang); hiện ngay dữ liệu cũ khi quay lại; prefetch trang kế; debounce ô tìm 200 ms.
+
 ## D-006 — Supabase project
 Project riêng `in-thong-ke` (ref `sybzvaybffgkgiyvevsp`, ap-southeast-1), tạo 29/10/2026.

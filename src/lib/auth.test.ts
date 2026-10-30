@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canEditRow, toLoginEmail, userActions, type Profile } from './auth'
+import { canEditRow, makeUsername, toLoginEmail, userActions, type Profile } from './auth'
 
 const H = 3_600_000
 const now = Date.parse('2026-10-30T12:00:00Z')
@@ -43,8 +43,8 @@ describe('userActions (D-014)', () => {
   const A = { id: 'a', role: 'admin' } as const
   const A2 = { id: 'a2', role: 'admin' } as const
   const U = { id: 'u', role: 'user' } as const
-  const all = { edit: true, resetPassword: true, toggleActive: true, changeRole: true }
-  const none = { edit: false, resetPassword: false, toggleActive: false, changeRole: false }
+  const none = { edit: false, resetPassword: false, toggleActive: false, changeRole: false, approve: false, reject: false }
+  const all = { ...none, edit: true, resetPassword: true, toggleActive: true, changeRole: true }
   it.each([
     ['root → user', R, U, all],
     ['root → admin', R, A, all],
@@ -59,6 +59,27 @@ describe('userActions (D-014)', () => {
   })
   it('chưa có hồ sơ → không được gì', () => {
     expect(userActions(null, U)).toEqual(none)
+  })
+  it('tài khoản chờ duyệt (D-015): admin/root chỉ Duyệt + Từ chối; user thường không được gì', () => {
+    const P = { id: 'p', role: 'user', is_pending: true } as const
+    const only = { ...none, approve: true, reject: true }
+    expect(userActions(R, P)).toEqual(only)
+    expect(userActions(A, P)).toEqual(only)
+    expect(userActions(U, P)).toEqual(none)
+    expect(userActions(A, { ...P, is_pending: false })).toEqual({ ...all, changeRole: false })
+  })
+})
+
+describe('makeUsername (D-013)', () => {
+  it.each([
+    ['Lê Thái Bão', 'bao.lt'],
+    ['Nguyễn Văn Đức', 'duc.nv'],
+    ['Lê Thái Quốc', 'quoc.lt'],
+    ['Bão', 'bao'],
+    ['  đỗ   văn  ĐẠT ', 'dat.dv'],
+    ['', ''],
+  ])('%s → %s', (name, expected) => {
+    expect(makeUsername(name)).toBe(expected)
   })
 })
 

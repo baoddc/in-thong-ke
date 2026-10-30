@@ -1,10 +1,10 @@
 // Edge Function admin-users (D-013, D-014): quản lý người dùng, chỉ admin/root đang hoạt động được gọi; quyền chi tiết ở permissions.ts.
-// POST JSON { action, ... }; action: list | preview_username | create | update | set_active | reset_password.
+// POST JSON { action, ... }; action: list | preview_username | create | update | set_active | reset_password | approve | reject (D-015).
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
-import { canManage, isRole, type Role } from './permissions.ts'
+import { type Action, canManage, isRole, type Role, type Target } from './permissions.ts'
 import { INTERNAL_EMAIL_DOMAIN, makeUsername, nextFreeUsername } from './username.ts'
 
-type Profile = { id: string; username: string; full_name: string; role: Role; is_active: boolean; created_at: string }
+type Profile = { id: string; username: string; full_name: string; role: Role; is_active: boolean; is_pending: boolean; created_by: string | null; approved_by: string | null; approved_at: string | null; created_at: string }
 type Body = { action?: string; full_name?: unknown; password?: unknown; role?: unknown; user_id?: unknown; active?: unknown }
 
 const CORS = {
@@ -16,7 +16,7 @@ const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { ...CORS, 'Content-Type': 'application/json' } })
 const fail = (error: string, status = 400) => json({ error }, status)
 
-const PROFILE_COLS = 'id, username, full_name, role, is_active, created_at'
+const PROFILE_COLS = 'id, username, full_name, role, is_active, is_pending, created_by, approved_by, approved_at, created_at'
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
 const checkPassword = (v: unknown) =>
   // 6 = mức tối thiểu thấp nhất Supabase Auth cho phép (người dùng muốn không giới hạn, D-013)
@@ -39,8 +39,11 @@ async function listAll(admin: SupabaseClient) {
     if (data.length < 1000) break
   }
   const byId = new Map(users.map((u) => [u.id, u]))
+  const nameOf = new Map(profiles.map((p) => [p.id, p.full_name]))
   return profiles.map((p) => ({
     ...p,
+    created_by_name: (p.created_by && nameOf.get(p.created_by)) || null,
+    approved_by_name: (p.approved_by && nameOf.get(p.approved_by)) || null,
     email: byId.get(p.id)?.email ?? null,
     last_sign_in_at: byId.get(p.id)?.last_sign_in_at ?? null,
   }))
@@ -69,15 +72,16 @@ async function handle(req: Request): Promise<Response> {
   }
   const myRole: Role = myProfile.role
   const myId = me.user.id
-  const deny = (target: { id: string | null; role: Role }, action: Parameters<typeof canManage>[3], newRole?: Role) => {
+  const deny = (target: Target, action: Action, newRole?: Role) => {
     const msg = canManage(myRole, myId, target, action, newRole)
     return msg ? fail(msg, 403) : null
   }
   // Tải profile đích rồi kiểm quyền; trả Response nếu lỗi.
-  const loadTarget = async (id: string, action: Parameters<typeof canManage>[3], newRole?: Role): Promise<{ err: Response | null; target?: Profile }> => {
-    const { data: target } = await admin.from('profiles').select(PROFILE_COLS).eq('id', id).maybeSingle()
-    if (!target) return { err: fail('Không tìm thấy người dùng', 404) }
-    return { target: target as Profile, err: deny(target as Profile, action, newRole) }
+  const loadTarget = async (id: string, action: Action, newRole?: Role): Promise<{ err: Response | null; target?: Profile }> => {
+    const { data } = await admin.from('profiles').select(PROFILE_COLS).eq('id', id).maybeSingle()
+    if (!data) return { err: fail('Không tìm thấy người dùng', 404) }
+    const target = data as Profile
+    return { target, err: deny({ id: target.id, role: target.role, pending: target.is_pending }, action, newRole) }
   }
 
   let body: Body
@@ -119,7 +123,8 @@ async function handle(req: Request): Promise<Response> {
           return fail(`Không tạo được tài khoản: ${cErr?.message ?? 'lỗi không rõ'}`, 500)
         }
         const { data: profile, error: pErr } = await admin.from('profiles')
-          .insert({ id: created.user.id, username, full_name: fullName, role }).select(PROFILE_COLS).single()
+          .insert({ id: created.user.id, username, full_name: fullName, role, created_by: myId, approved_by: myId, approved_at: new Date().toISOString() })
+          .select(PROFILE_COLS).single()
         if (!pErr) {
           return json({ ...profile, email: created.user.email ?? null, last_sign_in_at: null }, 201)
         }
@@ -147,7 +152,7 @@ async function handle(req: Request): Promise<Response> {
       const t = await loadTarget(id, patch.full_name !== undefined ? 'rename' : 'change_role', patch.role)
       if (t.err) return t.err
       if (patch.full_name !== undefined && patch.role !== undefined) {
-        const e = deny(t.target!, 'change_role', patch.role)
+        const e = deny({ id: t.target!.id, role: t.target!.role }, 'change_role', patch.role)
         if (e) return e
       }
       const { data, error } = await admin.from('profiles').update(patch).eq('id', id).select(PROFILE_COLS).single()
@@ -174,6 +179,30 @@ async function handle(req: Request): Promise<Response> {
       }
       const { data } = await admin.from('profiles').select(PROFILE_COLS).eq('id', id).single()
       return json(data)
+    }
+
+    case 'approve': {
+      const id = str(body.user_id)
+      if (!id) return fail('Thiếu mã người dùng')
+      const t = await loadTarget(id, 'approve')
+      if (t.err) return t.err
+      // Gỡ ban trước rồi mới bật profile (lỗi giữa chừng: profile vẫn pending, RLS chặn, bấm Duyệt lại được).
+      const { error: bErr } = await admin.auth.admin.updateUserById(id, { ban_duration: 'none' })
+      if (bErr) return fail(`Không đổi được trạng thái đăng nhập: ${bErr.message}`, 500)
+      const { data, error } = await admin.from('profiles').update({ is_active: true, is_pending: false, approved_by: myId, approved_at: new Date().toISOString() })
+        .eq('id', id).eq('is_pending', true).select(PROFILE_COLS).single()
+      if (error) return fail(`Không cập nhật được: ${error.message}`, 500)
+      return json(data)
+    }
+
+    case 'reject': {
+      const id = str(body.user_id)
+      if (!id) return fail('Thiếu mã người dùng')
+      const t = await loadTarget(id, 'reject')
+      if (t.err) return t.err
+      const { error } = await admin.auth.admin.deleteUser(id) // profile xóa theo (cascade)
+      if (error) return fail(`Không xóa được tài khoản: ${error.message}`, error.status === 404 ? 404 : 500)
+      return json({ ok: true })
     }
 
     case 'reset_password': {

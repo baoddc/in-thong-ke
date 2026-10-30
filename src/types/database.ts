@@ -44,6 +44,7 @@ export type Database = {
           driver_id: number | null
           fg_exporter_id: number | null
           note: string | null
+          updated_by: string | null
           created_by: string | null
           created_at: string
           updated_at: string
@@ -61,6 +62,7 @@ export type Database = {
           driver_id?: number | null
           fg_exporter_id?: number | null
           note?: string | null
+          updated_by?: string | null
           created_by?: string | null
           created_at?: string
           updated_at?: string
@@ -78,6 +80,7 @@ export type Database = {
           driver_id?: number | null
           fg_exporter_id?: number | null
           note?: string | null
+          updated_by?: string | null
           created_by?: string | null
           created_at?: string
           updated_at?: string
@@ -169,6 +172,7 @@ export type Database = {
           quantity: number | null
           total_weight_kg: number | null
           note: string | null
+          updated_by: string | null
           created_by: string | null
           created_at: string
           updated_at: string
@@ -192,6 +196,7 @@ export type Database = {
           quantity?: number | null
           total_weight_kg?: number | null
           note?: string | null
+          updated_by?: string | null
           created_by?: string | null
           created_at?: string
           updated_at?: string
@@ -215,6 +220,7 @@ export type Database = {
           quantity?: number | null
           total_weight_kg?: number | null
           note?: string | null
+          updated_by?: string | null
           created_by?: string | null
           created_at?: string
           updated_at?: string
@@ -330,6 +336,10 @@ export type Database = {
           full_name: string
           role: 'admin' | 'user' | 'root'
           is_active: boolean
+          is_pending: boolean
+          created_by: string | null
+          approved_by: string | null
+          approved_at: string | null
           created_at: string
           updated_at: string
         }
@@ -339,6 +349,10 @@ export type Database = {
           full_name: string
           role?: 'admin' | 'user' | 'root'
           is_active?: boolean
+          is_pending?: boolean
+          created_by?: string | null
+          approved_by?: string | null
+          approved_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -348,6 +362,10 @@ export type Database = {
           full_name?: string
           role?: 'admin' | 'user' | 'root'
           is_active?: boolean
+          is_pending?: boolean
+          created_by?: string | null
+          approved_by?: string | null
+          approved_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -390,6 +408,7 @@ export type Database = {
           shipper_id: number | null
           plan_shipper_name: string | null
           created_by: string | null
+          updated_by: string | null
         }
         Relationships: []
       }
@@ -407,6 +426,103 @@ export type Database = {
           p_note: string | null
         }
         Returns: Database['public']['Tables']['transport_plans']['Row']
+      }
+      list_inspection_details: {
+        Args: {
+          p_q?: string | null
+          p_from?: string | null
+          p_to?: string | null
+          p_export_type_id?: number | null
+          p_product_id?: number | null
+          p_construction_id?: number | null
+          p_receiving_unit_id?: number | null
+          p_sort?: string
+          p_desc?: boolean
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: {
+          id: number
+          plan_id: number | null
+          tk_number: string | null
+          transport_order_no: string | null
+          export_date: string | null
+          warehouse_slip_no: string | null
+          construction_id: number | null
+          construction_code: string | null
+          construction_name: string | null
+          work_item: string | null
+          delivery_unit_id: number | null
+          delivery_unit_name: string | null
+          receiving_unit_id: number | null
+          receiving_unit_name: string | null
+          export_type_id: number | null
+          export_type_name: string | null
+          product_id: number | null
+          product_name: string | null
+          unit_id: number | null
+          unit_name: string | null
+          quantity: number | null
+          total_weight_kg: number | null
+          shipper_name: string | null
+          vehicle_name: string | null
+          driver_name: string | null
+          carrier_id: number | null
+          carrier_name: string | null
+          note: string | null
+          created_at: string
+          updated_at: string
+          shipper_id: number | null
+          plan_shipper_name: string | null
+          created_by: string | null
+          updated_by: string | null
+          created_by_name: string | null
+          created_by_username: string | null
+          updated_by_name: string | null
+          updated_by_username: string | null
+        }[]
+      }
+      list_transport_plans: {
+        Args: {
+          p_q?: string | null
+          p_from?: string | null
+          p_to?: string | null
+          p_sort?: string
+          p_desc?: boolean
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: {
+          id: number
+          tk_number: string
+          tk_year: number
+          tk_month: number
+          tk_seq: number
+          export_date: string | null
+          transport_order_no: string | null
+          transport_type_id: number | null
+          transport_type_name: string | null
+          vehicle_id: number | null
+          vehicle_name: string | null
+          driver_id: number | null
+          driver_name: string | null
+          fg_exporter_id: number | null
+          fg_exporter_name: string | null
+          material_exporters: { id: number; name: string; sort_order: number }[]
+          note: string | null
+          created_by: string | null
+          created_by_name: string | null
+          created_by_username: string | null
+          created_at: string
+          updated_by: string | null
+          updated_by_name: string | null
+          updated_by_username: string | null
+          updated_at: string
+        }[]
+      }
+      get_user_names: {
+        Args: { p_ids: string[] }
+        Returns: { id: string; full_name: string; username: string }[]
       }
       get_lookup_items: {
         Args: { p_ids: number[] }

@@ -3,6 +3,13 @@ export type PlanRow = {
   tk_number: string
   created_at?: string
   created_by?: string | null
+  updated_at?: string | null
+  updated_by?: string | null // D-016: người sửa lần cuối (trigger đặt)
+  // D-017: tên người tạo/sửa kèm sẵn trong dòng của RPC danh sách
+  created_by_name?: string | null
+  created_by_username?: string | null
+  updated_by_name?: string | null
+  updated_by_username?: string | null
   export_date: string | null
   transport_order_no: string | null
   transport_type_id: number | null

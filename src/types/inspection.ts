@@ -31,5 +31,12 @@ export type InspectionRow = {
   carrier_name: string | null
   note: string | null
   created_at?: string | null
-  created_by?: string | null // D-013: cột cuối của view
+  created_by?: string | null // D-013
+  updated_at?: string | null
+  updated_by?: string | null // D-016: cột cuối của view
+  // D-017: tên người tạo/sửa kèm sẵn trong dòng của RPC list_inspection_details
+  created_by_name?: string | null
+  created_by_username?: string | null
+  updated_by_name?: string | null
+  updated_by_username?: string | null
 }

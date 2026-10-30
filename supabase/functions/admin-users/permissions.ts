@@ -1,8 +1,9 @@
 // Kiểm quyền quản lý tài khoản (D-014). Hàm thuần, không I/O. Trả null nếu được phép, ngược lại thông điệp lỗi (HTTP 403).
 export type Role = 'root' | 'admin' | 'user'
-export type Action = 'view' | 'create' | 'rename' | 'change_role' | 'set_active' | 'reset_password'
+export type Action = 'view' | 'create' | 'rename' | 'change_role' | 'set_active' | 'reset_password' | 'approve' | 'reject'
 // create: target.role = vai trò sẽ tạo (id bỏ qua). change_role: target.role = vai trò hiện tại, newRole = vai trò mới.
-export type Target = { id: string | null; role: Role }
+// pending: tài khoản tự đăng ký đang chờ duyệt (D-015).
+export type Target = { id: string | null; role: Role; pending?: boolean }
 
 export const isRole = (v: unknown): v is Role => v === 'root' || v === 'admin' || v === 'user'
 
@@ -23,7 +24,11 @@ export function canManage(callerRole: Role, callerId: string, target: Target, ac
       if (target.role === 'root') return 'Không thể đổi vai trò của root'
       if (newRole !== 'admin' && newRole !== 'user') return 'Chỉ được đặt vai trò admin hoặc người dùng'
       return null
+    case 'approve':
+    case 'reject':
+      return target.pending && target.role === 'user' ? null : 'Chỉ duyệt hoặc từ chối được tài khoản đang chờ duyệt'
     case 'set_active':
+      if (target.pending) return 'Tài khoản đang chờ duyệt: hãy dùng Duyệt hoặc Từ chối'
       if (target.role === 'root') return 'Không thể khóa hoặc mở khóa tài khoản root'
       return isRoot || target.role === 'user' ? null : ONLY_USER
     case 'view':

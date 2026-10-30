@@ -57,6 +57,18 @@ Deno.test('canManage theo D-014', () => {
   }
 })
 
+Deno.test('approve/reject chỉ cho user đang chờ duyệt; set_active không áp cho pending (D-015)', () => {
+  for (const caller of ['root', 'admin'] as Role[]) {
+    for (const action of ['approve', 'reject'] as Action[]) {
+      assertEquals(canManage(caller, ME, { id: OTHER, role: 'user', pending: true }, action), null)
+      assertEquals(canManage(caller, ME, { id: OTHER, role: 'user' }, action) === null, false)
+      assertEquals(canManage(caller, ME, { id: OTHER, role: 'admin', pending: true }, action) === null, false)
+    }
+    assertEquals(canManage(caller, ME, { id: OTHER, role: 'user', pending: true }, 'set_active') === null, false)
+  }
+  assertEquals(canManage('user', ME, { id: OTHER, role: 'user', pending: true }, 'approve') === null, false)
+})
+
 Deno.test('thông điệp lỗi chính', () => {
   assertEquals(canManage('admin', ME, { id: null, role: 'admin' }, 'create'), 'Chỉ root được tạo admin')
   assertEquals(canManage('admin', ME, { id: OTHER, role: 'admin' }, 'set_active'), 'Admin chỉ quản lý tài khoản người dùng')

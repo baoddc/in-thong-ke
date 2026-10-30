@@ -1,4 +1,5 @@
 ﻿import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { toLoginEmail } from '../lib/auth'
 import Button from '../components/ui/Button'
@@ -6,7 +7,7 @@ import { Field, Input } from '../components/ui/Input'
 
 /** Lỗi đăng nhập của Supabase Auth -> thông báo tiếng Việt. */
 export function loginErrorMessage(err: { status?: number; code?: string; message?: string }): string {
-  if (err.code === 'user_banned' || /banned/i.test(err.message ?? '')) return 'Tài khoản đã bị khóa, liên hệ admin'
+  if (err.code === 'user_banned' || /banned/i.test(err.message ?? '')) return 'Tài khoản đang chờ duyệt hoặc đã bị khóa, liên hệ quản trị viên'
   if (err.code === 'invalid_credentials' || err.status === 400) return 'Sai tên đăng nhập hoặc mật khẩu'
   if (err.status === 429) return 'Bạn thử quá nhiều lần. Vui lòng chờ ít phút rồi thử lại.'
   if (!err.status || /fetch|network/i.test(err.message ?? '')) return 'Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.'
@@ -56,6 +57,10 @@ export default function LoginPage() {
         <Button type="submit" variant="primary" disabled={busy} className="w-full" data-testid="login-submit">
           {busy ? 'Đang đăng nhập...' : 'Đăng nhập'}
         </Button>
+        <p className="text-center text-sm text-gray-700">
+          Chưa có tài khoản?{' '}
+          <Link to="/dang-ky" className="font-semibold text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="login-register-link">Đăng ký</Link>
+        </p>
         </div>
       </form>
     </div>

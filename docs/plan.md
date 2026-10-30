@@ -58,7 +58,11 @@ Danh mục do người dùng tự nhập trên trang "Danh mục" (D-005).
 | T-034 | Quản lý người dùng & phân quyền (D-013): profiles, RLS người tạo + 24h, Edge Function `admin-users` | backend | Code xong, Lead đã review. Edge Function `admin-users` ĐÃ DEPLOY (v1, verify_jwt on). Chờ người dùng chạy 000009, rồi tạo tài khoản Lê Thái Bão → Lead chạy `supabase/import/assign_owner_bao_lt.sql` |
 | T-035 | Trang Quản lý người dùng, đăng nhập bằng tên đăng nhập, ẩn nút theo quyền | frontend | Đang làm |
 | T-034b | Gán người tạo dữ liệu đã nạp | Lead | Xong: 21.958 phiếu + 41.799 dòng BK → bao.lt; email `.local` dùng được (bao.lt đã đăng nhập) |
-| T-036 | Vai trò root (D-014): migration 000010 + Edge Function | backend | Function v3 ĐÃ DEPLOY (nhận admin+root). Chờ người dùng chạy 000010 |
+| T-036 | Vai trò root (D-014): migration 000010 + Edge Function | backend | Xong — 000010 đã áp (thaibao06061997 = root) |
 | T-037 | Vai trò root ở giao diện + thanh phân trang mảnh (giữ đủ thông tin) | frontend | Xong — 217 test qua. Chưa push |
 | T-038 | Đếm dòng chính xác (bỏ `estimated` — sai khi có RLS, phân trang hụt trang cuối) | frontend | Xong — 221 test qua; chưa thử với DB thật. Chưa push |
+| T-039 | Tự đăng ký chờ duyệt (D-015) + người duyệt/người sửa (D-016): migration 000011, Edge Function `register`, admin-users approve/reject | backend | Xong — 000011 đã áp; `register` v1 (verify_jwt off) + `admin-users` v4 ĐÃ DEPLOY |
+| T-040 | Trang Đăng ký + Duyệt/Từ chối + hiện người duyệt/người tạo/người sửa | frontend | Xong — 242 test qua; chưa thử với backend thật. TODO nhỏ: gỡ ép kiểu `get_user_names` trong useUserNames.ts (database.ts đã có). Chưa push |
+| T-041 | RPC `list_inspection_details` / `list_transport_plans` (planning nhanh, kèm tên người) — migration 000012 | backend | Xong — đã áp. Lead đo (RLS bao.lt): BK trang đầu 23 ms tổng (trước ~173 ms = 150 planning + 23), BK lọc q+ngày 57 ms (trước ~93), Phiếu 13 ms |
+| T-042 | FE dùng RPC mới + cache + prefetch trang kế + debounce 200 ms | frontend | Xong — 247 test qua; chưa push |
 | T-005 | Dọn số xe/tài xế không hợp lệ | Lead | Chờ người dùng chạy SQL — `execute_sql` có xóa/sửa bị từ chối 2 lần |

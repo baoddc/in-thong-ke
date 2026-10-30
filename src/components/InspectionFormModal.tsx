@@ -5,6 +5,7 @@ import type { LookupItem } from '../lib/useLookups'
 import { isBigKind, type Opt } from '../lib/lookupSearch'
 import { EDIT_DENIED_HINT } from '../lib/auth'
 import { PLAN_SELECT, mergeShippers, planShipperId, shipperIdToSave } from '../lib/plans'
+import { AuditNote } from './AuditInfo'
 import LookupCombobox from './LookupCombobox'
 import Button from './ui/Button'
 import DateInput from './ui/DateInput'
@@ -184,7 +185,10 @@ export default function InspectionFormModal({ row, readOnly = false, lookups, on
       className="p-0 w-full max-w-[640px] max-h-[90vh] overflow-hidden rounded-2xl border-t-4 border-primary-brand shadow-2xl backdrop:bg-slate-900/60 open:flex flex-col max-sm:max-w-none max-sm:max-h-none max-sm:w-screen max-sm:h-dvh max-sm:rounded-none">
       <form ref={formRef} onSubmit={(e) => { e.preventDefault(); void save(false) }} className="flex flex-col min-h-0 flex-1" data-testid="inspection-form">
         <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3">
-          <h2 id="inspection-modal-title" className="text-lg font-bold">{row ? (readOnly ? 'Xem dòng bảng kiểm' : 'Sửa dòng bảng kiểm') : 'Thêm dòng bảng kiểm'}</h2>
+          <div className="min-w-0">
+            <h2 id="inspection-modal-title" className="text-lg font-bold">{row ? (readOnly ? 'Xem dòng bảng kiểm' : 'Sửa dòng bảng kiểm') : 'Thêm dòng bảng kiểm'}</h2>
+            {row && <AuditNote row={row} />}
+          </div>
           <button type="button" onClick={requestClose} aria-label="Đóng" className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-600 transition-colors duration-150 hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="inspection-close"><Icon name="close" /></button>
         </div>
         <fieldset disabled={readOnly} className="min-w-0 flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3">

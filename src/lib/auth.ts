@@ -12,22 +12,35 @@ export const ROLE_LABEL: Record<Role, string> = { root: 'Root', admin: 'Admin', 
 /** Quyền dữ liệu của admin = root (D-014). */
 export const isAdminRole = (role: Role | null | undefined): boolean => role === 'admin' || role === 'root'
 
-export type UserActions = { edit: boolean; resetPassword: boolean; toggleActive: boolean; changeRole: boolean }
+export type UserActions = { edit: boolean; resetPassword: boolean; toggleActive: boolean; changeRole: boolean; approve: boolean; reject: boolean }
 
 /**
- * Thao tác `me` được làm trên tài khoản `target` ở trang Quản lý người dùng (D-014), khớp Edge Function admin-users.
- * Chỉ để ẩn/khóa nút — quyền thật do Edge Function quyết định (trả 403).
+ * Thao tác `me` được làm trên tài khoản `target` ở trang Quản lý người dùng (D-014, D-015), khớp Edge Function admin-users.
+ * Tài khoản chờ duyệt (`is_pending`): chỉ Duyệt / Từ chối. Chỉ để ẩn/khóa nút — quyền thật do Edge Function quyết định (trả 403).
  */
-export function userActions(me: Pick<Profile, 'id' | 'role'> | null | undefined, target: Pick<Profile, 'id' | 'role'>): UserActions {
-  const none = { edit: false, resetPassword: false, toggleActive: false, changeRole: false }
-  if (!me) return none
+export function userActions(me: Pick<Profile, 'id' | 'role'> | null | undefined, target: Pick<Profile, 'id' | 'role'> & { is_pending?: boolean }): UserActions {
+  const none = { edit: false, resetPassword: false, toggleActive: false, changeRole: false, approve: false, reject: false }
+  if (!me || !isAdminRole(me.role)) return none
+  if (target.is_pending) return { ...none, approve: true, reject: true }
   const self = me.id === target.id
   if (me.role === 'root') {
     const isRootTarget = target.role === 'root'
-    return { edit: true, resetPassword: true, toggleActive: !isRootTarget && !self, changeRole: !isRootTarget && !self }
+    return { ...none, edit: true, resetPassword: true, toggleActive: !isRootTarget && !self, changeRole: !isRootTarget && !self }
   }
-  if (me.role === 'admin' && (self || target.role === 'user')) return { edit: true, resetPassword: true, toggleActive: !self, changeRole: false }
+  if (self || target.role === 'user') return { ...none, edit: true, resetPassword: true, toggleActive: !self }
   return none
+}
+
+/**
+ * Tên đăng nhập gợi ý từ họ tên (D-013): tên (chữ cuối) + "." + chữ cái đầu của họ và tên đệm, bỏ dấu, đ→d, chữ thường.
+ * "Lê Thái Bão" → bao.lt; "Bão" → bao. Chỉ để xem trước — máy chủ quyết định tên cuối (trùng thì thêm số).
+ */
+export function makeUsername(fullName: string): string {
+  const words = fullName
+    .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase()
+    .split(/[^a-z0-9]+/).filter(Boolean)
+  const last = words.pop() ?? ''
+  return words.length ? `${last}.${words.map((w) => w[0]).join('')}` : last
 }
 
 export const EDIT_WINDOW_HOURS = 24

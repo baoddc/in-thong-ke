@@ -2,10 +2,12 @@ import { useCallback, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { errorMessage, formatDate, formatNumber } from '../lib/format'
 import { useLookups } from '../lib/useLookups'
-import { applyFilters, applyList, countActiveFilters, type ListConfig } from '../lib/listQuery'
+import { applyFilters, countActiveFilters, type ListConfig } from '../lib/listQuery'
+import { idOrNull, rpcList } from '../lib/listRpc'
 import { useListPage, type Fetcher } from '../lib/useListPage'
 import { useShortcuts } from '../lib/useShortcuts'
 import { isSmallScreen, usePersistentToggle } from '../lib/usePersistentToggle'
+import { AuditCell } from '../components/AuditInfo'
 import LookupCombobox from '../components/LookupCombobox'
 import InspectionFormModal from '../components/InspectionFormModal'
 import ListToolbar from '../components/ListToolbar'
@@ -29,10 +31,13 @@ const CFG: ListConfig = {
   searchCols: ['tk_number', 'warehouse_slip_no'], // chỉ cột có index trigram (D-012)
   dateCol: 'export_date', filterCols: { type: 'export_type_id', product: 'product_id', cons: 'construction_id', recv: 'receiving_unit_id' }, tiebreak: 'id',
 }
-// Dữ liệu từ view (không đếm: đếm qua view chậm do lateral join); đếm chính xác riêng trên bảng gốc, cùng bộ lọc, chạy song song.
+// Dữ liệu trang qua RPC (không qua view trực tiếp: planning chậm; kèm tên người tạo/sửa — D-017); đếm chính xác riêng trên bảng gốc, cùng bộ lọc, chạy song song.
 const fetchRows: Fetcher = async (p) => {
   const [rows, cnt] = await Promise.all([
-    applyList(supabase.from('inspection_details_view').select('*'), p, CFG),
+    rpcList('list_inspection_details', p, {
+      p_export_type_id: idOrNull(p.filters.type), p_product_id: idOrNull(p.filters.product),
+      p_construction_id: idOrNull(p.filters.cons), p_receiving_unit_id: idOrNull(p.filters.recv),
+    }),
     applyFilters(supabase.from('inspection_details').select('id', { count: 'exact', head: true }), p, CFG),
   ])
   return { data: rows.data, error: rows.error, count: cnt.error ? null : cnt.count }
@@ -45,7 +50,7 @@ export default function InspectionPage() {
   const toast = useToast()
   const { profile } = useProfile()
   const canEdit = (r: InspectionRow) => canEditRow(profile, r.created_by, r.created_at)
-  const list = useListPage<InspectionRow>(CFG, fetchRows)
+  const list = useListPage<InspectionRow>(CFG, fetchRows, 'inspection_details')
   const { p, update, reload } = list
   const searchRef = useRef<HTMLInputElement>(null)
   const [modal, setModal] = useState<{ row: InspectionRow | null } | null>(null) // null: đóng
@@ -93,6 +98,7 @@ export default function InspectionPage() {
     { key: 'driver', header: 'Tên tài xế/ phụ xe', render: (r) => r.driver_name },
     { key: 'carrier', header: 'Nhà xe', render: (r) => r.carrier_name },
     { key: 'note', header: 'Ghi chú', render: (r) => r.note },
+    { key: 'audit', header: 'Người tạo / sửa', nowrap: true, render: (r) => <AuditCell row={r} /> },
     {
       key: 'actions', header: 'Thao tác', nowrap: true,
       render: (r) => (

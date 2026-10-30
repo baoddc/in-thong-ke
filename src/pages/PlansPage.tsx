@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { errorMessage, formatDate, formatNumber } from '../lib/format'
 import { useLookups } from '../lib/useLookups'
-import { applyList, countActiveFilters, type ListConfig } from '../lib/listQuery'
+import { applyFilters, countActiveFilters, type ListConfig } from '../lib/listQuery'
+import { rpcList } from '../lib/listRpc'
 import { useListPage, type Fetcher } from '../lib/useListPage'
 import { useMonthStats } from '../lib/useMonthStats'
 import { useShortcuts } from '../lib/useShortcuts'
 import { isSmallScreen, usePersistentToggle } from '../lib/usePersistentToggle'
+import { AuditCell } from '../components/AuditInfo'
 import PlanFormModal from '../components/PlanFormModal'
 import ListToolbar from '../components/ListToolbar'
 import { Badge, PersonChip, PersonChips } from '../components/ui/Badge'
@@ -22,7 +24,7 @@ import Pagination from '../components/ui/Pagination'
 import { useToast } from '../components/ui/Toast'
 import { EDIT_DENIED_HINT, canEditRow } from '../lib/auth'
 import { useProfile } from '../lib/useProfile'
-import { PLAN_SELECT, sortedMaterials } from '../lib/plans'
+import { fromRpcPlan, sortedMaterials, type PlanRpcRow } from '../lib/plans'
 import type { PlanRow } from '../types/plan'
 
 const CFG: ListConfig = {
@@ -30,7 +32,14 @@ const CFG: ListConfig = {
   defaultSort: 'created_at', defaultDir: 'desc', descFirst: ['created_at', 'export_date'],
   searchCols: ['tk_number', 'transport_order_no'], dateCol: 'export_date', filterCols: {}, tiebreak: 'id',
 }
-const fetchPlans: Fetcher = (p) => applyList(supabase.from('transport_plans').select(PLAN_SELECT, { count: 'exact' }), p, CFG)
+// Dữ liệu trang qua RPC (planning nhanh, kèm tên người tạo/sửa — D-017) + đếm exact trên bảng gốc cùng bộ lọc, chạy song song.
+const fetchPlans: Fetcher = async (p) => {
+  const [rows, cnt] = await Promise.all([
+    rpcList('list_transport_plans', p),
+    applyFilters(supabase.from('transport_plans').select('id', { count: 'exact', head: true }), p, CFG),
+  ])
+  return { data: rows.error ? null : ((rows.data ?? []) as PlanRpcRow[]).map(fromRpcPlan), error: rows.error, count: cnt.error ? null : cnt.count }
+}
 
 // Màu theo thẻ: đỏ (thương hiệu), xanh dương (thông tin), cam (khối lượng). Viết nguyên chuỗi để Tailwind quét được.
 const TONES = {
@@ -58,7 +67,7 @@ export default function PlansPage() {
   const stats = useMonthStats()
   const { profile } = useProfile()
   const canEdit = (r: PlanRow) => canEditRow(profile, r.created_by, r.created_at)
-  const list = useListPage<PlanRow>(CFG, fetchPlans)
+  const list = useListPage<PlanRow>(CFG, fetchPlans, 'transport_plans')
   const { p, update, reload } = list
   const searchRef = useRef<HTMLInputElement>(null)
   const [modal, setModal] = useState<{ plan: PlanRow | null } | null>(null) // null: đóng
@@ -99,6 +108,7 @@ export default function PlansPage() {
     { key: 'fg', header: 'NV xuất TP/BTP', render: (r) => <PersonChip name={r.fg_exporter?.name} /> },
     { key: 'mat', header: 'NV xuất VT', render: (r) => <PersonChips names={sortedMaterials(r).flatMap((m) => (m.lookup?.name ? [m.lookup.name] : []))} /> },
     { key: 'note', header: 'Ghi chú', render: (r) => r.note },
+    { key: 'audit', header: 'Người tạo / sửa', nowrap: true, render: (r) => <AuditCell row={r} /> },
     {
       key: 'actions', header: 'Thao tác', nowrap: true,
       render: (r) => (

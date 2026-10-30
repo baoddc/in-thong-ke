@@ -4,6 +4,8 @@ import { supabase } from './lib/supabase'
 import { useSession } from './lib/useSession'
 import Icon, { type IconName } from './components/ui/Icon'
 import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
+import { usePendingCount } from './lib/useAdminUsers'
 import PlansPage from './pages/PlansPage'
 import InspectionPage from './pages/InspectionPage'
 import PrintPage from './pages/PrintPage'
@@ -42,6 +44,7 @@ function LogoTile({ className = 'h-10 w-10' }: { className?: string }) {
 export function Layout({ email }: { email: string }) {
   const { profile, isAdmin } = useProfile()
   const displayName = profile?.full_name || email
+  const pending = usePendingCount(isAdmin) // D-015: badge số tài khoản chờ duyệt
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [drawer, setDrawer] = useState(false) // ngăn kéo trên màn hình nhỏ
   const showLabels = !collapsed || drawer // ngăn kéo luôn hiện nhãn
@@ -89,11 +92,19 @@ export function Layout({ email }: { email: string }) {
           )}
         </div>
         <nav aria-label="Menu chính" className="mt-1 flex flex-col gap-1">
-          {(isAdmin ? [...ITEMS, ...ADMIN_ITEMS] : ITEMS).map((i) => (
-            <NavLink key={i.to} to={i.to} end={i.end} className={link} onClick={() => setDrawer(false)} {...hint(i.label)}>
-              <Icon name={i.icon} />{showLabels && <span>{i.label}</span>}
-            </NavLink>
-          ))}
+          {(isAdmin ? [...ITEMS, ...ADMIN_ITEMS] : ITEMS).map((i) => {
+            const count = i.to === '/nguoi-dung' ? pending : 0
+            return (
+              <NavLink key={i.to} to={i.to} end={i.end} className={link} onClick={() => setDrawer(false)}
+                {...hint(count ? `${i.label} (${count} chờ duyệt)` : i.label)}>
+                <Icon name={i.icon} />
+                {showLabels && <span>{i.label}</span>}
+                {count > 0 && (
+                  <span className={showLabels ? 'ml-auto rounded-full bg-orange-500 px-2 text-xs font-bold text-white' : 'sr-only'} data-testid="pending-badge" title={`${count} tài khoản chờ duyệt`}>{count}</span>
+                )}
+              </NavLink>
+            )
+          })}
         </nav>
         <div className="mt-auto space-y-1 border-t border-white/10 pt-2">
           <button onClick={toggle} aria-expanded={!collapsed} aria-label={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
@@ -155,6 +166,7 @@ export default function App() {
   const routes = (
     <Routes>
       <Route path="/dang-nhap" element={session ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/dang-ky" element={session ? <Navigate to="/" replace /> : <RegisterPage />} />
       <Route element={session ? <AccessGate email={session.user.email ?? ''} /> : <Navigate to="/dang-nhap" replace />}>
         <Route path="/" element={<PlansPage />} />
         <Route path="/bang-kiem" element={<InspectionPage />} />

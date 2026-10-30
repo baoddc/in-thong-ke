@@ -9,6 +9,9 @@ const users = [
   { id: 'u2', username: 'quoc.lt', full_name: 'Lê Thái Quốc', role: 'user', is_active: false, created_at: '2026-10-03T03:00:00Z', email: 'quoc.lt@kho-an-ha.local', last_sign_in_at: null },
 ]
 users.push({ id: 'r1', username: 'root', full_name: 'Bão Root', role: 'root', is_active: true, created_at: '2026-09-01T03:00:00Z', email: 'thaibao06061997@gmail.com', last_sign_in_at: null })
+users.push({ id: 'p1', username: 'duc.nv', full_name: 'Nguyễn Văn Đức', role: 'user', is_active: false, is_pending: true, created_at: '2026-10-29T03:00:00Z', email: 'duc.nv@kho-an-ha.local', last_sign_in_at: null, approved_by_name: null, approved_at: null, created_by_name: null } as never)
+Object.assign(users[1], { approved_by_name: 'Quản Trị', approved_at: '2026-10-30T07:05:00Z' })
+Object.assign(users[2], { created_by_name: 'Bão Root' })
 const invoke = vi.fn()
 const me = { id: 'a1', role: 'admin', is_active: true }
 vi.mock('../lib/supabase', () => ({ supabase: { functions: { invoke: (n: string, o: unknown) => invoke(n, o) } } }))
@@ -145,6 +148,46 @@ describe('UsersPage', () => {
     expect((screen.getByTestId('user-edit-role') as HTMLSelectElement).disabled).toBe(false)
     await userEvent.click(screen.getByTestId('user-edit-cancel'))
     expect(off('user-toggle-admin')).toBe(false)
+  })
+
+  it('chờ duyệt (D-015): badge cam, lên đầu bảng, chỉ có Duyệt/Từ chối; ghi chú Duyệt bởi/Tạo bởi', async () => {
+    setup()
+    const table = await screen.findByTestId('user-table')
+    const rows = Array.from(table.querySelectorAll('[data-testid^="user-row-"]')).map((r) => r.getAttribute('data-testid'))
+    expect(rows[0]).toBe('user-row-duc.nv')
+    const row = within(screen.getByTestId('user-row-duc.nv'))
+    expect(row.getByText('Chờ duyệt').className).toContain('bg-orange-100')
+    expect(screen.queryByTestId('user-edit-duc.nv')).toBeNull()
+    expect(screen.queryByTestId('user-toggle-duc.nv')).toBeNull()
+    expect(screen.queryByTestId('user-reset-duc.nv')).toBeNull()
+    expect((screen.getByTestId('user-approve-duc.nv') as HTMLButtonElement).disabled).toBe(false)
+    expect(within(screen.getByTestId('user-row-bao.lt')).getByText('Duyệt bởi Quản Trị · 30/10/2026 14:05')).toBeTruthy()
+    expect(within(screen.getByTestId('user-row-quoc.lt')).getByText('Tạo bởi Bão Root')).toBeTruthy()
+    expect(within(screen.getByTestId('user-row-admin')).getByText('—')).toBeTruthy()
+  })
+
+  it('Duyệt gọi action approve; Từ chối hỏi xác nhận rồi gọi reject', async () => {
+    setup()
+    await userEvent.click(await screen.findByTestId('user-approve-duc.nv'))
+    await waitFor(() => expect(body('approve')).toEqual([{ action: 'approve', user_id: 'p1' }]))
+    expect(body('reject')).toHaveLength(0)
+
+    await userEvent.click(screen.getByTestId('user-reject-duc.nv'))
+    expect(screen.getByTestId('confirm-dialog').textContent).toContain('Từ chối sẽ xóa hẳn yêu cầu đăng ký của Nguyễn Văn Đức')
+    expect(body('reject')).toHaveLength(0) // chưa xác nhận
+    await userEvent.click(screen.getByTestId('confirm-ok'))
+    await waitFor(() => expect(body('reject')).toEqual([{ action: 'reject', user_id: 'p1' }]))
+  })
+
+  it('bộ lọc nhanh "Chờ duyệt (n)" chỉ giữ dòng chờ duyệt', async () => {
+    setup()
+    await screen.findByTestId('user-table')
+    expect(screen.getByTestId('filter-pending').textContent).toBe('Chờ duyệt (1)')
+    await userEvent.click(screen.getByTestId('filter-pending'))
+    expect(screen.queryByTestId('user-row-bao.lt')).toBeNull()
+    expect(screen.getByTestId('user-row-duc.nv')).toBeTruthy()
+    await userEvent.click(screen.getByTestId('filter-all'))
+    expect(screen.getByTestId('user-row-bao.lt')).toBeTruthy()
   })
 
   it('lỗi tải danh sách → thông báo + nút Thử lại', async () => {
