@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@page { size: A4 portrait; margin: 8mm; }
+
+/* Hộp thoại: mờ dần + phóng nhẹ khi mở (nền mờ dần). */
+dialog[open] { animation: pop-in 180ms ease-out; }
+dialog[open]::backdrop { animation: fade-in 180ms ease-out; }
+
+/* Người dùng tắt hiệu ứng chuyển động trong hệ điều hành → bỏ hết animation/transition. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+
+/* Bản in "In thống kê": giữ màu nền header, lặp header bảng ở trang sau, không cắt đôi dòng. */
+.print-sheet, .print-sheet * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+.print-sheet { font-family: "Times New Roman", Times, serif; }
+.print-sheet thead { display: table-header-group; }
+.print-sheet tr { break-inside: avoid; }

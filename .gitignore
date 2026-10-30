@@ -1,0 +1,16 @@
+﻿node_modules
+dist
+.env.local
+*.local
+
+# Dữ liệu nghiệp vụ thật — không đưa lên Git (người dùng chốt 30/10/2026)
+data/raw/
+data/clean/
+data/scripts/*.txt
+chuan-bi/
+
+# Công cụ cục bộ
+.claude/skills/
+.claude/settings.local.json
+.playwright-mcp/
+.archify/

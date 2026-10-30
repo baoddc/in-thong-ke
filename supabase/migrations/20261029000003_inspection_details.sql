@@ -1,0 +1,229 @@
+-- T-009 / D-008: Bảng kiểm chi tiết (sheet 02.BANG KEML CHI TIET).
+-- Viết để chạy lại được khi dán vào SQL Editor (mỗi câu có thể commit riêng): if not exists / or replace / drop if exists.
+begin;
+
+-- ---------- 1. lookup_items: cột code + kind mới ----------
+alter table public.lookup_items add column if not exists code text;
+
+alter table public.lookup_items drop constraint if exists lookup_items_code_check;
+alter table public.lookup_items add constraint lookup_items_code_check
+  check (code is null or (code = btrim(code) and code <> ''));
+
+alter table public.lookup_items drop constraint if exists lookup_items_kind_check;
+alter table public.lookup_items add constraint lookup_items_kind_check
+  check (kind in ('transport_type','vehicle','driver','fg_exporter','material_exporter',
+    'construction','delivery_unit','receiving_unit','export_type','product','unit','carrier'));
+
+create unique index if not exists lookup_items_kind_code_uq
+  on public.lookup_items (kind, lower(code)) where code is not null;
+
+insert into public.lookup_items (kind, name) values ('delivery_unit', 'An Hạ') on conflict do nothing;
+
+-- ---------- 2. NV xuất VT có thứ tự + RPC ghi sort_order ----------
+alter table public.transport_plan_material_exporters add column if not exists sort_order int not null default 0;
+
+-- Chữ ký và logic như migration 000002; chỉ khác phần insert NV xuất VT (ghi sort_order = vị trí trong mảng).
+create or replace function public.create_transport_plan(
+  p_export_date date, p_transport_order_no text, p_transport_type_id bigint, p_vehicle_id bigint,
+  p_driver_id bigint, p_fg_exporter_id bigint, p_material_exporter_ids bigint[], p_note text)
+returns public.transport_plans language plpgsql set search_path = '' as $$
+declare
+  v_now timestamp := now() at time zone 'Asia/Ho_Chi_Minh';
+  v_y int := extract(year from v_now)::int;
+  v_m int := extract(month from v_now)::int;
+  v_seq int;
+  v_row public.transport_plans;
+begin
+  perform pg_advisory_xact_lock(hashtext('tk_number'));
+  v_seq := public.tk_next_seq(v_y, v_m);
+  if v_seq is null then
+    raise exception 'Đã hết số phiếu thống kê trong tháng %/%', v_m, v_y using errcode = 'P0001';
+  end if;
+
+  insert into public.transport_plans (tk_number, tk_year, tk_month, tk_seq, export_date, transport_order_no,
+    transport_type_id, vehicle_id, driver_id, fg_exporter_id, note)
+  values (public.tk_format(v_y, v_m, v_seq), v_y, v_m, v_seq, p_export_date, nullif(btrim(p_transport_order_no), ''),
+    p_transport_type_id, p_vehicle_id, p_driver_id, p_fg_exporter_id, nullif(btrim(p_note), ''))
+  returning * into v_row;
+
+  -- bỏ null, bỏ trùng (giữ lần xuất hiện đầu), sort_order = thứ tự còn lại bắt đầu từ 0
+  insert into public.transport_plan_material_exporters (plan_id, lookup_id, sort_order)
+  select v_row.id, s.x, (row_number() over (order by s.o) - 1)::int
+  from (select t.x, min(t.o) as o
+        from unnest(coalesce(p_material_exporter_ids, '{}')) with ordinality as t(x, o)
+        where t.x is not null group by t.x) s;
+
+  return v_row;
+end $$;
+
+create or replace function public.update_transport_plan(
+  p_id bigint, p_export_date date, p_transport_order_no text, p_transport_type_id bigint, p_vehicle_id bigint,
+  p_driver_id bigint, p_fg_exporter_id bigint, p_material_exporter_ids bigint[], p_note text)
+returns public.transport_plans language plpgsql set search_path = '' as $$
+declare
+  v_row public.transport_plans;
+begin
+  update public.transport_plans set
+    export_date = p_export_date,
+    transport_order_no = nullif(btrim(p_transport_order_no), ''),
+    transport_type_id = p_transport_type_id,
+    vehicle_id = p_vehicle_id,
+    driver_id = p_driver_id,
+    fg_exporter_id = p_fg_exporter_id,
+    note = nullif(btrim(p_note), '')
+  where id = p_id
+  returning * into v_row;
+
+  if not found then
+    raise exception 'Không tìm thấy phiếu cần sửa' using errcode = 'P0002';
+  end if;
+
+  delete from public.transport_plan_material_exporters where plan_id = p_id;
+  insert into public.transport_plan_material_exporters (plan_id, lookup_id, sort_order)
+  select p_id, s.x, (row_number() over (order by s.o) - 1)::int
+  from (select t.x, min(t.o) as o
+        from unnest(coalesce(p_material_exporter_ids, '{}')) with ordinality as t(x, o)
+        where t.x is not null group by t.x) s;
+
+  return v_row;
+end $$;
+
+-- create or replace giữ nguyên quyền cũ; khai báo lại cho chắc
+revoke execute on function
+  public.create_transport_plan(date,text,bigint,bigint,bigint,bigint,bigint[],text),
+  public.update_transport_plan(bigint,date,text,bigint,bigint,bigint,bigint,bigint[],text)
+  from public, anon;
+grant execute on function
+  public.create_transport_plan(date,text,bigint,bigint,bigint,bigint,bigint[],text),
+  public.update_transport_plan(bigint,date,text,bigint,bigint,bigint,bigint,bigint[],text)
+  to authenticated;
+
+-- ---------- 3. Bảng inspection_details ----------
+create table if not exists public.inspection_details (
+  id bigint generated by default as identity primary key,
+  plan_id bigint not null constraint inspection_details_plan_id_fkey
+    references public.transport_plans(id) on delete restrict,
+  export_date date,
+  warehouse_slip_no text,
+  construction_id bigint constraint inspection_details_construction_id_fkey references public.lookup_items(id) on delete restrict,
+  delivery_unit_id bigint constraint inspection_details_delivery_unit_id_fkey references public.lookup_items(id) on delete restrict,
+  receiving_unit_id bigint constraint inspection_details_receiving_unit_id_fkey references public.lookup_items(id) on delete restrict,
+  export_type_id bigint constraint inspection_details_export_type_id_fkey references public.lookup_items(id) on delete restrict,
+  product_id bigint constraint inspection_details_product_id_fkey references public.lookup_items(id) on delete restrict,
+  unit_id bigint constraint inspection_details_unit_id_fkey references public.lookup_items(id) on delete restrict,
+  carrier_id bigint constraint inspection_details_carrier_id_fkey references public.lookup_items(id) on delete restrict,
+  work_item text,
+  quantity numeric(18,3) check (quantity >= 0),
+  total_weight_kg numeric(18,3) check (total_weight_kg >= 0),
+  note text,
+  created_by uuid default auth.uid() constraint inspection_details_created_by_fkey
+    references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists inspection_details_plan_id_idx on public.inspection_details (plan_id);
+create index if not exists inspection_details_construction_id_idx on public.inspection_details (construction_id);
+create index if not exists inspection_details_delivery_unit_id_idx on public.inspection_details (delivery_unit_id);
+create index if not exists inspection_details_receiving_unit_id_idx on public.inspection_details (receiving_unit_id);
+create index if not exists inspection_details_export_type_id_idx on public.inspection_details (export_type_id);
+create index if not exists inspection_details_product_id_idx on public.inspection_details (product_id);
+create index if not exists inspection_details_unit_id_idx on public.inspection_details (unit_id);
+create index if not exists inspection_details_carrier_id_idx on public.inspection_details (carrier_id);
+create index if not exists inspection_details_created_by_idx on public.inspection_details (created_by);
+create index if not exists inspection_details_created_at_idx on public.inspection_details (created_at desc);
+create index if not exists inspection_details_export_date_idx on public.inspection_details (export_date);
+
+drop trigger if exists inspection_details_set_updated_at on public.inspection_details;
+create trigger inspection_details_set_updated_at before update on public.inspection_details
+  for each row execute function public.set_updated_at();
+
+revoke all on public.inspection_details from anon;
+grant select, insert, update, delete on public.inspection_details to authenticated;
+alter table public.inspection_details enable row level security;
+
+drop policy if exists inspection_details_select on public.inspection_details;
+drop policy if exists inspection_details_insert on public.inspection_details;
+drop policy if exists inspection_details_update on public.inspection_details;
+drop policy if exists inspection_details_delete on public.inspection_details;
+create policy inspection_details_select on public.inspection_details for select to authenticated using ((select auth.uid()) is not null);
+create policy inspection_details_insert on public.inspection_details for insert to authenticated with check ((select auth.uid()) is not null);
+create policy inspection_details_update on public.inspection_details for update to authenticated using ((select auth.uid()) is not null) with check ((select auth.uid()) is not null);
+create policy inspection_details_delete on public.inspection_details for delete to authenticated using ((select auth.uid()) is not null);
+
+-- ---------- 4. View đọc (RLS áp theo người gọi) ----------
+create or replace view public.inspection_details_view with (security_invoker = true) as
+select
+  d.id,
+  d.plan_id,
+  p.tk_number,
+  p.transport_order_no,
+  d.export_date,
+  d.warehouse_slip_no,
+  d.construction_id,
+  con.code as construction_code,
+  con.name as construction_name,
+  d.work_item,
+  d.delivery_unit_id,
+  du.name as delivery_unit_name,
+  d.receiving_unit_id,
+  ru.name as receiving_unit_name,
+  d.export_type_id,
+  et.name as export_type_name,
+  d.product_id,
+  pr.name as product_name,
+  d.unit_id,
+  un.name as unit_name,
+  d.quantity,
+  d.total_weight_kg,
+  coalesce(fg.name, mx.name) as shipper_name,  -- NV xuất TP/BTP; trống thì NV xuất VT được chọn đầu tiên
+  veh.name as vehicle_name,
+  drv.name as driver_name,
+  d.carrier_id,
+  ca.name as carrier_name,
+  d.note,
+  d.created_at,
+  d.updated_at
+from public.inspection_details d
+join public.transport_plans p on p.id = d.plan_id
+left join public.lookup_items con on con.id = d.construction_id
+left join public.lookup_items du on du.id = d.delivery_unit_id
+left join public.lookup_items ru on ru.id = d.receiving_unit_id
+left join public.lookup_items et on et.id = d.export_type_id
+left join public.lookup_items pr on pr.id = d.product_id
+left join public.lookup_items un on un.id = d.unit_id
+left join public.lookup_items ca on ca.id = d.carrier_id
+left join public.lookup_items fg on fg.id = p.fg_exporter_id
+left join public.lookup_items veh on veh.id = p.vehicle_id
+left join public.lookup_items drv on drv.id = p.driver_id
+left join lateral (
+  select l.name
+  from public.transport_plan_material_exporters m
+  join public.lookup_items l on l.id = m.lookup_id
+  where m.plan_id = d.plan_id
+  order by m.sort_order, m.lookup_id
+  limit 1
+) mx on true;
+
+revoke all on public.inspection_details_view from anon;
+grant select on public.inspection_details_view to authenticated;
+
+-- ---------- 5. Kiểm tra cấu trúc (không phụ thuộc biến từ câu trước) ----------
+do $$
+begin
+  assert (select count(*) from public.lookup_items) >= 2119, 'lookup_items: mất dữ liệu';
+  assert exists (select 1 from public.lookup_items where kind = 'delivery_unit' and name = 'An Hạ'), 'thiếu delivery_unit An Hạ';
+  assert exists (select 1 from information_schema.columns
+                 where table_schema = 'public' and table_name = 'lookup_items' and column_name = 'code'), 'thiếu lookup_items.code';
+  assert exists (select 1 from information_schema.columns
+                 where table_schema = 'public' and table_name = 'transport_plan_material_exporters' and column_name = 'sort_order'), 'thiếu sort_order';
+  assert exists (select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                 where n.nspname = 'public' and c.relname = 'inspection_details' and c.relrowsecurity), 'inspection_details chưa bật RLS';
+  assert (select count(*) from pg_policies where schemaname = 'public' and tablename = 'inspection_details') = 4, 'inspection_details: thiếu policy';
+  assert exists (select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                 where n.nspname = 'public' and c.relname = 'inspection_details_view'
+                   and 'security_invoker=true' = any (c.reloptions)), 'view thiếu security_invoker';
+  perform 1 from public.inspection_details_view limit 1;
+end $$;
+
+commit;
