@@ -87,5 +87,6 @@ Danh mục do người dùng tự nhập trên trang "Danh mục" (D-005).
 | T-061 | D-022: Tìm nhanh Bảng kiểm trên mọi cột — migration 000019 (list/count_inspection_details) | backend | Xong (đã chạy) |
 | T-064 | Bản in: chỉ 1 NV xuất kho = NV xuất TP/BTP, không có thì NV xuất VT đầu tiên (pickShipper) | frontend | Xong |
 | T-065 | Bản in: ô ký tên cao 28 mm (trước ~17 mm) | frontend | Xong |
+| T-066 | Bản in: cột Ngày + Số phiếu xuất kho 1 dòng (7pt, nowrap; rộng 8,5%/9,5%, Tên CT 13,5%) | frontend | Xong |
 | T-052 | Vẽ lại sơ đồ Luồng công việc bằng Archify → public/luong-cong-viec.html (nguồn: .archify/workflow-luong-cong-viec-20261030-142358/candidate.json) | Lead | Xong |
 | T-005 | Dọn số xe/tài xế không hợp lệ | Lead | Chờ người dùng chạy SQL — `execute_sql` có xóa/sửa bị từ chối 2 lần |

@@ -5,7 +5,7 @@ import type { PlanRow } from '../types/plan'
 import type { InspectionRow } from '../types/inspection'
 
 const HEADERS = ['', 'Ngày', 'Số phiếu xuất kho', 'Loại hình xuất', 'Mã CT', 'Tên công trình', 'Hạng mục', 'Đơn vị Nhận/ Gia Công', 'ĐVT', 'Số lượng', 'Khối lượng (kg)', 'Mặt hàng', 'Ghi chú']
-const WIDTHS = [3, 7, 8, 9, 7, 17, 7, 8, 4, 6, 8, 9, 7] // % bề rộng cột, tổng 100
+const WIDTHS = [3, 8.5, 9.5, 9, 7, 13.5, 7, 8, 4, 6, 8, 9, 7] // % bề rộng cột, tổng 100
 const cell = 'border border-gray-500 px-0.5 py-0.5 align-middle break-words'
 const blue = 'text-blue-900'
 
@@ -46,8 +46,8 @@ export default function PrintSheet({ plan, rows }: { plan: PlanRow; rows: Inspec
           {rows.map((r, i) => (
             <tr key={r.id} className="break-inside-avoid" data-testid={`print-row-${r.id}`}>
               <td className={`${cell} text-center`}>{i + 1}</td>
-              <td className={`${cell} text-center`}>{formatDate(r.export_date)}</td>
-              <td className={`${cell} text-center break-words`}>{r.warehouse_slip_no}</td>
+              <td className={`${cell} text-center whitespace-nowrap text-[7pt]`}>{formatDate(r.export_date)}</td>
+              <td className={`${cell} text-center whitespace-nowrap text-[7pt]`}>{r.warehouse_slip_no}</td>
               <td className={`${cell} text-center`}>{r.export_type_name}</td>
               <td className={`${cell} text-center break-words`}>{r.construction_code}</td>
               <td className={`${cell} break-words`}>{r.construction_name}</td>
