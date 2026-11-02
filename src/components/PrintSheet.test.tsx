@@ -50,4 +50,17 @@ describe('PrintSheet', () => {
     expect(screen.getByTestId('print-driver').textContent).toBe('PHẠM MINH LUÂN')
     expect(screen.getByTestId('print-shipper').textContent).toBe('LÊ VĂN CHIÊU')
   })
+
+  it('chỉ hiện 1 NV xuất: ưu tiên NV xuất TP/BTP, bỏ qua shipper_name của dòng', () => {
+    const p = { ...plan, fg_exporter: { name: 'Lê Văn Chiêu' } } as PlanRow
+    render(<PrintSheet plan={p} rows={[row({ shipper_name: 'Lê Duy Khánh' })]} />)
+    expect(screen.getByTestId('print-shipper').textContent).toBe('LÊ VĂN CHIÊU')
+  })
+
+  it('không có NV xuất TP/BTP: lấy NV xuất vật tư đầu tiên theo sort_order', () => {
+    const m = (id: number, name: string, sort_order: number) => ({ sort_order, lookup: { id, name } })
+    const p = { ...plan, material_exporters: [m(2, 'Bình', 2), m(1, 'An', 1)] } as unknown as PlanRow
+    render(<PrintSheet plan={p} rows={[row({ shipper_name: 'Lê Duy Khánh' })]} />)
+    expect(screen.getByTestId('print-shipper').textContent).toBe('AN')
+  })
 })

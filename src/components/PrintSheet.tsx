@@ -1,6 +1,6 @@
 import { formatDate } from '../lib/format'
 import { pickShipper } from '../lib/plans'
-import { carrierList, countSlips, formatDateTime, formatFixed2, shipperList, sumField } from '../lib/printSummary'
+import { carrierList, countSlips, formatDateTime, formatFixed2, sumField } from '../lib/printSummary'
 import type { PlanRow } from '../types/plan'
 import type { InspectionRow } from '../types/inspection'
 
@@ -11,7 +11,7 @@ const blue = 'text-blue-900'
 
 // Bản in "Thống kê bàn giao phiếu xuất kho" theo mẫu mau-phieu-in.pdf (A4 đứng, vùng in 194mm).
 export default function PrintSheet({ plan, rows }: { plan: PlanRow; rows: InspectionRow[] }) {
-  const shipper = (shipperList(rows) || pickShipper(plan)).toUpperCase()
+  const shipper = pickShipper(plan).toUpperCase()
   const driver = (plan.driver?.name ?? '').toUpperCase()
   const info = (label: string, value: string, id: string) => (
     <p>{label} <b data-testid={id}>{value}</b></p>
@@ -75,11 +75,11 @@ export default function PrintSheet({ plan, rows }: { plan: PlanRow; rows: Inspec
       </table>
 
       <div className="break-inside-avoid border border-gray-500 border-t-0 text-[8pt]">
-        <div className="h-16 px-1 pt-0.5 flex flex-col">
+        <div className="h-[28mm] px-1 pt-0.5 flex flex-col">
           <p>Nhân Viên xuất kho cam kết xác nhận xuất kho Vật tư, hàng hóa ĐẦY ĐỦ &amp; ĐÚNG với Phiếu xuất kho</p>
           <p className="mt-auto text-right pr-16 text-[9pt] font-bold" data-testid="print-shipper">{shipper}</p>
         </div>
-        <div className="h-16 px-1 pt-0.5 flex flex-col border-t border-gray-500">
+        <div className="h-[28mm] px-1 pt-0.5 flex flex-col border-t border-gray-500">
           <p>Tài xế, Phụ xe cam kết xác nhận đã nhận Vật tư, hàng hóa ĐẦY ĐỦ &amp; ĐÚNG với Phiếu xuất kho</p>
           <p>Tài xế, Phụ xe xác nhận đã nhận bàn giao đầy đủ Phiếu xuất kho từ Nhân viên kho</p>
           <p className="mt-auto text-right pr-16 text-[9pt] font-bold">{driver}</p>

@@ -22,11 +22,6 @@ export function carrierList(rows: InspectionRow[]): string {
   return [...new Set(rows.map((r) => r.carrier_name?.trim()).filter(Boolean))].join(', ')
 }
 
-/** NV xuất hàng của các dòng: bỏ trống, bỏ trùng, nối ", ". */
-export function shipperList(rows: InspectionRow[]): string {
-  return [...new Set(rows.map((r) => r.shipper_name?.trim()).filter(Boolean))].join(', ')
-}
-
 /** ISO timestamp -> "28/10/2026 21:16:09" theo giờ Asia/Ho_Chi_Minh. */
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return ''

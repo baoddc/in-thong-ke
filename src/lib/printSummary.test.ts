@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { carrierList, countSlips, formatDateTime, formatFixed2, shipperList, sumField } from './printSummary'
+import { carrierList, countSlips, formatDateTime, formatFixed2, sumField } from './printSummary'
 import type { InspectionRow } from '../types/inspection'
 
 const row = (o: Partial<InspectionRow>) => o as InspectionRow
@@ -25,12 +25,6 @@ describe('printSummary', () => {
   it('nhà xe không trùng, bỏ trống', () => {
     expect(carrierList(rows)).toBe('Xe DDC, Xe thuê')
     expect(carrierList([])).toBe('')
-  })
-
-  it('NV xuất hàng khác nhau của các dòng, bỏ trống/trùng', () => {
-    const r = [row({ shipper_name: 'An' }), row({ shipper_name: 'Bình' }), row({ shipper_name: 'An' }), row({ shipper_name: null })]
-    expect(shipperList(r)).toBe('An, Bình')
-    expect(shipperList([])).toBe('')
   })
 
   it('định dạng số 2 chữ số thập phân và ngày giờ giờ Việt Nam', () => {
