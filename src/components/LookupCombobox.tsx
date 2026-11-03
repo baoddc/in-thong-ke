@@ -28,11 +28,15 @@ type Props = {
   testId: string
   /** 'sm': ô thấp 36px, nhãn nổi trên viền (thanh lọc). */
   inputSize?: 'md' | 'sm'
+  /** Dòng nhập trên bảng: nhãn chỉ dành cho trình đọc màn hình, ô khóa được, gợi ý tùy chỉnh. */
+  hideLabel?: boolean
+  disabled?: boolean
+  placeholder?: string
 }
 
 // Combobox gõ để tìm; không có thì cho thêm mới vào lookup_items.
 // Văn bản khởi tạo lấy từ `selectedIds`; đổi giá trị từ ngoài (Sửa/Hủy) thì remount bằng `key`.
-export default function LookupCombobox({ label, kind, items: rawItems = [], server = false, known, selectedIds, multiple, field = 'name', allowAdd = true, onChange, onPending, reload, testId, inputSize }: Props) {
+export default function LookupCombobox({ label, kind, items: rawItems = [], server = false, known, selectedIds, multiple, field = 'name', allowAdd = true, onChange, onPending, reload, testId, inputSize, hideLabel, disabled, placeholder = 'Gõ để tìm...' }: Props) {
   const uid = useId()
   const sm = inputSize === 'sm'
   const view = (list: Item[]) => (field === 'code' ? list.flatMap((i) => (i.code ? [{ ...i, name: i.code }] : [])) : list)
@@ -136,7 +140,7 @@ export default function LookupCombobox({ label, kind, items: rawItems = [], serv
 
   return (
     <div className="relative">
-      <label htmlFor={`${uid}-in`} className={sm ? floatLabelClass : labelClass}>{label}{multiple ? ' (chọn nhiều)' : ''}</label>
+      <label htmlFor={`${uid}-in`} className={hideLabel ? 'sr-only' : sm ? floatLabelClass : labelClass}>{label}{multiple ? ' (chọn nhiều)' : ''}</label>
       {multiple && selectedIds.length > 0 && (
         <ul className="mt-1 flex flex-wrap gap-1" data-testid={`${testId}-chips`}>
           {selectedIds.map((id) => {
@@ -154,7 +158,7 @@ export default function LookupCombobox({ label, kind, items: rawItems = [], serv
       <input
         id={`${uid}-in`} role="combobox" aria-expanded={open && rows > 0} aria-controls={`${uid}-list`} aria-autocomplete="list"
         aria-activedescendant={open && cur >= 0 ? `${uid}-o${cur}` : undefined} aria-invalid={invalid}
-        value={text} placeholder="Gõ để tìm..." autoComplete="off" data-testid={testId}
+        value={text} placeholder={placeholder} disabled={disabled} autoComplete="off" data-testid={testId}
         onChange={(e) => {
           const t = e.target.value
           setText(t)
@@ -163,7 +167,7 @@ export default function LookupCombobox({ label, kind, items: rawItems = [], serv
           if (!multiple) { onChange([]); onPending?.(t.trim() !== '') }
         }}
         onKeyDown={onKeyDown} onBlur={() => void onBlur()}
-        className={sm ? `${inputClass} ${inputSmClass}` : inputClass}
+        className={sm || hideLabel ? `${inputClass} ${inputSmClass}` : inputClass}
       />
       {open && rows > 0 && (
         <ul id={`${uid}-list`} role="listbox" aria-label={label} data-testid={`${testId}-list`}

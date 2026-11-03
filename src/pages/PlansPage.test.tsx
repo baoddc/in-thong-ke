@@ -20,6 +20,11 @@ let weightRpc: { data: unknown; error: { message: string } | null } = { data: 24
 let deleteData: unknown[] | null = null // kết quả `.delete().select()`; null: trả về phiếu (xóa được)
 let editRows: unknown[] = [] // edit_requests của mình (D-019)
 const editRpc: [string, unknown][] = [] // lời gọi request_plan_edit
+const rpcLog: [string, unknown][] = [] // lời gọi reserve/release/create (dòng nhập, D-023)
+type PresencePayload = { username: string; activity: { kind: string; tk: string; expiresAt: number } | null }
+const tracks: PresencePayload[] = [] // payload mỗi lần track Presence
+const rpcOf =(fn: string) => rpcLog.filter((c) => c[0] === fn)
+let rpcFail = false // create_transport_plan trả lỗi
 
 // Mọi chuỗi gọi trả về chính nó và có thể await; ghi lại lời gọi để kiểm tra truy vấn phân trang.
 vi.mock('../lib/supabase', () => {
@@ -30,30 +35,36 @@ vi.mock('../lib/supabase', () => {
   }
   return {
     supabase: {
+      channel: () => { const ch = { on: () => ch, subscribe: (cb: (s: string) => void) => { cb('SUBSCRIBED'); return ch }, track: (p: PresencePayload) => { tracks.push(p); return Promise.resolve('ok') }, untrack: () => Promise.resolve('ok') }; return ch }, // Presence (D-024)
+      removeChannel: () => {},
       from: (t: string) => chain(t, t === 'transport_plans' ? [plan] : t === 'edit_requests' ? editRows : []),
-      rpc: (fn: string, args: Record<string, unknown>) => fn === 'request_plan_edit' ? (editRpc.push([fn, args]), Promise.resolve({ data: 7, error: null })) : fn === 'count_transport_plans' ? (countCalls.push(args), Promise.resolve(countError ? { data: null, error: { message: 'boom' } } : { data: total ?? null, error: null })) : fn === 'list_transport_plans' ? (rpcCalls.push(args), Promise.resolve({ data: [plan], error: null })) : fn === 'inspection_weight_total' ? Promise.resolve(weightRpc) : Promise.resolve({ data: fn === 'reserve_tk_number' ? 'TK0002' : { tk_number: 'TK0002' }, error: null }),
+      rpc: (fn: string, args: Record<string, unknown>) => fn === 'release_tk_reservation' || fn === 'create_transport_plan' || fn === 'reserve_tk_number' ? (rpcLog.push([fn, args]), Promise.resolve({ data: fn === 'create_transport_plan' ? { tk_number: 'TK0002' } : fn === 'reserve_tk_number' ? 'TK0002' : null, error: rpcFail && fn === 'create_transport_plan' ? { message: 'boom' } : null })) : fn === 'request_plan_edit' ? (editRpc.push([fn, args]), Promise.resolve({ data: 7, error: null })) : fn === 'count_transport_plans' ? (countCalls.push(args), Promise.resolve(countError ? { data: null, error: { message: 'boom' } } : { data: total ?? null, error: null })) : fn === 'list_transport_plans' ? (rpcCalls.push(args), Promise.resolve({ data: [plan], error: null })) : fn === 'inspection_weight_total' ? Promise.resolve(weightRpc) : Promise.resolve({ data: fn === 'reserve_tk_number' ? 'TK0002' : { tk_number: 'TK0002' }, error: null }),
     },
   }
 })
 
-const me = { id: 'a1', role: 'admin', is_active: true }
+const me = { id: 'a1', role: 'admin', is_active: true, username: 'a.admin', full_name: 'Admin' }
 vi.mock('../lib/useProfile', () => ({ useProfile: () => ({ profile: me, isAdmin: me.role === 'admin', loading: false, error: '' }) }))
 
 import PlansPage from './PlansPage'
 import { ToastProvider } from '../components/ui/Toast'
 import { clearListCache } from '../lib/listCache'
+import { PresenceProvider } from '../lib/presence'
 
-const renderPage = (url = '/') => render(<MemoryRouter initialEntries={[url]}><ToastProvider><PlansPage /></ToastProvider></MemoryRouter>)
+const renderPage = (url = '/?from=&to=') => render(<MemoryRouter initialEntries={[url]}><ToastProvider><PlansPage /></ToastProvider></MemoryRouter>)
 
 beforeAll(() => {
   // jsdom chưa có showModal/close → polyfill tối thiểu
   HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) { this.setAttribute('open', '') }
 })
-beforeEach(() => { editRows = []; editRpc.length = 0; Object.assign(me, { id: 'a1', role: 'admin' }); Object.assign(plan, { created_by: null, created_at: '2026-10-01T00:00:00Z' }); deleteData = null; localStorage.clear(); clearListCache(); calls.length = 0; rpcCalls.length = 0; countCalls.length = 0; countError = false; total = undefined; weightRpc = { data: 246043357.56, error: null } })
-afterEach(cleanup)
+const realMatchMedia = window.matchMedia
+const narrow = () => { window.matchMedia = ((q: string) => ({ matches: true, media: q })) as unknown as typeof window.matchMedia } // < md: Thêm mở modal
+beforeEach(() => { tracks.length = 0; rpcLog.length = 0; rpcFail = false; editRows = []; editRpc.length = 0; Object.assign(me, { id: 'a1', role: 'admin' }); Object.assign(plan, { created_by: null, created_at: '2026-10-01T00:00:00Z' }); deleteData = null; localStorage.clear(); clearListCache(); calls.length = 0; rpcCalls.length = 0; countCalls.length = 0; countError = false; total = undefined; weightRpc = { data: 246043357.56, error: null } })
+afterEach(() => { cleanup(); window.matchMedia = realMatchMedia })
 
 describe('PlansPage', () => {
-  it('hiện bảng, NV xuất VT nối bằng ", "; Thêm phiếu mở modal có số xem trước', async () => {
+  it('hiện bảng, NV xuất VT nối bằng ", "; Thêm phiếu trên màn nhỏ mở modal có số xem trước', async () => {
+    narrow()
     renderPage()
     expect((await screen.findByTestId('plan-table')).textContent).toContain('An, Bình')
     expect(screen.queryByTestId('plan-modal')).toBeNull()
@@ -76,6 +87,7 @@ describe('PlansPage', () => {
 
   it('đã sửa form mà Hủy → hỏi xác nhận, từ chối thì giữ modal', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    narrow()
     renderPage()
     await userEvent.click(await screen.findByTestId('add-plan'))
     await userEvent.type(screen.getByTestId('order-no'), 'x')
@@ -94,6 +106,40 @@ describe('PlansPage', () => {
     expect(screen.getByTestId('page-count').textContent).toBe('/330')
     expect(screen.getByTestId('page-total').textContent).toBe('· tổng 16.500 dòng')
     expect((screen.getByTestId('page-prev') as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('T-073: không có ngày trên URL → mặc định hôm nay (giờ VN); Xóa bộ lọc → xem tất cả, không bị đặt lại; URL có ngày khác → giữ', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-31T18:00:00Z')) // 01/11/2026 01:00 giờ VN
+    try {
+      renderPage('/')
+      await screen.findByTestId('plan-table')
+      expect(rpcCalls[0]).toMatchObject({ p_from: '2026-11-01', p_to: '2026-11-01' })
+      expect(countCalls[0]).toMatchObject({ p_from: '2026-11-01', p_to: '2026-11-01' })
+      expect((screen.getByTestId('filter-from') as HTMLInputElement).value).toBe('01/11/2026')
+      await userEvent.click(screen.getByTestId('clear-filters'))
+      await waitFor(() => expect(rpcCalls[rpcCalls.length - 1]).toMatchObject({ p_from: null, p_to: null }))
+      expect(screen.queryByTestId('clear-filters')).toBeNull()
+      cleanup(); rpcCalls.length = 0; clearListCache()
+      renderPage('/?from=2026-10-05&to=2026-10-06')
+      await screen.findByTestId('plan-table')
+      expect(rpcCalls[0]).toMatchObject({ p_from: '2026-10-05', p_to: '2026-10-06' })
+    } finally { vi.useRealTimers() }
+  })
+
+  it('T-074: nút Hôm nay đặt from=to=hôm nay (giờ VN), giữ bộ lọc khác, aria-pressed đúng', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-31T18:00:00Z'))
+    try {
+      renderPage('/?q=TK01&from=&to=')
+      await screen.findByTestId('plan-table')
+      const btn = screen.getByTestId('filter-today')
+      expect(btn.getAttribute('aria-pressed')).toBe('false')
+      await userEvent.click(btn)
+      await waitFor(() => expect(rpcCalls[rpcCalls.length - 1]).toMatchObject({ p_q: 'TK01', p_from: '2026-11-01', p_to: '2026-11-01' }))
+      expect(countCalls[countCalls.length - 1]).toMatchObject({ p_q: 'TK01', p_from: '2026-11-01', p_to: '2026-11-01' })
+      expect(screen.getByTestId('filter-today').getAttribute('aria-pressed')).toBe('true')
+    } finally { vi.useRealTimers() }
   })
 
   it('đọc bộ lọc + trang từ URL và gửi lên server', async () => {
@@ -300,11 +346,119 @@ describe('PlansPage', () => {
     expect(screen.getByTestId('stat-plans').textContent).not.toContain('—')
   })
 
-  it('phím N mở modal thêm khi không đang gõ', async () => {
+  it('phím N mở modal thêm (màn nhỏ) hoặc dòng nhập (≥ md) khi không đang gõ', async () => {
+    narrow()
     renderPage()
     await screen.findByTestId('plan-table')
     await userEvent.keyboard('n')
     expect(screen.getByTestId('plan-modal').hasAttribute('open')).toBe(true)
+    cleanup(); window.matchMedia = realMatchMedia
+    renderPage()
+    await screen.findByTestId('plan-table')
+    await userEvent.keyboard('n')
+    expect(screen.getByTestId('plan-inline-row')).not.toBeNull()
+  })
+
+  describe('Dòng nhập trên bảng (D-023)', () => {
+    it('Thêm phiếu chèn dòng nhập đầu bảng, không mở modal; có số TK đang giữ + đếm ngược, focus ô Ngày xuất', async () => {
+      renderPage()
+      await userEvent.click(await screen.findByTestId('add-plan'))
+      expect(screen.queryByTestId('plan-modal')).toBeNull()
+      const body = screen.getByTestId('plan-table').querySelector('tbody')!
+      expect(body.firstElementChild).toBe(screen.getByTestId('plan-inline-row'))
+      await waitFor(() => expect((screen.getByTestId('inline-tk-number') as HTMLInputElement).value).toBe('TK0002'))
+      expect(screen.getByTestId('inline-tk-hold-timer').textContent).toBe('05:00')
+      expect(document.activeElement).toBe(screen.getByTestId('inline-export-date'))
+    })
+
+    it('Tab chuyển ô theo thứ tự cột', async () => {
+      renderPage()
+      await userEvent.click(await screen.findByTestId('add-plan'))
+      await userEvent.click(screen.getByTestId('inline-order-no'))
+      await userEvent.tab()
+      expect(document.activeElement).toBe(screen.getByTestId('inline-transport-type'))
+    })
+
+    it('Enter lưu bằng create_transport_plan như modal; dòng nhập reset và giữ số TK mới', async () => {
+      renderPage()
+      await userEvent.click(await screen.findByTestId('add-plan'))
+      await waitFor(() => expect((screen.getByTestId('inline-tk-number') as HTMLInputElement).value).toBe('TK0002'))
+      await userEvent.type(screen.getByTestId('inline-order-no'), 'L9{Enter}')
+      expect((await screen.findByTestId('toast-success')).textContent).toContain('Đã lưu phiếu TK0002')
+      expect(rpcOf('create_transport_plan')[0][1]).toMatchObject({ p_transport_order_no: 'L9', p_material_exporter_ids: [], p_note: null })
+      expect((screen.getByTestId('inline-order-no') as HTMLInputElement).value).toBe('')
+      await waitFor(() => expect(rpcOf('reserve_tk_number')).toHaveLength(2)) // giữ số mới cho dòng kế
+      expect(rpcOf('release_tk_reservation')).toHaveLength(0) // máy chủ đã xóa chỗ giữ khi lưu
+    })
+
+    it('nút "Lưu phiếu" trên header gọi create_transport_plan như Enter; "Hủy" đóng dòng và release; ẩn khi không có dòng nhập', async () => {
+      renderPage()
+      await screen.findByTestId('add-plan')
+      expect(screen.queryByTestId('header-save')).toBeNull()
+      await userEvent.click(screen.getByTestId('add-plan'))
+      expect(screen.getByTestId('header-save').textContent).toBe('Lưu phiếu')
+      await userEvent.type(screen.getByTestId('inline-order-no'), 'L9')
+      await userEvent.click(screen.getByTestId('header-save'))
+      expect((await screen.findByTestId('toast-success')).textContent).toContain('Đã lưu phiếu TK0002')
+      expect(rpcOf('create_transport_plan')[0][1]).toMatchObject({ p_transport_order_no: 'L9' })
+      await waitFor(() => expect(rpcOf('reserve_tk_number')).toHaveLength(2))
+      await userEvent.click(screen.getByTestId('header-cancel')) // dòng mới chưa gõ → không confirm
+      expect(screen.queryByTestId('plan-inline-row')).toBeNull()
+      expect(screen.queryByTestId('header-save')).toBeNull()
+      expect(rpcOf('release_tk_reservation')).toHaveLength(1)
+    })
+
+    it('nút "Lưu phiếu" trong dòng; lỗi từ server hiện ngay dưới dòng và giữ nguyên dữ liệu đã nhập', async () => {
+      rpcFail = true
+      renderPage()
+      await userEvent.click(await screen.findByTestId('add-plan'))
+      await userEvent.type(screen.getByTestId('inline-order-no'), 'L9')
+      await userEvent.click(screen.getByTestId('plan-inline-row-save'))
+      expect((await screen.findByTestId('plan-inline-row-error')).textContent).toContain('boom')
+      expect((screen.getByTestId('inline-order-no') as HTMLInputElement).value).toBe('L9')
+      expect(screen.queryByTestId('toast-success')).toBeNull()
+    })
+
+    it('báo Presence: mở dòng nhập → adding_plan kèm số TK đang giữ + hạn; hủy → null (D-024)', async () => {
+      render(<MemoryRouter><ToastProvider><PresenceProvider><PlansPage /></PresenceProvider></ToastProvider></MemoryRouter>)
+      await userEvent.click(await screen.findByTestId('add-plan'))
+      await waitFor(() => expect(tracks[tracks.length - 1]).toMatchObject({ username: 'a.admin', activity: { kind: 'adding_plan', tk: 'TK0002' } }))
+      expect(tracks[tracks.length - 1]?.activity?.expiresAt).toBeGreaterThan(Date.now())
+      await userEvent.keyboard('{Escape}')
+      await waitFor(() => expect(tracks[tracks.length - 1]?.activity).toBeNull())
+    })
+
+    it('Esc hủy dòng và nhả số đang giữ (release_tk_reservation)', async () => {
+      renderPage()
+      await userEvent.click(await screen.findByTestId('add-plan'))
+      await waitFor(() => expect((screen.getByTestId('inline-tk-number') as HTMLInputElement).value).toBe('TK0002'))
+      await userEvent.keyboard('{Escape}')
+      expect(screen.queryByTestId('plan-inline-row')).toBeNull()
+      expect(rpcOf('release_tk_reservation')).toHaveLength(1)
+    })
+
+    it('hết 5 phút giữ số (không thao tác) → dòng nhập tự đóng, nhả số, toast lỗi, Presence về null', async () => {
+      render(<MemoryRouter><ToastProvider><PresenceProvider><PlansPage /></PresenceProvider></ToastProvider></MemoryRouter>)
+      await userEvent.click(await screen.findByTestId('add-plan'))
+      await waitFor(() => expect((screen.getByTestId('inline-tk-number') as HTMLInputElement).value).toBe('TK0002'))
+      const real = Date.now()
+      const spy = vi.spyOn(Date, 'now').mockImplementation(() => real + 301_000) // tua đồng hồ; interval 1 giây thật sẽ thấy hết hạn
+      try {
+        await waitFor(() => expect(screen.queryByTestId('plan-inline-row')).toBeNull(), { timeout: 3000 })
+        expect((await screen.findByTestId('toast-error')).textContent).toContain('Hết thời gian giữ số TK0002 — dòng nhập đã bị hủy')
+        expect(rpcOf('release_tk_reservation')).toHaveLength(1)
+        await waitFor(() => expect(tracks[tracks.length - 1]?.activity).toBeNull())
+      } finally { spy.mockRestore() }
+    })
+
+    it('đổi trang khi đang có dòng nhập: dòng nhập vẫn ở đầu bảng', async () => {
+      total = 120
+      renderPage()
+      await userEvent.click(await screen.findByTestId('add-plan'))
+      await userEvent.click(screen.getByTestId('page-next'))
+      await waitFor(() => expect((screen.getByTestId('page-input') as HTMLInputElement).value).toBe('2'))
+      expect(screen.getByTestId('plan-inline-row')).not.toBeNull()
+    })
   })
 
   it('ẩn/hiện số liệu và bộ lọc, nhớ trạng thái trong localStorage', async () => {

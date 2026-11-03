@@ -111,6 +111,25 @@ Mục tiêu: `inspection_details` ≥ 1–5 triệu dòng, `transport_plans` ≥
 - Thêm `count_transport_plans` / `count_inspection_details` (security definer, cùng bộ lọc với list) thay cho request đếm `count: 'exact'` qua PostgREST.
 - Sau nạp/nhân dữ liệu lớn phải `VACUUM ANALYZE` (dọn pending list của GIN): trước 1.006 ms, sau 23 ms.
 
+## D-025 — Thấy người khác đang nhập ngay trong bảng, kiểu Google Sheets (03/11/2026) — bổ sung D-024
+- Dòng nhập (D-023) của mỗi người phát Realtime **broadcast** (không lưu DB) trên kênh presence hiện có: bảng (plans/details), chế độ (thêm/sửa + id dòng), số TK đang giữ, giá trị hiển thị từng ô (tên danh mục, không phải id), ô đang focus. Gửi tối đa ~5 lần/giây; lưu/hủy/đóng → gửi xóa. Presence vẫn là nguồn "ai còn online"; người rời presence thì dòng nháp của họ bị gỡ.
+- Bảng của người khác: mỗi người đang thêm hiện **1 dòng nháp chỉ đọc** ở đầu bảng (trên dòng nhập của mình), viền + nền nhạt theo màu riêng của người đó, nhãn "<user> đang nhập · giữ TK… · còn mm:ss", ô họ đang đứng có khung màu + tên nhỏ. Người đang sửa dòng có sẵn (modal hoặc dòng sửa): dòng đó có viền màu + nhãn "<user> đang sửa".
+- Dải "Đang giữ số" (D-024) bỏ vì đã hiện trong dòng nháp; sidebar "Đang trực tuyến" giữ.
+- Chỉ hiển thị, không khóa, không ảnh hưởng quyền hay dữ liệu.
+
+## D-024 — Thấy ai đang thao tác / giữ số phiếu (03/11/2026)
+- Dùng Supabase Realtime **Presence** (kênh chung cho người đã đăng nhập), không thêm bảng/migration. Mỗi tab gửi: username, họ tên, trang đang mở, hành động (thêm phiếu + số TK đang giữ + hạn giữ / sửa phiếu TK… / nhập bảng kiểm cho TK… / sửa dòng bảng kiểm), cập nhật khi hành động đổi. Đóng tab/mất mạng → tự rời.
+- Hiển thị: (1) góc trên/ sidebar: danh sách người đang trực tuyến kèm việc đang làm; (2) trang Nhập phiếu: dải "Đang giữ số" (TK… · ai · còn mm:ss); (3) dòng phiếu/dòng bảng kiểm người khác đang sửa có nhãn "<user> đang sửa".
+- Chỉ để biết, không khóa: quyền sửa vẫn theo D-013/D-019; số TK vẫn chống trùng ở DB (D-018). Presence là dữ liệu client tự khai, không dùng để phân quyền.
+
+## D-023 — Thêm dòng nhập trực tiếp trên bảng kiểu Google Sheets (03/11/2026)
+- Bấm "Thêm phiếu" / "Thêm dòng" (hoặc phím N) → chèn 1 dòng nhập ở đầu bảng, các ô là ô nhập (combobox danh mục như form cũ), không mở modal. Tab/Shift+Tab chuyển ô; Enter (hoặc nút ✓) lưu dòng; Esc (hoặc ✕) hủy dòng.
+- Lưu xong: dòng vừa lưu hiện trong bảng, một dòng nhập trống mới xuất hiện ngay để nhập tiếp (như Sheets). Bảng kiểm giữ lại Số phiếu TK của dòng trước cho dòng mới (như "Lưu và thêm dòng tiếp" cũ).
+- Nhập phiếu: dòng nhập dùng giữ chỗ số TK 5 phút (D-018) như form cũ — hiện số đang giữ + đếm ngược trong ô Số phiếu TK.
+- Bảng kiểm: bắt buộc chọn Số phiếu TK trước; các ô khác khóa (disabled) đến khi có số TK; chọn xong tự điền số lệnh VC, xe, tài xế, NV xuất hàng như form cũ.
+- Giữ nguyên modal cho Sửa và Xem dòng có sẵn; trên màn hình nhỏ (< md) "Thêm" vẫn mở modal (bảng nhiều cột không nhập được ở 375px).
+- Kiểm tra dữ liệu, lỗi, quyền giống form modal hiện tại (dùng lại logic, không viết lại).
+
 ## D-022 — Tìm nhanh trang Nhập phiếu trên mọi cột hiển thị (30/10/2026)
 - Ô Tìm nhanh của `list_transport_plans`/`count_transport_plans` khớp: số phiếu TK, số lệnh VC, ghi chú (ilike, index trigram) + Phân loại VC, Số xe, Tài xế, NV xuất TP/BTP, NV xuất VT (tên/mã danh mục, không dấu) + Người tạo/sửa (username/họ tên, không dấu). Không tìm Ngày xuất (đã có bộ lọc ngày).
 - Cách giữ tốc độ: tìm trước trong `lookup_items` (~4.5k) và `profiles` (ít) → mảng id; rồi lọc phiếu bằng `= any(id[])` trên cột khóa ngoại có index (BitmapOr), không join chuỗi tên trên bảng lớn.

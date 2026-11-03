@@ -27,13 +27,15 @@ type Props<T> = {
   empty: ReactNode
   testId: string
   attached?: boolean // có dải phân trang dính ngay dưới → bỏ bo góc/viền đáy
+  topRow?: ReactNode // dòng nhập (<tr>) chèn đầu tbody; có thì bảng không hiện trạng thái trống
+  draftRows?: ReactNode // dòng nháp chỉ đọc của người khác (D-025), đặt trên topRow; không ảnh hưởng trạng thái trống
 }
 
 const SKELETON_ROWS = 8
 const WIDTHS = ['w-16', 'w-24', 'w-20', 'w-32', 'w-12']
 
 // Cột đầu dính trái, tiêu đề dính trên (cuộn trong khung, không cuộn cả trang). Bốn trạng thái: tải / lỗi / trống / có dữ liệu.
-export default function DataTable<T>({ columns, rows, rowKey, rowTestId, loading, refreshing, error, onRetry, sort, dir, onSort, empty, testId, attached }: Props<T>) {
+export default function DataTable<T>({ columns, rows, rowKey, rowTestId, loading, refreshing, error, onRetry, sort, dir, onSort, empty, testId, attached, topRow, draftRows }: Props<T>) {
   if (error) {
     return (
       <div role="alert" className="flex items-start gap-3 rounded-card border border-danger-line bg-danger-soft p-4 text-danger" data-testid="page-error">
@@ -45,7 +47,7 @@ export default function DataTable<T>({ columns, rows, rowKey, rowTestId, loading
       </div>
     )
   }
-  if (!loading && rows.length === 0) {
+  if (!loading && rows.length === 0 && !topRow) {
     return <div className="rounded-card border border-stone-200 bg-white p-6 text-center text-muted shadow-card sm:p-8" data-testid="table-empty">{empty}</div>
   }
 
@@ -72,6 +74,8 @@ export default function DataTable<T>({ columns, rows, rowKey, rowTestId, loading
           </tr>
         </thead>
         <tbody>
+          {draftRows}
+          {topRow}
           {loading
             ? Array.from({ length: SKELETON_ROWS }, (_, r) => (
               <tr key={r} className="border-t border-stone-100">

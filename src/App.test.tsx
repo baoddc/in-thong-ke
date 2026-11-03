@@ -8,7 +8,7 @@ vi.mock('./pages/UsersPage', () => ({ default: () => <p>Trang người dùng</p>
 const invoke = vi.fn()
 vi.mock('./lib/supabase', () => ({
   supabase: {
-    channel: () => { const ch = { on: () => ch, subscribe: () => ch }; return ch }, removeChannel: vi.fn(), // Realtime yêu cầu sửa (D-020)
+    channel: () => { const ch = { on: () => ch, subscribe: () => ch, presenceState: () => ({}), track: vi.fn(), untrack: vi.fn() }; return ch }, removeChannel: vi.fn(), // Realtime yêu cầu sửa (D-020) + Presence (D-024)
     auth: { signOut: vi.fn() }, functions: { invoke: (n: string, o: unknown) => invoke(n, o) },
     from: () => ({ select: () => ({ eq: () => Promise.resolve({ count: 4, error: null }) }) }), // số yêu cầu sửa chờ duyệt (D-019)
   },

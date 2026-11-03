@@ -10,8 +10,14 @@ export type Fetcher = (p: ListParams) => Fetched
 /** Trạng thái danh sách phân trang: bộ lọc/trang nằm trong URL, dữ liệu tải từ server theo từng trang. `table` = một phần khóa cache. */
 export function useListPage<T>(cfg: ListConfig, fetcher: Fetcher, table: string) {
   const [sp, setSp] = useSearchParams()
-  const p = useMemo(() => parseListParams(sp, cfg), [sp, cfg])
-  const key = sp.toString()
+  const parsed = parseListParams(sp, cfg)
+  const key = toSearchParams(parsed, cfg).toString() // chuẩn hóa: URL chưa có ngày mặc định và URL đã ghi ngày cho cùng một khóa → không tải hai lần
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- p chỉ đổi khi khóa chuẩn hóa đổi
+  const p = useMemo(() => parsed, [key, cfg])
+  // Mặc định hôm nay phải hiện trên URL như khi người dùng tự chọn (D-… T-073).
+  useEffect(() => {
+    if (cfg.defaultToday && !sp.has('from') && !sp.has('to')) setSp(toSearchParams(p, cfg), { replace: true })
+  }, [cfg, sp, p, setSp])
   // total = null khi không đếm được (request đếm lỗi): vẫn hiện dữ liệu, không chặn điều hướng.
   const [state, setState] = useState<{ key: string | null; rows: T[]; total: number | null; error: string }>({ key: null, rows: [], total: 0, error: '' })
   const req = useRef(0)

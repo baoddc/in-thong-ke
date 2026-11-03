@@ -8,10 +8,13 @@ import { rpcCount, rpcList } from '../lib/listRpc'
 import { useListPage, type Fetcher } from '../lib/useListPage'
 import { useMonthStats } from '../lib/useMonthStats'
 import { useShortcuts } from '../lib/useShortcuts'
-import { isSmallScreen, usePersistentToggle } from '../lib/usePersistentToggle'
+import { isBelowMd, isSmallScreen, usePersistentToggle } from '../lib/usePersistentToggle'
 import { AuditCell } from '../components/AuditInfo'
+import type { InlineControls } from '../components/ui/InlineEntryRow'
 import PlanFormModal from '../components/PlanFormModal'
+import PlanInlineRow from '../components/PlanInlineRow'
 import ListToolbar from '../components/ListToolbar'
+import { DraftRows, EditingTag } from '../components/PresenceViews'
 import { Badge, PersonChip, PersonChips } from '../components/ui/Badge'
 import Button, { IconButton, iconButtonClass } from '../components/ui/Button'
 import { Collapsible, PanelToggle } from '../components/ui/Collapsible'
@@ -32,7 +35,7 @@ import type { PlanRow } from '../types/plan'
 const CFG: ListConfig = {
   sorts: ['created_at', 'export_date', 'tk_number', 'transport_order_no'],
   defaultSort: 'created_at', defaultDir: 'desc', descFirst: ['created_at', 'export_date'],
-  filterCols: {},
+  filterCols: {}, defaultToday: true,
 }
 // Dữ liệu trang qua RPC (planning nhanh, kèm tên người tạo/sửa — D-017) + đếm qua RPC cùng bộ lọc (D-021), chạy song song.
 const fetchPlans: Fetcher = async (p) => {
@@ -77,7 +80,11 @@ export default function PlansPage() {
   const [deleting, setDeleting] = useState<{ plan: PlanRow; busy: boolean } | null>(null)
   const [requesting, setRequesting] = useState<PlanRow | null>(null)
 
-  const openNew = useCallback(() => setModal({ plan: null }), [])
+  const [inlineKey, setInlineKey] = useState<number | null>(null) // dòng nhập trên bảng (D-023); null: đóng, số đổi sau mỗi lần lưu để dòng mới giữ số TK mới
+  // ≥ md: thêm bằng dòng nhập đầu bảng; điện thoại: modal như cũ. Dòng nhập dở được giữ nguyên khi đổi trang/lọc/sắp xếp.
+  const inlineCtl = useRef<InlineControls | null>(null) // nút Lưu/Hủy trên PageHeader gọi đúng hành động của dòng nhập
+  const [inlineBusy, setInlineBusy] = useState(false)
+  const openNew = useCallback(() => { if (isBelowMd()) setModal({ plan: null }); else setInlineKey((k) => k ?? 0) }, [])
   const [statsOpen,, toggleStats] = usePersistentToggle('plans:stats')
   const [filtersOpen, setFiltersOpen, toggleFilters] = usePersistentToggle('plans:filters', () => !isSmallScreen())
   const showFilters = useCallback(() => setFiltersOpen(true), [setFiltersOpen])
@@ -100,8 +107,11 @@ export default function PlansPage() {
     {
       key: 'tk', header: 'Số phiếu TK', sort: 'tk_number', nowrap: true,
       render: (r) => (
+        <>
         <button type="button" onClick={() => setModal({ plan: r })} title={canUpdate(r) ? `Sửa phiếu ${r.tk_number}` : `Xem phiếu ${r.tk_number}`} data-testid={`open-${r.tk_number}`}
           className="rounded font-bold text-primary underline-offset-2 transition-colors duration-150 hover:text-primary-dark hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{r.tk_number}</button>
+          <EditingTag kind="plan" id={r.id} />
+        </>
       ),
     },
     { key: 'date', header: 'Ngày xuất', sort: 'export_date', nowrap: true, render: (r) => formatDate(r.export_date) },
@@ -145,6 +155,12 @@ export default function PlansPage() {
         <PanelToggle controls="plans-filters" open={filtersOpen} onToggle={toggleFilters} openLabel="Ẩn bộ lọc" closedLabel="Hiện bộ lọc" badge={activeCount} badgeLabel="Bộ lọc" testId="toggle-filters" />
         {!filtersOpen && filtered && <Button size="sm" icon="close" onClick={list.clearFilters} aria-label="Xóa lọc" title="Xóa lọc" data-testid="clear-filters-hidden"><span className="hidden sm:inline">Xóa lọc</span></Button>}
         <Button variant="primary" size="sm" icon="plus" onClick={openNew} title="Thêm phiếu (phím N)" data-testid="add-plan">Thêm phiếu</Button>
+        {inlineKey !== null && (
+          <>
+            <Button variant="primary" size="sm" disabled={inlineBusy} onClick={() => inlineCtl.current?.save()} data-testid="header-save">{inlineBusy ? 'Đang lưu…' : 'Lưu phiếu'}</Button>
+            <Button size="sm" disabled={inlineBusy} onClick={() => inlineCtl.current?.cancel()} data-testid="header-cancel">Hủy</Button>
+          </>
+        )}
       </PageHeader>
 
       <Collapsible id="plans-stats" open={statsOpen} testId="stats-panel">
@@ -157,12 +173,17 @@ export default function PlansPage() {
 
       <Collapsible id="plans-filters" open={filtersOpen} testId="filters-panel">
       <ListToolbar searchRef={searchRef} text={list.text} onText={list.setText} placeholder="Tìm trong mọi cột…" searchTitle="Tìm trên mọi cột: số TK, lệnh VC, xe, tài xế, NV xuất, ghi chú, người tạo…"
-        from={p.from} to={p.to} onFrom={(from) => update({ from })} onTo={(to) => update({ to })}
+        from={p.from} to={p.to} onFrom={(from) => update({ from })} onTo={(to) => update({ to })} onRange={(from, to) => update({ from, to })}
         active={filtered} onClear={list.clearFilters} />
       </Collapsible>
 
-      <DataTable columns={columns} rows={list.rows} rowKey={(r) => r.id} loading={list.loading} refreshing={list.refreshing}
+      <DataTable draftRows={<DraftRows table="plans" columnKeys={columns.map((c) => c.key)} />} columns={columns} rows={list.rows} rowKey={(r) => r.id} loading={list.loading} refreshing={list.refreshing}
         error={list.error} onRetry={() => void reload()} sort={p.sort} dir={p.dir} onSort={list.sortBy} testId="plan-table" attached={!list.loading && list.hasData}
+        topRow={inlineKey !== null && (
+          <PlanInlineRow key={inlineKey} columnKeys={columns.map((c) => c.key)} lookups={lookups} controlsRef={inlineCtl} onBusy={setInlineBusy} onCancel={() => setInlineKey(null)}
+            onExpired={(msg) => { setInlineKey(null); toast.error(msg) }}
+            onSaved={(msg) => { setInlineKey((k) => (k ?? 0) + 1); toast.success(msg); void reload(); void stats.reload() }} />
+        )}
         empty={filtered ? (
           <EmptyState title="Không có phiếu nào khớp bộ lọc." hint="Thử đổi từ khóa hoặc khoảng ngày.">
             <Button onClick={list.clearFilters}>Xóa bộ lọc</Button>
@@ -179,6 +200,7 @@ export default function PlansPage() {
 
       {modal && (
         <PlanFormModal plan={modal.plan} readOnly={!!modal.plan && !canUpdate(modal.plan)} lookups={lookups} onClose={() => setModal(null)}
+          onExpired={(msg) => { setModal(null); toast.error(msg) }}
           onSaved={(msg) => { setModal(null); toast.success(msg); void reload(); void stats.reload() }} />
       )}
       {requesting && (

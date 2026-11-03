@@ -88,5 +88,14 @@ Danh mục do người dùng tự nhập trên trang "Danh mục" (D-005).
 | T-064 | Bản in: chỉ 1 NV xuất kho = NV xuất TP/BTP, không có thì NV xuất VT đầu tiên (pickShipper) | frontend | Xong |
 | T-065 | Bản in: ô ký tên cao 28 mm (trước ~17 mm) | frontend | Xong |
 | T-066 | Bản in: cột Ngày + Số phiếu xuất kho 1 dòng (7pt, nowrap; rộng 8,5%/9,5%, Tên CT 13,5%) | frontend | Xong |
+| T-067 | D-023: thêm dòng nhập trực tiếp trên bảng (Nhập phiếu + Bảng kiểm), Bảng kiểm bắt buộc số TK trước | frontend | Xong — chờ người dùng thử trên trình duyệt |
+| T-068 | D-024: Presence — ai đang trực tuyến, đang giữ số TK, đang sửa phiếu/dòng | frontend | Xong — chờ thử 2 tài khoản |
+| T-069 | D-025: dòng nháp của người khác hiện trực tiếp trong bảng (kiểu Google Sheets) | frontend | Xong — chờ thử 2 tài khoản (sửa dòng: chỉ nhãn màu, chưa viền cả dòng) |
+| T-070 | Presence/nháp hiện họ tên đầy đủ thay username | frontend | Xong |
+| T-071 | Hết hạn giữ số: gỡ ngay nháp người khác; tự đóng dòng nhập của mình + toast + release | frontend | Xong |
+| T-072 | Nút "Lưu phiếu" / "Lưu dòng" (header + dòng nhập) | frontend | Xong |
+| T-073 | Nhập phiếu + Bảng kiểm mặc định lọc ngày xuất = hôm nay (xóa lọc → xem tất cả) | frontend | Xong |
+| T-074 | Nút lọc "Hôm nay" trước "Xóa bộ lọc" (Nhập phiếu + Bảng kiểm) | frontend | Xong |
+| T-075 | Bảng kiểm: bỏ bộ lọc Loại hình xuất, Mặt hàng | frontend | Xong |
 | T-052 | Vẽ lại sơ đồ Luồng công việc bằng Archify → public/luong-cong-viec.html (nguồn: .archify/workflow-luong-cong-viec-20261030-142358/candidate.json) | Lead | Xong |
 | T-005 | Dọn số xe/tài xế không hợp lệ | Lead | Chờ người dùng chạy SQL — `execute_sql` có xóa/sửa bị từ chối 2 lần |

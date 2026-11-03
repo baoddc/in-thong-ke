@@ -12,6 +12,9 @@ const read = (key: string): boolean | null => {
 /** Màn hình nhỏ (điện thoại): dùng để mặc định thu gọn bộ lọc. */
 export const isSmallScreen = () => typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 639px)').matches
 
+/** Dưới breakpoint md (768px): bảng nhiều cột không nhập được trực tiếp → "Thêm" mở modal. */
+export const isBelowMd = () => typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 767px)').matches
+
 /**
  * Bật/tắt có nhớ trong localStorage theo `key`. Chưa có giá trị lưu → `getDefault()`; chỉ ghi khi người dùng đổi.
  * Trả về [giá trị, đặt giá trị, đảo giá trị].

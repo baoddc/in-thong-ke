@@ -1,5 +1,7 @@
 // Dựng truy vấn danh sách phân trang/lọc/sắp xếp phía server và đọc/ghi bộ lọc trong URL. Toàn bộ là hàm thuần.
 
+import { todayISO } from './format'
+
 export const PAGE_SIZES = [25, 50, 100] as const
 export const DEFAULT_SIZE = 50
 export type SortDir = 'asc' | 'desc'
@@ -16,6 +18,7 @@ export type ListConfig = {
   defaultDir: SortDir
   descFirst?: readonly string[] // cột bấm lần đầu thì giảm dần (ngày, số lượng…)
   filterCols: Record<string, string> // khóa URL -> id (chỉ khóa được dùng; lọc thật nằm trong tham số RPC)
+  defaultToday?: boolean // URL chưa có from/to → mặc định hôm nay; người dùng xóa ngày thì URL ghi `from=&to=` để không bị đặt lại
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -32,8 +35,9 @@ export function parseListParams(sp: URLSearchParams, cfg: ListConfig): ListParam
     filters[k] = /^\d+$/.test(v) ? v : ''
   }
   const size = positive(sp.get('size'), DEFAULT_SIZE)
-  const from = sp.get('from') ?? ''
-  const to = sp.get('to') ?? ''
+  const dflt = cfg.defaultToday && !sp.has('from') && !sp.has('to') ? todayISO() : ''
+  const from = sp.get('from') ?? dflt
+  const to = sp.get('to') ?? dflt
   return {
     page: positive(sp.get('page'), 1),
     size: (PAGE_SIZES as readonly number[]).includes(size) ? size : DEFAULT_SIZE,
@@ -50,8 +54,7 @@ export function parseListParams(sp: URLSearchParams, cfg: ListConfig): ListParam
 export function toSearchParams(p: ListParams, cfg: ListConfig): URLSearchParams {
   const sp = new URLSearchParams()
   if (p.q) sp.set('q', p.q)
-  if (p.from) sp.set('from', p.from)
-  if (p.to) sp.set('to', p.to)
+  if (p.from || p.to || cfg.defaultToday) { sp.set('from', p.from); sp.set('to', p.to) }
   for (const [k, v] of Object.entries(p.filters)) if (v) sp.set(k, v)
   if (p.sort !== cfg.defaultSort || p.dir !== cfg.defaultDir) { sp.set('sort', p.sort); sp.set('dir', p.dir) }
   if (p.size !== DEFAULT_SIZE) sp.set('size', String(p.size))

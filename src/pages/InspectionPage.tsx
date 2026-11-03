@@ -3,20 +3,22 @@ import { supabase } from '../lib/supabase'
 import { errorMessage, formatDate, formatNumber } from '../lib/format'
 import { useLookups } from '../lib/useLookups'
 import { countActiveFilters, type ListConfig } from '../lib/listQuery'
-import { idOrNull, rpcCount, rpcList } from '../lib/listRpc'
+import { rpcCount, rpcList } from '../lib/listRpc'
 import { useListPage, type Fetcher } from '../lib/useListPage'
 import { useShortcuts } from '../lib/useShortcuts'
-import { isSmallScreen, usePersistentToggle } from '../lib/usePersistentToggle'
+import { isBelowMd, isSmallScreen, usePersistentToggle } from '../lib/usePersistentToggle'
 import { AuditCell } from '../components/AuditInfo'
+import type { InlineControls } from '../components/ui/InlineEntryRow'
 import InspectionFormModal from '../components/InspectionFormModal'
+import InspectionInlineRow from '../components/InspectionInlineRow'
 import ListToolbar from '../components/ListToolbar'
+import { DraftRows, EditingTag } from '../components/PresenceViews'
 import { Badge, PersonChip } from '../components/ui/Badge'
 import Button, { IconButton } from '../components/ui/Button'
 import { Collapsible, PanelToggle } from '../components/ui/Collapsible'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import DataTable, { type Column } from '../components/ui/DataTable'
 import EmptyState from '../components/ui/EmptyState'
-import { Field, Select } from '../components/ui/Input'
 import PageHeader from '../components/ui/PageHeader'
 import Pagination from '../components/ui/Pagination'
 import { useToast } from '../components/ui/Toast'
@@ -29,12 +31,11 @@ import type { InspectionRow } from '../types/inspection'
 const CFG: ListConfig = {
   sorts: ['created_at', 'export_date', 'tk_number', 'warehouse_slip_no', 'construction_code', 'construction_name', 'export_type_name', 'product_name', 'quantity', 'total_weight_kg'],
   defaultSort: 'created_at', defaultDir: 'desc', descFirst: ['created_at', 'export_date', 'quantity', 'total_weight_kg'],
-  filterCols: { type: 'export_type_id', product: 'product_id' },
+  filterCols: {}, defaultToday: true,
 }
 // Dữ liệu trang qua RPC (không qua view trực tiếp: planning chậm; kèm tên người tạo/sửa — D-017); đếm qua RPC cùng bộ lọc (D-021), chạy song song.
 const fetchRows: Fetcher = async (p) => {
-  const extra = { p_export_type_id: idOrNull(p.filters.type), p_product_id: idOrNull(p.filters.product) }
-  const [rows, count] = await Promise.all([rpcList('list_inspection_details', p, extra), rpcCount('count_inspection_details', p, extra)])
+  const [rows, count] = await Promise.all([rpcList('list_inspection_details', p), rpcCount('count_inspection_details', p)])
   return { data: rows.data, error: rows.error, count }
 }
 
@@ -55,7 +56,11 @@ export default function InspectionPage() {
   const [deleting, setDeleting] = useState<{ row: InspectionRow; busy: boolean } | null>(null)
   const [requesting, setRequesting] = useState<InspectionRow | null>(null)
 
-  const openNew = useCallback(() => setModal({ row: null }), [])
+  const [inline, setInline] = useState(false) // dòng nhập trên bảng (D-023)
+  // ≥ md: thêm bằng dòng nhập đầu bảng; điện thoại: modal như cũ. Dòng nhập dở được giữ nguyên khi đổi trang/lọc/sắp xếp.
+  const inlineCtl = useRef<InlineControls | null>(null) // nút Lưu/Hủy trên PageHeader gọi đúng hành động của dòng nhập
+  const [inlineBusy, setInlineBusy] = useState(false)
+  const openNew = useCallback(() => { if (isBelowMd()) setModal({ row: null }); else setInline(true) }, [])
   const [filtersOpen, setFiltersOpen, toggleFilters] = usePersistentToggle('inspection:filters', () => !isSmallScreen())
   const showFilters = useCallback(() => setFiltersOpen(true), [setFiltersOpen])
   useShortcuts(openNew, searchRef, showFilters)
@@ -75,10 +80,15 @@ export default function InspectionPage() {
     { key: 'date', header: 'Ngày xuất', sort: 'export_date', nowrap: true, render: (r) => formatDate(r.export_date) },
     {
       key: 'tk', header: 'Số phiếu TK', sort: 'tk_number', nowrap: true,
-      render: (r) => (r.tk_number ? (
-        <button type="button" onClick={() => setModal({ row: r })} title={canUpdate(r) ? 'Sửa dòng này' : 'Xem dòng này'} data-testid={`open-${r.id}`}
-          className="rounded font-bold text-primary underline-offset-2 transition-colors duration-150 hover:text-primary-dark hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{r.tk_number}</button>
-      ) : DASH),
+      render: (r) => (
+        <>
+          {r.tk_number ? (
+            <button type="button" onClick={() => setModal({ row: r })} title={canUpdate(r) ? 'Sửa dòng này' : 'Xem dòng này'} data-testid={`open-${r.id}`}
+              className="rounded font-bold text-primary underline-offset-2 transition-colors duration-150 hover:text-primary-dark hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{r.tk_number}</button>
+          ) : DASH}
+          <EditingTag kind="detail" id={r.id} />
+        </>
+      ),
     },
     { key: 'order', header: 'Số lệnh VC', render: (r) => r.transport_order_no },
     { key: 'slip', header: 'Số phiếu xuất kho', sort: 'warehouse_slip_no', render: (r) => r.warehouse_slip_no },
@@ -118,7 +128,6 @@ export default function InspectionPage() {
     },
   ]
 
-  const setFilter = (key: string, value: string) => update({ filters: { ...p.filters, [key]: value } })
   const clearFilters = list.clearFilters
   const activeCount = countActiveFilters(p)
   const filtered = activeCount > 0
@@ -128,30 +137,27 @@ export default function InspectionPage() {
         <PanelToggle controls="inspection-filters" open={filtersOpen} onToggle={toggleFilters} openLabel="Ẩn bộ lọc" closedLabel="Hiện bộ lọc" badge={activeCount} badgeLabel="Bộ lọc" testId="toggle-filters" />
         {!filtersOpen && filtered && <Button size="sm" icon="close" onClick={clearFilters} aria-label="Xóa lọc" title="Xóa lọc" data-testid="clear-filters-hidden"><span className="hidden sm:inline">Xóa lọc</span></Button>}
         <Button variant="primary" size="sm" icon="plus" onClick={openNew} title="Thêm dòng (phím N)" data-testid="add-inspection">Thêm dòng</Button>
+        {inline && (
+          <>
+            <Button variant="primary" size="sm" disabled={inlineBusy} onClick={() => inlineCtl.current?.save()} data-testid="header-save">{inlineBusy ? 'Đang lưu…' : 'Lưu dòng'}</Button>
+            <Button size="sm" disabled={inlineBusy} onClick={() => inlineCtl.current?.cancel()} data-testid="header-cancel">Hủy</Button>
+          </>
+        )}
       </PageHeader>
 
       <Collapsible id="inspection-filters" open={filtersOpen} testId="filters-panel">
       <ListToolbar searchRef={searchRef} text={list.text} onText={list.setText} placeholder="Tìm trong mọi cột…" searchTitle="Tìm trên mọi cột: số TK, số PXK, lệnh VC, công trình, đơn vị giao/nhận, loại hình xuất, mặt hàng, ĐVT, xe, tài xế, nhà xe, NV xuất, ghi chú, người tạo…"
-        from={p.from} to={p.to} onFrom={(from) => update({ from })} onTo={(to) => update({ to })}
-        active={filtered} onClear={clearFilters}>
-        <Field compact label="Loại hình xuất" className="col-span-2 sm:col-span-1 sm:w-44">
-          <Select inputSize="sm" value={p.filters.type} onChange={(e) => setFilter('type', e.target.value)} data-testid="filter-type">
-            <option value="">Tất cả</option>
-            {lookups.byKind('export_type').map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-          </Select>
-        </Field>
-        <Field compact label="Mặt hàng" className="col-span-2 sm:col-span-1 sm:w-44">
-          <Select inputSize="sm" value={p.filters.product} onChange={(e) => setFilter('product', e.target.value)} data-testid="filter-product">
-            <option value="">Tất cả</option>
-            {lookups.byKind('product').map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-          </Select>
-        </Field>
-      </ListToolbar>
+        from={p.from} to={p.to} onFrom={(from) => update({ from })} onTo={(to) => update({ to })} onRange={(from, to) => update({ from, to })}
+        active={filtered} onClear={clearFilters} />
       </Collapsible>
 
-      <DataTable columns={columns} rows={list.rows} rowKey={(r) => r.id} rowTestId={(r) => `row-${r.id}`}
+      <DataTable draftRows={<DraftRows table="details" columnKeys={columns.map((c) => c.key)} />} columns={columns} rows={list.rows} rowKey={(r) => r.id} rowTestId={(r) => `row-${r.id}`}
         loading={list.loading} refreshing={list.refreshing} error={list.error} onRetry={() => void reload()}
         sort={p.sort} dir={p.dir} onSort={list.sortBy} testId="inspection-table" attached={!list.loading && list.hasData}
+        topRow={inline && (
+          <InspectionInlineRow columnKeys={columns.map((c) => c.key)} lookups={lookups} controlsRef={inlineCtl} onBusy={setInlineBusy} onCancel={() => setInline(false)}
+            onSaved={(msg) => { toast.success(msg); void reload() }} />
+        )}
         empty={filtered ? (
           <EmptyState title="Không có dòng nào khớp bộ lọc." hint="Thử đổi từ khóa, khoảng ngày hoặc bộ lọc.">
             <Button onClick={clearFilters}>Xóa bộ lọc</Button>

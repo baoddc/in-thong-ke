@@ -19,6 +19,8 @@ import UsersPage from './pages/UsersPage'
 import { ProfileProvider, useProfile } from './lib/useProfile'
 import { ROLE_LABEL } from './lib/auth'
 import Button from './components/ui/Button'
+import { PresenceProvider } from './lib/presence'
+import { OnlineUsers } from './components/PresenceViews'
 
 const STORAGE_KEY = 'sidebar-collapsed'
 
@@ -50,6 +52,10 @@ function LogoTile({ className = 'h-10 w-10' }: { className?: string }) {
 }
 
 export function Layout({ email }: { email: string }) {
+  return <PresenceProvider><LayoutBody email={email} /></PresenceProvider> // D-024
+}
+
+function LayoutBody({ email }: { email: string }) {
   const { profile, isAdmin } = useProfile()
   const displayName = profile?.full_name || email
   const pending = usePendingCount(isAdmin) // D-015: badge số tài khoản chờ duyệt
@@ -119,6 +125,7 @@ export function Layout({ email }: { email: string }) {
           })}
         </nav>
         <div className="mt-auto space-y-1 border-t border-white/10 pt-2">
+          <OnlineUsers showLabels={showLabels} />
           <button onClick={toggle} aria-expanded={!collapsed} aria-label={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
             className={`${row} hidden w-full border-transparent text-slate-300 hover:bg-white/10 hover:text-white md:flex`} data-testid="toggle-sidebar">
             <Icon name={collapsed ? 'expand' : 'collapse'} />

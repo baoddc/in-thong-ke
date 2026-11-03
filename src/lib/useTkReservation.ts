@@ -70,5 +70,6 @@ export function useTkReservation(enabled: boolean) {
   const touch = useCallback(() => { touched.current = Date.now() }, [])
   const markSaved = useCallback(() => { stopped.current = true }, [])
   const remaining = reservedAt ? Math.max(0, HOLD_SECONDS - Math.floor((now - reservedAt) / 1000)) : HOLD_SECONDS
-  return { number, error, remaining, expired: reservedAt > 0 && remaining === 0, touch, markSaved }
+  const expiresAt = reservedAt ? reservedAt + HOLD_SECONDS * 1000 : 0 // mốc hết hạn (ms), để người khác thấy đếm ngược (D-024)
+  return { number, error, remaining, expiresAt, expired: reservedAt > 0 && remaining === 0, touch, markSaved }
 }

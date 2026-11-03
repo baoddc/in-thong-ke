@@ -182,16 +182,17 @@ describe('PlanFormModal - giữ chỗ số TK (D-018)', () => {
     const timer = () => screen.getByTestId('tk-hold-timer').textContent
     const advance = (s: number) => act(async () => { await vi.advanceTimersByTimeAsync(s * 1000) })
 
-    it('đếm 05:00 → hết giờ hiện thông báo, không gia hạn khi không thao tác', async () => {
-      render(<PlanFormModal plan={null} lookups={lookups} onClose={() => {}} onSaved={vi.fn()} />)
+    it('đếm 05:00 → hết giờ gọi onExpired (trang đóng modal), không gia hạn khi không thao tác', async () => {
+      const onExpired = vi.fn()
+      render(<PlanFormModal plan={null} lookups={lookups} onClose={() => {}} onSaved={vi.fn()} onExpired={onExpired} />)
       await advance(0)
       expect(timer()).toBe('05:00')
       await advance(65)
       expect(timer()).toBe('03:55')
+      expect(onExpired).not.toHaveBeenCalled()
       await advance(235)
-      expect(screen.getByTestId('tk-hold-expired').textContent).toContain('Đã hết thời gian giữ số, số sẽ được cấp lại khi lưu')
+      expect(onExpired).toHaveBeenCalledWith('Hết thời gian giữ số TK2026/10-005 — dòng nhập đã bị hủy')
       expect(h.hold.filter((f) => f === 'reserve_tk_number')).toHaveLength(1)
-      expect((screen.getByTestId('plan-save') as HTMLButtonElement).disabled).toBe(false)
     })
 
     it('còn ≤ 1 phút và người dùng đang thao tác → gọi reserve lại, đồng hồ về 05:00', async () => {

@@ -2,6 +2,7 @@ import type { ReactNode, RefObject } from 'react'
 import Button from './ui/Button'
 import DateInput from './ui/DateInput'
 import Icon from './ui/Icon'
+import { todayISO } from '../lib/format'
 import { Field, Input } from './ui/Input'
 
 type Props = {
@@ -14,13 +15,15 @@ type Props = {
   to: string
   onFrom: (v: string) => void
   onTo: (v: string) => void
+  onRange: (from: string, to: string) => void // nút "Hôm nay": đặt cả hai ngày một lần
   active: boolean // có bộ lọc nào đang bật
   onClear: () => void
   children?: ReactNode // bộ lọc thêm (select…)
 }
 
 // Thanh lọc phía server: ô tìm nhanh (phím /), khoảng ngày xuất (dd/mm/yyyy), bộ lọc thêm. Nhãn nổi trên viền ô để thanh lọc thấp.
-export default function ListToolbar({ searchRef, text, onText, placeholder, searchTitle, from, to, onFrom, onTo, active, onClear, children }: Props) {
+export default function ListToolbar({ searchRef, text, onText, placeholder, searchTitle, from, to, onFrom, onTo, onRange, active, onClear, children }: Props) {
+  const today = todayISO()
   return (
     // pt-3: chừa chỗ cho nhãn nổi nằm trên viền ô
     <div className="grid grid-cols-2 items-start gap-x-2 gap-y-3 rounded-card border border-stone-200 bg-white p-2 pt-3 shadow-sm sm:flex sm:flex-wrap" data-testid="list-toolbar">
@@ -41,7 +44,8 @@ export default function ListToolbar({ searchRef, text, onText, placeholder, sear
         </Field>
       </div>
       {children}
-      {active && <Button size="sm" onClick={onClear} className="col-span-2 sm:col-span-1 sm:min-h-9" data-testid="clear-filters">Xóa bộ lọc</Button>}
+      <Button size="sm" onClick={() => onRange(today, today)} aria-pressed={from === today && to === today} className={`sm:min-h-9 ${from === today && to === today ? 'border-primary bg-primary-soft text-primary' : ''}`} data-testid="filter-today">Hôm nay</Button>
+      {active && <Button size="sm" onClick={onClear} className="sm:min-h-9" data-testid="clear-filters">Xóa bộ lọc</Button>}
     </div>
   )
 }
