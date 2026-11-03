@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import type { Role } from './auth'
+import { useDbChange } from './dbChanges'
 
 /** Người dùng do Edge Function `admin-users` trả về (docs/api-contract.md). */
 export type AdminUser = {
@@ -55,6 +56,8 @@ export const countPending = (users: AdminUser[]) => users.filter((u) => u.is_pen
 /** Số tài khoản chờ duyệt cho badge sidebar (chỉ gọi khi `enabled`, tức admin/root); lỗi thì coi như 0. */
 export function usePendingCount(enabled: boolean): number {
   const [count, setCount] = useState(0)
+  const [tick, setTick] = useState(0)
+  useDbChange(['profiles'], () => setTick((t) => t + 1), 1000) // D-028: có người đăng ký / được duyệt
   useEffect(() => {
     if (!enabled) return
     let alive = true
@@ -62,7 +65,7 @@ export function usePendingCount(enabled: boolean): number {
     const on = (e: Event) => setCount((e as CustomEvent<number>).detail)
     window.addEventListener(PENDING_EVENT, on)
     return () => { alive = false; window.removeEventListener(PENDING_EVENT, on) }
-  }, [enabled])
+  }, [enabled, tick])
   return enabled ? count : 0
 }
 
@@ -80,5 +83,6 @@ export function useAdminUsers() {
   }, [])
 
   useEffect(() => { void reload() }, [reload])
+  useDbChange(['profiles'], () => void reload(), 1000) // D-028
   return { users: state.users, error: state.error, loading: !state.loaded, reload }
 }

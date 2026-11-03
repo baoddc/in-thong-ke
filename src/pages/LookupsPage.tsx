@@ -12,6 +12,7 @@ import PageHeader from '../components/ui/PageHeader'
 import Pagination from '../components/ui/Pagination'
 import { useToast } from '../components/ui/Toast'
 import { useProfile } from '../lib/useProfile'
+import { useDbChange } from '../lib/dbChanges'
 
 // Nhóm tab theo vị trí: từ 'construction' trở đi thuộc "Bảng kiểm chi tiết".
 const SPLIT = KINDS.findIndex((k) => k.kind === 'construction')
@@ -61,6 +62,7 @@ export default function LookupsPage() {
   const isCons = kind === 'construction'
   const big = isBigKind(kind)
   const bigList = useBigLookups(kind, filter.trim(), page, size)
+  useDbChange(['lookup_items'], () => bigList.reload()) // D-028 (danh mục nhỏ đã tự tải lại trong useLookups)
 
   async function run(fn: () => PromiseLike<{ error: { code?: string; message?: string } | null }>) {
     setBusy(true)

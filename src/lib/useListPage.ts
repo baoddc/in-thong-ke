@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { errorMessage } from './format'
+import { useDbChange, type DbTable } from './dbChanges'
 import { FRESH_MS, cacheGeneration, cacheGet, cacheKey, cacheSet, clearListCache } from './listCache'
 import { isCappedTotal, nextSort, pageCount, parseListParams, toSearchParams, type ListConfig, type ListParams } from './listQuery'
 
-type Fetched = PromiseLike<{ data: unknown; count: number | null; error: { code?: string; message?: string } | null }>
+// Danh sách hiện tên danh mục / NV xuất / số TK của bảng khác → nghe cả các bảng đó.
+const WATCH: Record<string, DbTable[]> = {
+  transport_plans: ['transport_plans', 'transport_plan_material_exporters', 'lookup_items', 'inspection_details'],
+  inspection_details: ['inspection_details', 'transport_plans', 'transport_plan_material_exporters', 'lookup_items'],
+}
+
+type Fetched =PromiseLike<{ data: unknown; count: number | null; error: { code?: string; message?: string } | null }>
 export type Fetcher = (p: ListParams) => Fetched
 
 /** Trạng thái danh sách phân trang: bộ lọc/trang nằm trong URL, dữ liệu tải từ server theo từng trang. `table` = một phần khóa cache. */
@@ -64,6 +71,8 @@ export function useListPage<T>(cfg: ListConfig, fetcher: Fetcher, table: string)
   }, [fetcher, p, key, table, prefetch])
 
   const reload = useCallback(() => { clearListCache(); return load(true) }, [load])
+  // D-028: người khác thêm/sửa/xóa → tải lại ngầm trang đang xem (giữ dòng đang hiện tới khi có dữ liệu mới).
+  useDbChange(WATCH[table] ?? [table as DbTable], () => void reload())
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- tải dữ liệu, hiện cache hoặc setState sau await
   useEffect(() => { void load() }, [load])

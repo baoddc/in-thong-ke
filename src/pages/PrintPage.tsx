@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useDbChange } from '../lib/dbChanges'
 import { errorMessage } from '../lib/format'
 import { recall } from '../lib/lookupSearch'
 import { PLAN_SELECT } from '../lib/plans'
@@ -20,6 +21,7 @@ export default function PrintPage() {
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0) // tăng để thử lại
   const loaded = data && data.tk === tk ? data : null
+  useDbChange(['transport_plans', 'transport_plan_material_exporters', 'inspection_details', 'lookup_items'], () => setAttempt((a) => a + 1), 800) // D-028: bản in tự cập nhật
 
   // Tra phiếu theo số TK trong URL (không tải danh sách số TK), rồi tải các dòng bảng kiểm của phiếu.
   useEffect(() => {

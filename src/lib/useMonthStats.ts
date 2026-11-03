@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import { todayISO } from './format'
 import { monthRange } from './listQuery'
+import { useDbChange } from './dbChanges'
 
 type Stats = { plans: number | null; lines: number | null; weightKg: number | null; weightError: string }
 
@@ -27,5 +28,6 @@ export function useMonthStats() {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- tải dữ liệu lần đầu, setState chạy sau await
   useEffect(() => { void reload() }, [reload])
+  useDbChange(['transport_plans', 'inspection_details'], () => void reload(), 1000) // D-028
   return { ...stats, reload }
 }

@@ -117,6 +117,20 @@ Mục tiêu: `inspection_details` ≥ 1–5 triệu dòng, `transport_plans` ≥
 - Dải "Đang giữ số" (D-024) bỏ vì đã hiện trong dòng nháp; sidebar "Đang trực tuyến" giữ.
 - Chỉ hiển thị, không khóa, không ảnh hưởng quyền hay dữ liệu.
 
+## D-028 — Mọi thao tác hiện ngay trên máy khác (03/11/2026)
+- Supabase Realtime `postgres_changes` trên `transport_plans`, `transport_plan_material_exporters`, `inspection_details`, `lookup_items`, `profiles` (migration 000023); `edit_requests` đã có từ D-020.
+- FE: một kênh dùng chung `db-changes` (`src/lib/dbChanges.ts`, `useDbChange`), gom thay đổi dồn dập 0,4–1 giây rồi tải lại ngầm (giữ dòng đang hiện). Nối vào: danh sách Nhập phiếu/Bảng kiểm, thẻ số liệu tháng, danh mục (ô chọn + trang Danh mục), thanh nhắc thiếu thông tin, trang In, badge/trang người dùng.
+- Bắt được cả thay đổi từ lịch tự xóa (D-027) và SQL Editor. Nháp đang gõ vẫn qua Broadcast (D-025).
+- Giới hạn: tải lại cả trang đang xem (không vá từng dòng); mất kết nối thì lỡ sự kiện tới khi có thay đổi kế tiếp / đổi trang. Realtime áp RLS cho mỗi người nghe — ổn với đội nhỏ.
+
+## D-027 — Tự xóa phiếu/dòng thiếu thông tin sau 24h (03/11/2026)
+- Người dùng chốt: giữ số TK 5 phút như cũ; phiếu/dòng đã lưu mà sau 24h còn thiếu ô (trừ Ghi chú) thì tự xóa.
+- Phiếu đủ: Ngày xuất, Số lệnh VC, Phân loại VC, Số xe, Tài xế, và NV xuất TP/BTP hoặc ≥1 NV xuất VT. Dòng đủ: Số phiếu TK, Số PXK, Công trình, Đơn vị giao, Đơn vị nhận, Loại hình xuất, Mặt hàng, ĐVT, Số lượng, Khối lượng (Hạng mục, Nhà xe, NV xuất hàng, Ghi chú được trống).
+- Phiếu thiếu nhưng đã có dòng Bảng kiểm: không xóa, chỉ nhắc người tạo điền.
+- Chỉ áp cho bản ghi tạo sau migration 000022 (cột `require_complete`, cũ = false) — dữ liệu nạp từ Google Sheets/LOADTEST không bị đụng.
+- Cách chạy: pg_cron 15 phút/lần gọi `purge_incomplete()` (xóa thực tế trong khoảng 24h–24h15'). Nhắc: thanh cảnh báo đầu trang đọc `my_incomplete_items()` (của chính mình, tải lại mỗi phút/khi đổi trang).
+- Giới hạn: quá 24h phiếu bị khóa sửa (D-019) → người dùng phải "Yêu cầu sửa" để điền tiếp; `require_complete` FE gửi được nên không phải ràng buộc bảo mật.
+
 ## D-026 — Xóa mục danh mục đang được dùng = ẩn (03/11/2026)
 - Người dùng muốn xóa thủ công mọi mục trong Danh mục (vd dọn NV xuất TP/BTP chỉ còn 2 Khánh), kể cả mục phiếu cũ đang dùng.
 - Chọn: cột `lookup_items.archived_at`; RPC `delete_lookup_item` (admin) xóa hẳn nếu chưa ai dùng, đang dùng thì ẩn. Phiếu cũ vẫn trỏ mục đã ẩn → giữ tên khi xem/in. Ô chọn, Danh mục, `search_lookup_items` bỏ mục đã ẩn; unique tên/mã chỉ áp cho mục chưa ẩn nên thêm lại cùng tên tạo mục mới.

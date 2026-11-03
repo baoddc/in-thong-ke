@@ -8,6 +8,7 @@ import RegisterPage from './pages/RegisterPage'
 import { usePendingCount } from './lib/useAdminUsers'
 import { useEditPendingCount } from './lib/useEditRequests'
 import { useEditRequestNotices } from './lib/useEditRequestNotices'
+import IncompleteNotice from './components/IncompleteNotice'
 import EditRequestsPage from './pages/EditRequestsPage'
 import PlansPage from './pages/PlansPage'
 import InspectionPage from './pages/InspectionPage'
@@ -147,6 +148,7 @@ function LayoutBody({ email }: { email: string }) {
       </aside>
 
       <main id="noi-dung" className="min-w-0 flex-1 p-3 md:flex md:min-h-0 md:flex-col md:overflow-y-auto md:p-6 print:block print:overflow-visible print:p-0">
+        <IncompleteNotice />
         <Outlet />
       </main>
     </div>

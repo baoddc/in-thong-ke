@@ -99,5 +99,7 @@ Danh mục do người dùng tự nhập trên trang "Danh mục" (D-005).
 | T-075 | Bảng kiểm: bỏ bộ lọc Loại hình xuất, Mặt hàng | frontend | Xong |
 | T-076 | Phiếu mới tự điền NV xuất theo họ tên người đăng nhập (có trong TP/BTP → ô TP/BTP, không thì NV xuất VT); dọn danh mục: NV xuất TP/BTP chỉ Lê Duy Khánh, Lê Giang Khánh; NV xuất VT bỏ 2 người này — Danh mục là nguồn (không cố định tên trong code); sửa phiếu cũ vẫn hiện người ở danh mục kia (`exporterOptions`) | Lead | Xong (dọn bằng T-077) |
 | T-077 | Danh mục: xóa được cả mục đang dùng (ẩn, D-026) — migration 000021 + Danh mục/ô chọn bỏ mục đã ẩn | Lead | Xong code · chờ áp migration 000021 |
+| T-078 | Tự xóa phiếu/dòng tạo mới còn thiếu thông tin sau 24h + thanh nhắc người tạo (D-027) — migration 000022, IncompleteNotice | Lead | Xong code · chờ áp migration 000022 |
+| T-079 | Mọi thao tác realtime (D-028) — migration 000023 + `useDbChange` ở danh sách, số liệu, danh mục, In, người dùng | Lead | Xong code · chờ áp migration 000023, thử 2 máy |
 | T-052 | Vẽ lại sơ đồ Luồng công việc bằng Archify → public/luong-cong-viec.html (nguồn: .archify/workflow-luong-cong-viec-20261030-142358/candidate.json) | Lead | Xong |
 | T-005 | Dọn số xe/tài xế không hợp lệ | Lead | Chờ người dùng chạy SQL — `execute_sql` có xóa/sửa bị từ chối 2 lần |

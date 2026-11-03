@@ -2,7 +2,8 @@
 import { supabase } from './supabase'
 import { errorMessage } from './format'
 import { compareNames } from './lookupMatch'
-import { isBigKind } from './lookupSearch'
+import { forgetLookups, isBigKind } from './lookupSearch'
+import { useDbChange } from './dbChanges'
 import type { Tables } from '../types/database'
 
 export type LookupItem = Tables<'lookup_items'>
@@ -55,6 +56,7 @@ export function useLookups() {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- tải dữ liệu lần đầu, setState chạy sau await
   useEffect(() => { reload() }, [reload])
+  useDbChange(['lookup_items'], () => { forgetLookups(); void reload() }) // D-028: danh mục đổi ở máy khác
   // Mục đã ẩn (D-026) không hiện để chọn, trừ khi đang có trong phiếu đang sửa (`keep`) để vẫn hiện tên.
   const byKind = (k: string, keep: (number | null)[] = []) => items.filter((i) => i.kind === k && (!i.archived_at || keep.includes(i.id)))
   return { items, error, loading, reload, byKind }
