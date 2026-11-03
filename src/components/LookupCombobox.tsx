@@ -97,7 +97,7 @@ export default function LookupCombobox({ label, kind, items: rawItems = [], serv
     let item: Item | null = ins.data
     if (ins.error?.code === '23505') {
       // đã có (người khác vừa thêm hoặc khác hoa/thường): lấy mục đã có
-      item = (await supabase.from('lookup_items').select('*').eq('kind', kind).eq(field, name).maybeSingle()).data
+      item = (await supabase.from('lookup_items').select('*').eq('kind', kind).eq(field, name).is('archived_at', null).maybeSingle()).data
       if (!item) setErr(errorMessage(ins.error))
     } else if (ins.error) setErr(errorMessage(ins.error))
     if (item) {

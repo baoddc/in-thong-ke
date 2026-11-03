@@ -4,6 +4,7 @@ import { errorMessage, todayISO } from './format'
 import { sortedMaterials } from './plans'
 import { useTkReservation } from './useTkReservation'
 import { useReportActivity } from './presence'
+import { useProfile } from './useProfile'
 import type { Opt } from './lookupSearch'
 import type { PlanRow } from '../types/plan'
 
@@ -24,9 +25,35 @@ const fromPlan = (p: PlanRow | null): PlanForm => ({
 export const formatCountdown = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 
 /** State + kiểm tra + lưu của form phiếu, dùng chung cho modal và dòng nhập trên bảng. Thêm mới (plan null) thì giữ số TK. */
-export function usePlanForm({ plan, readOnly = false, onSaved, onExpired }: { plan: PlanRow | null; readOnly?: boolean; onSaved: (message: string) => void; onExpired?: (message: string) => void }) {
-  const [initial] = useState(() => fromPlan(plan))
+/** Phiếu mới: điền sẵn người đăng nhập — có trong NV xuất TP/BTP thì vào ô đó, không thì vào NV xuất VT. So tên không phân biệt hoa/thường, khoảng trắng. */
+export function defaultExporter(fullName: string | null | undefined, byKind: (k: string) => { id: number; name: string }[]): Partial<PlanForm> {
+  const key = (s: string) => s.normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase()
+  const me = key(fullName ?? '')
+  if (!me) return {}
+  const find = (kind: string) => byKind(kind).find((i) => key(i.name) === me)?.id
+  const fg = find('fg_exporter')
+  if (fg !== undefined) return { fgExporterId: fg }
+  const mat = find('material_exporter')
+  return mat !== undefined ? { materialIds: [mat] } : {}
+}
+
+export function usePlanForm({ plan, readOnly = false, onSaved, onExpired, lookups }: {
+  plan: PlanRow | null; readOnly?: boolean; onSaved: (message: string) => void; onExpired?: (message: string) => void
+  lookups?: { byKind: (k: string) => { id: number; name: string }[]; loading: boolean }
+}) {
+  const [initial, setInitial] = useState(() => fromPlan(plan))
   const [form, setForm] = useState(initial)
+
+  // Điền mặc định một lần khi danh mục + profile đã tải; tính vào `initial` để không bị coi là đã sửa.
+  // Đặt state ngay trong render (mẫu "điều chỉnh state theo props"); `defaulted` đổi → trang remount ô TP/BTP để hiện tên.
+  const { profile } = useProfile()
+  const [defaulted, setDefaulted] = useState(false)
+  if (!defaulted && !plan && !readOnly && lookups && !lookups.loading && profile) {
+    setDefaulted(true)
+    const d = defaultExporter(profile.full_name, lookups.byKind)
+    setInitial((f) => ({ ...f, ...d }))
+    setForm((f) => ({ ...f, fgExporterId: f.fgExporterId ?? d.fgExporterId ?? null, materialIds: f.materialIds.length ? f.materialIds : d.materialIds ?? [] }))
+  }
   const [pending, setPending] = useState<Record<string, boolean>>({}) // ô đơn có chữ nhưng chưa chọn
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -85,5 +112,5 @@ export function usePlanForm({ plan, readOnly = false, onSaved, onExpired }: { pl
     onSaved(hold.number && tk !== hold.number ? `Số phiếu đã đổi thành ${tk} do hết thời gian giữ` : `Đã lưu phiếu ${tk}`)
   }
 
-  return { form, set, setPending, pending, error, busy, dirty, hold, known, selectProps, submit }
+  return { form, set, setPending, pending, error, busy, dirty, hold, known, selectProps, submit, defaulted }
 }

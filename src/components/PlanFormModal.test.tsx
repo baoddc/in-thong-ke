@@ -32,7 +32,7 @@ vi.mock('../lib/supabase', () => ({
 import PlanFormModal from './PlanFormModal'
 import type { PlanRow } from '../types/plan'
 
-const it_ = (id: number, kind: string, name: string) => ({ id, kind, name, code: null, created_at: '', updated_at: '' })
+const it_ = (id: number, kind: string, name: string) => ({ id, kind, name, code: null, archived_at: null, created_at: '', updated_at: '' })
 const items = [
   it_(11, 'material_exporter', 'An'), it_(12, 'material_exporter', 'Bình'), it_(13, 'material_exporter', 'Chi'),
   it_(21, 'vehicle', '51D-44521'), it_(31, 'driver', 'Phạm Minh Luân'),

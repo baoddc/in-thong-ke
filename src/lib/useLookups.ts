@@ -22,7 +22,15 @@ export const KINDS = [
   { kind: 'carrier', label: 'Nhà xe' },
 ] as const
 
-const SMALL_KINDS = KINDS.map((k) => k.kind).filter((k) => !isBigKind(k))
+/** Ô NV xuất khi sửa phiếu cũ: danh mục của ô + người phiếu đang có nhưng nằm ở danh mục NV xuất kia (sau khi dọn danh mục) để vẫn hiện tên. */
+export function exporterOptions<T extends { id: number }>(kind: string, byKind: (k: string, keep?: (number | null)[]) => T[], keep: (number | null)[]): T[] {
+  const list = byKind(kind, keep)
+  if (kind !== 'fg_exporter' && kind !== 'material_exporter') return list
+  const other = kind === 'fg_exporter' ? 'material_exporter' : 'fg_exporter'
+  return [...list, ...byKind(other, keep).filter((i) => keep.includes(i.id) && !list.some((l) => l.id === i.id))]
+}
+
+const SMALL_KINDS =KINDS.map((k) => k.kind).filter((k) => !isBigKind(k))
 
 export function useLookups() {
   const [items, setItems] = useState<LookupItem[]>([])
@@ -47,5 +55,7 @@ export function useLookups() {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- tải dữ liệu lần đầu, setState chạy sau await
   useEffect(() => { reload() }, [reload])
-  return { items, error, loading, reload, byKind: (k: string) => items.filter((i) => i.kind === k) }
+  // Mục đã ẩn (D-026) không hiện để chọn, trừ khi đang có trong phiếu đang sửa (`keep`) để vẫn hiện tên.
+  const byKind = (k: string, keep: (number | null)[] = []) => items.filter((i) => i.kind === k && (!i.archived_at || keep.includes(i.id)))
+  return { items, error, loading, reload, byKind }
 }

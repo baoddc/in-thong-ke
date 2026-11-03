@@ -117,6 +117,12 @@ Mục tiêu: `inspection_details` ≥ 1–5 triệu dòng, `transport_plans` ≥
 - Dải "Đang giữ số" (D-024) bỏ vì đã hiện trong dòng nháp; sidebar "Đang trực tuyến" giữ.
 - Chỉ hiển thị, không khóa, không ảnh hưởng quyền hay dữ liệu.
 
+## D-026 — Xóa mục danh mục đang được dùng = ẩn (03/11/2026)
+- Người dùng muốn xóa thủ công mọi mục trong Danh mục (vd dọn NV xuất TP/BTP chỉ còn 2 Khánh), kể cả mục phiếu cũ đang dùng.
+- Chọn: cột `lookup_items.archived_at`; RPC `delete_lookup_item` (admin) xóa hẳn nếu chưa ai dùng, đang dùng thì ẩn. Phiếu cũ vẫn trỏ mục đã ẩn → giữ tên khi xem/in. Ô chọn, Danh mục, `search_lookup_items` bỏ mục đã ẩn; unique tên/mã chỉ áp cho mục chưa ẩn nên thêm lại cùng tên tạo mục mới.
+- Bỏ: chuyển ~180k dòng Bảng kiểm sang mục cùng tên (quá chậm trên SQL Editor), cố định tên trong code.
+- Giới hạn: form Bảng kiểm sửa dòng cũ có mục đã ẩn (danh mục nhỏ) thì ô đó hiện trống nhưng lưu vẫn giữ id; form phiếu đã xử lý (`byKind(kind, keep)`).
+
 ## D-024 — Thấy ai đang thao tác / giữ số phiếu (03/11/2026)
 - Dùng Supabase Realtime **Presence** (kênh chung cho người đã đăng nhập), không thêm bảng/migration. Mỗi tab gửi: username, họ tên, trang đang mở, hành động (thêm phiếu + số TK đang giữ + hạn giữ / sửa phiếu TK… / nhập bảng kiểm cho TK… / sửa dòng bảng kiểm), cập nhật khi hành động đổi. Đóng tab/mất mạng → tự rời.
 - Hiển thị: (1) góc trên/ sidebar: danh sách người đang trực tuyến kèm việc đang làm; (2) trang Nhập phiếu: dải "Đang giữ số" (TK… · ai · còn mm:ss); (3) dòng phiếu/dòng bảng kiểm người khác đang sửa có nhãn "<user> đang sửa".

@@ -29,7 +29,7 @@ function useBigLookups(kind: string, q: string, page: number, size: number) {
     if (!isBigKind(kind)) return
     let alive = true
     const t = setTimeout(async () => {
-      let qb = supabase.from('lookup_items').select('*', { count: 'exact' }).eq('kind', kind)
+      let qb = supabase.from('lookup_items').select('*', { count: 'exact' }).eq('kind', kind).is('archived_at', null)
       const term = sanitizeTerm(q)
       if (term) qb = qb.or(`name.ilike.%${term}%,code.ilike.%${term}%`)
       const [a, b] = pageRange(page, size)
@@ -93,7 +93,9 @@ export default function LookupsPage() {
     if (!deleting) return
     const item = deleting
     setDeleting(null)
-    if (await run(() => supabase.from('lookup_items').delete().eq('id', item.id))) toast.success(`Đã xóa "${item.name}"`)
+    let result = ''
+    const ok = await run(async () => { const r = await supabase.rpc('delete_lookup_item', { p_id: item.id }); result = r.data ?? ''; return r })
+    if (ok) toast.success(result === 'archived' ? `Đã xóa "${item.name}" khỏi danh mục (phiếu cũ vẫn giữ tên)` : `Đã xóa "${item.name}"`)
   }
 
   const q = filter.trim().toLowerCase()
@@ -161,7 +163,7 @@ export default function LookupsPage() {
         <Pagination page={page} size={size} total={bigList.total} rowCount={bigList.rows.length} disabled={bigList.refreshing} onPage={setPage} onSize={(n) => { setSize(n); setPage(1) }} />
       )}
       {deleting && (
-        <ConfirmDialog title={`Xóa "${deleting.name}"?`} message="Mục sẽ bị xóa khỏi danh mục. Nếu đang được dùng trong phiếu thì không xóa được."
+        <ConfirmDialog title={`Xóa "${deleting.name}"?`} message="Mục sẽ không còn hiện để chọn. Phiếu cũ đã dùng mục này vẫn giữ nguyên tên."
           onConfirm={() => void confirmDelete()} onCancel={() => setDeleting(null)} />
       )}
     </div>

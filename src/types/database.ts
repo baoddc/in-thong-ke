@@ -9,6 +9,7 @@ export type Database = {
           kind: string
           name: string
           code: string | null
+          archived_at: string | null
           created_at: string
           updated_at: string
         }
@@ -17,6 +18,7 @@ export type Database = {
           kind: string
           name: string
           code?: string | null
+          archived_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -25,6 +27,7 @@ export type Database = {
           kind?: string
           name?: string
           code?: string | null
+          archived_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -704,6 +707,10 @@ export type Database = {
       inspection_weight_total: {
         Args: { p_from: string; p_to: string }
         Returns: number
+      }
+      delete_lookup_item: {
+        Args: { p_id: number }
+        Returns: string
       }
       search_lookup_items: {
         Args: { p_kind: string; p_q: string; p_limit?: number }

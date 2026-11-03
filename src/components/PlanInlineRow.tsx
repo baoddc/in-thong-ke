@@ -23,7 +23,7 @@ type Props = {
 export default function PlanInlineRow({ columnKeys, lookups, onSaved, onCancel, onExpired, controlsRef, onBusy }: Props) {
   const { byKind, loading: lookupLoading, error: lookupError, reload } = lookups
   const dateRef = useRef<HTMLInputElement>(null)
-  const { form, set, error, busy, dirty, hold, known, selectProps, submit } = usePlanForm({ plan: null, onSaved, onExpired })
+  const { form, set, error, busy, dirty, hold, known, selectProps, submit, defaulted } = usePlanForm({ plan: null, onSaved, onExpired, lookups })
   useEffect(() => { dateRef.current?.focus() }, [])
 
   // D-025: cho người khác thấy dòng đang nhập (tên danh mục, không phải id) và ô đang đứng.
@@ -38,7 +38,7 @@ export default function PlanInlineRow({ columnKeys, lookups, onSaved, onCancel, 
   })
 
   const select = (label: string, kind: string, key: 'transportTypeId' | 'vehicleId' | 'driverId' | 'fgExporterId', id: string) => (
-    <LookupCombobox key={`${id}-${lookupLoading}`} hideLabel label={label} kind={kind} items={byKind(kind)} server={isBigKind(kind)} known={known[kind]}
+    <LookupCombobox key={`${id}-${lookupLoading}-${defaulted}`} hideLabel label={label} kind={kind} items={byKind(kind)} server={isBigKind(kind)} known={known[kind]}
       {...selectProps(key, id)} reload={reload} testId={`inline-${id}`} />
   )
   const text = `${inputClass} ${inputSmClass}`

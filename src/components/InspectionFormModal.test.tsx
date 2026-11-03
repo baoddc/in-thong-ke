@@ -30,9 +30,9 @@ import InspectionFormModal from './InspectionFormModal'
 import type { InspectionRow } from '../types/inspection'
 
 const items = [
-  { id: 1, kind: 'fg_exporter', name: 'Lê Văn Chiêu', code: null, created_at: '', updated_at: '' },
-  { id: 2, kind: 'material_exporter', name: 'Trần Văn Bình', code: null, created_at: '', updated_at: '' },
-  { id: 3, kind: 'material_exporter', name: 'Lê Văn Chiêu', code: null, created_at: '', updated_at: '' }, // trùng tên → chỉ hiện một lần
+  { id: 1, kind: 'fg_exporter', name: 'Lê Văn Chiêu', code: null, archived_at: null, created_at: '', updated_at: '' },
+  { id: 2, kind: 'material_exporter', name: 'Trần Văn Bình', code: null, archived_at: null, created_at: '', updated_at: '' },
+  { id: 3, kind: 'material_exporter', name: 'Lê Văn Chiêu', code: null, archived_at: null, created_at: '', updated_at: '' }, // trùng tên → chỉ hiện một lần
 ]
 const lookups = { byKind: (k: string) => items.filter((i) => i.kind === k), loading: false, error: '', reload: async () => {} }
 

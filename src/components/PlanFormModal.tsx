@@ -1,5 +1,5 @@
 import { useEffect, useRef, type FormEvent } from 'react'
-import type { LookupItem } from '../lib/useLookups'
+import { exporterOptions, type LookupItem } from '../lib/useLookups'
 import { isBigKind } from '../lib/lookupSearch'
 import { formatCountdown, usePlanForm } from '../lib/usePlanForm'
 import { AuditNote } from './AuditInfo'
@@ -26,7 +26,7 @@ export default function PlanFormModal({ plan, readOnly = false, lookups, onClose
   const dialogRef = useRef<HTMLDialogElement>(null)
   const formRef = useRef<HTMLFormElement>(null)
   const dateRef = useRef<HTMLInputElement>(null)
-  const { form, set, error, busy, dirty, hold, known, selectProps, submit } = usePlanForm({ plan, readOnly, onSaved, onExpired })
+  const { form, set, error, busy, dirty, hold, known, selectProps, submit, defaulted } = usePlanForm({ plan, readOnly, onSaved, onExpired, lookups })
   const { touch } = hold
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export default function PlanFormModal({ plan, readOnly = false, lookups, onClose
 
   // key đổi khi danh mục tải xong → ô gõ khởi tạo lại từ id trong form.
   const select = (label: string, kind: string, key: 'transportTypeId' | 'vehicleId' | 'driverId' | 'fgExporterId', id: string) => (
-    <LookupCombobox key={`${id}-${lookupLoading}`} label={label} kind={kind} items={byKind(kind)} server={isBigKind(kind)} known={known[kind]}
+    <LookupCombobox key={`${id}-${lookupLoading}-${defaulted}`} label={label} kind={kind} items={exporterOptions(kind, byKind, [form[key]])} server={isBigKind(kind)} known={known[kind]}
       {...selectProps(key, id)} reload={reload} testId={id} />
   )
 
@@ -84,7 +84,7 @@ export default function PlanFormModal({ plan, readOnly = false, lookups, onClose
           {select('Số xe lấy hàng', 'vehicle', 'vehicleId', 'vehicle')}
           {select('Tên tài xế/ phụ xe', 'driver', 'driverId', 'driver')}
           {select('NV Xuất TP/BTP', 'fg_exporter', 'fgExporterId', 'fg-exporter')}
-          <LookupCombobox key={`mat-${lookupLoading}`} label="NV Xuất VT" kind="material_exporter" items={byKind('material_exporter')}
+          <LookupCombobox key={`mat-${lookupLoading}`} label="NV Xuất VT" kind="material_exporter" items={exporterOptions('material_exporter', byKind, form.materialIds)}
             selectedIds={form.materialIds} multiple onChange={(ids) => set('materialIds', ids)} reload={reload} testId="material-exporters" />
           <label className={labelClass}>Ghi chú
             <textarea rows={3} className={inputClass} value={form.note} onChange={(e) => set('note', e.target.value)} data-testid="note" />
