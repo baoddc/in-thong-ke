@@ -46,7 +46,7 @@ function readCollapsed() {
 /** Ô vuông trắng chứa biểu tượng Đại Dũng (cắt từ ảnh header) — nổi trên nền tối. */
 function LogoTile({ className = 'h-10 w-10' }: { className?: string }) {
   return (
-    <span className={`flex shrink-0 items-center justify-center rounded-xl bg-white p-1 shadow-sm ${className}`}>
+    <span className={`flex shrink-0 items-center justify-center ${className}`}>
       <img src="/logo-daidung.png" alt="Đại Dũng" className="max-h-full max-w-full object-contain" />
     </span>
   )

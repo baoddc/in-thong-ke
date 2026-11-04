@@ -710,7 +710,7 @@ export type Database = {
       }
       my_incomplete_items: {
         Args: Record<PropertyKey, never>
-        Returns: { item_kind: string; id: number; label: string; created_at: string; delete_at: string | null; missing: string[] }[]
+        Returns: { item_kind: string; id: number; label: string; created_at: string; due_at: string; missing: string[] }[]
       }
       delete_lookup_item: {
         Args: { p_id: number }

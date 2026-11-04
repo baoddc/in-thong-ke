@@ -12,7 +12,7 @@ import type { InspectionRow } from '../types/inspection'
 export type InspectionIdKey = 'deliveryUnitId' | 'receivingUnitId' | 'exportTypeId' | 'productId' | 'unitId' | 'carrierId'
 type Form = {
   planId: number | null; exportDate: string; slipNo: string; constructionId: number | null; workItem: string
-  deliveryUnitId: number | null | undefined // undefined: chưa chọn → mặc định "An Hạ"
+  deliveryUnitId: number | null | undefined // undefined: chưa chọn → mặc định "Kho An Hạ"
   receivingUnitId: number | null; exportTypeId: number | null; productId: number | null; unitId: number | null
   quantity: string; weight: string; carrierId: number | null; note: string
   shipperId: number | null // null: theo phiếu TK
@@ -56,7 +56,9 @@ export function useInspectionForm({ row, readOnly = false, lookups, validity, on
   const [consTick, setConsTick] = useState({ code: 0, name: 0 }) // ô Mã/Tên công trình khởi tạo lại khi ô kia đổi
 
   const tkRequired = !(row && row.plan_id === null) // dòng cũ chưa có số phiếu TK thì được để trống
-  const defaultDeliveryId = byKind('delivery_unit').find((i) => i.name === 'An Hạ')?.id ?? null
+  // T-081: danh mục đổi tên "An Hạ" → "Kho An Hạ"; nhận cả tên cũ khi DB chưa chạy delta_v4.sql.
+  const delivery = byKind('delivery_unit')
+  const defaultDeliveryId = (delivery.find((i) => i.name === 'Kho An Hạ') ?? delivery.find((i) => i.name === 'An Hạ'))?.id ?? null
   const deliveryUnitId = form.deliveryUnitId === undefined ? defaultDeliveryId : form.deliveryUnitId
   const plan = planInfo && planInfo.id === form.planId ? planInfo : null
   const shippers = mergeShippers(byKind('fg_exporter'), byKind('material_exporter'))

@@ -26,6 +26,8 @@ import PageHeader from '../components/ui/PageHeader'
 import Pagination from '../components/ui/Pagination'
 import { useToast } from '../components/ui/Toast'
 import { EDIT_DENIED_HINT, canEditRow, canUpdateRow } from '../lib/auth'
+import { BLOCKED_MSG, useIncomplete } from '../lib/useIncomplete'
+import CopyButton from '../components/ui/CopyButton'
 import { untilLabel, useMyEditRequests } from '../lib/useEditRequests'
 import { useProfile } from '../lib/useProfile'
 import { EditRequestModal } from '../components/EditRequestModals'
@@ -71,8 +73,10 @@ export default function PlansPage() {
   const stats = useMonthStats()
   const { profile } = useProfile()
   const mine = useMyEditRequests(profile?.id)
-  const canEdit = (r: PlanRow) => canEditRow(profile, r.created_by, r.created_at) // xóa
-  const canUpdate = (r: PlanRow) => canUpdateRow(profile, r.created_by, r.created_at, mine.unlockOf(r.id)) // sửa (D-019: mở khóa theo yêu cầu đã duyệt)
+  const inc = useIncomplete() // D-029: phiếu/dòng thiếu quá 24h → khóa thao tác khác
+  const canEdit = (r: PlanRow) => canEditRow(profile, r.created_by, r.created_at) // xóa (khi không bị khóa)
+  const canDelete = (r: PlanRow) => canEdit(r) && (!inc.blocked || inc.has('plan', r.id))
+  const canUpdate = (r: PlanRow) => inc.has('plan', r.id) || (!inc.blocked && canUpdateRow(profile, r.created_by, r.created_at, mine.unlockOf(r.id))) // sửa (D-019: mở khóa theo yêu cầu đã duyệt)
   const list = useListPage<PlanRow>(CFG, fetchPlans, 'transport_plans')
   const { p, update, reload } = list
   const searchRef = useRef<HTMLInputElement>(null)
@@ -84,7 +88,11 @@ export default function PlansPage() {
   // ≥ md: thêm bằng dòng nhập đầu bảng; điện thoại: modal như cũ. Dòng nhập dở được giữ nguyên khi đổi trang/lọc/sắp xếp.
   const inlineCtl = useRef<InlineControls | null>(null) // nút Lưu/Hủy trên PageHeader gọi đúng hành động của dòng nhập
   const [inlineBusy, setInlineBusy] = useState(false)
-  const openNew = useCallback(() => { if (isBelowMd()) setModal({ plan: null }); else setInlineKey((k) => k ?? 0) }, [])
+  const { blocked } = inc
+  const openNew = useCallback(() => {
+    if (blocked) return toast.error(BLOCKED_MSG)
+    if (isBelowMd()) setModal({ plan: null }); else setInlineKey((k) => k ?? 0)
+  }, [blocked, toast])
   const [statsOpen,, toggleStats] = usePersistentToggle('plans:stats')
   const [filtersOpen, setFiltersOpen, toggleFilters] = usePersistentToggle('plans:filters', () => !isSmallScreen())
   const showFilters = useCallback(() => setFiltersOpen(true), [setFiltersOpen])
@@ -110,6 +118,7 @@ export default function PlansPage() {
         <>
         <button type="button" onClick={() => setModal({ plan: r })} title={canUpdate(r) ? `Sửa phiếu ${r.tk_number}` : `Xem phiếu ${r.tk_number}`} data-testid={`open-${r.tk_number}`}
           className="rounded font-bold text-primary underline-offset-2 transition-colors duration-150 hover:text-primary-dark hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{r.tk_number}</button>
+          <CopyButton value={r.tk_number} label={`Chép số phiếu ${r.tk_number}`} testId={`copy-${r.tk_number}`} />
           <EditingTag kind="plan" id={r.id} />
         </>
       ),
@@ -131,14 +140,14 @@ export default function PlansPage() {
         const showUntil = !!state && !!until
         return (
           <span className="inline-flex items-center gap-0.5">
-            {profile && r.created_by === profile.id && !canEdit(r) && !state && <Button size="sm" onClick={() => setRequesting(r)} data-testid={`request-edit-${r.tk_number}`}>Yêu cầu sửa</Button>}
+            {profile && r.created_by === profile.id && !canEdit(r) && !state && !inc.has('plan', r.id) && <Button size="sm" onClick={() => setRequesting(r)} data-testid={`request-edit-${r.tk_number}`}>Yêu cầu sửa</Button>}
             {state?.status === 'pending' && <span className={`${PILL} bg-orange-100 text-orange-900`} title="Yêu cầu sửa đang chờ admin duyệt" data-testid={`edit-pending-${r.tk_number}`}>Chờ duyệt</span>}
             {showUntil && <span className={`${PILL} bg-green-100 text-green-900`} title={`Được sửa đến ${untilLabel(until)}`} data-testid={`edit-unlocked-${r.tk_number}`}>Sửa đến {untilLabel(until)}</span>}
             <IconButton icon="edit" label={canUpdate(r) ? `Sửa phiếu ${r.tk_number}${showUntil ? ` (được sửa đến ${untilLabel(until)})` : ''}` : `Xem phiếu ${r.tk_number} (${EDIT_DENIED_HINT})`} onClick={() => setModal({ plan: r })} data-testid={`edit-${r.tk_number}`} />
             <Link to={`/in-thong-ke?tk=${encodeURIComponent(r.tk_number)}`} className={iconButtonClass()} aria-label={`In phiếu ${r.tk_number}`} title={`In phiếu ${r.tk_number}`} data-testid={`print-${r.tk_number}`}>
               <Icon name="print" size={18} />
             </Link>
-            <IconButton icon="trash" tone="danger" label={canEdit(r) ? `Xóa phiếu ${r.tk_number}` : `Không xóa được: ${EDIT_DENIED_HINT}`} disabled={!canEdit(r)}
+            <IconButton icon="trash" tone="danger" label={canDelete(r) ? `Xóa phiếu ${r.tk_number}` : `Không xóa được: ${canEdit(r) ? BLOCKED_MSG : EDIT_DENIED_HINT}`} disabled={!canDelete(r)}
               className="disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent" onClick={() => setDeleting({ plan: r, busy: false })} data-testid={`delete-${r.tk_number}`} />
           </span>
         )

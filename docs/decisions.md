@@ -117,6 +117,13 @@ Mục tiêu: `inspection_details` ≥ 1–5 triệu dòng, `transport_plans` ≥
 - Dải "Đang giữ số" (D-024) bỏ vì đã hiện trong dòng nháp; sidebar "Đang trực tuyến" giữ.
 - Chỉ hiển thị, không khóa, không ảnh hưởng quyền hay dữ liệu.
 
+## D-029 — Thiếu thông tin quá 24h: khóa thao tác thay vì xóa (04/11/2026)
+- Thay phần "tự xóa" của D-027 (bỏ lịch `purge-incomplete`, bỏ `purge_incomplete()`); điều kiện "đủ thông tin" giữ nguyên D-027.
+- Người tạo có phiếu/dòng còn thiếu đã quá 24h → bị khóa: không giữ số TK / thêm phiếu, dòng; không sửa / xóa phiếu, dòng khác. Chỉ được sửa (hoặc xóa nếu còn quyền) chính các mục còn thiếu; điền đủ là tự mở khóa.
+- Mục còn thiếu của chính mình luôn sửa được kể cả quá 24h (`can_update_row` thêm `is_own_incomplete`), không cần "Yêu cầu sửa".
+- Chặn ở DB: trigger `guard_blocked_incomplete` (insert/update/delete trên `transport_plans`, `inspection_details`) + `reserve_tk_number`; chỉ áp khi có `auth.uid()` (SQL Editor không bị chặn). Web: `useIncomplete` khóa nút Thêm/Xóa, thanh nhắc đổi sang đỏ và luôn hiện danh sách khi bị khóa.
+- Không chặn: Danh mục, In, Yêu cầu sửa, xem dữ liệu.
+
 ## D-028 — Mọi thao tác hiện ngay trên máy khác (03/11/2026)
 - Supabase Realtime `postgres_changes` trên `transport_plans`, `transport_plan_material_exporters`, `inspection_details`, `lookup_items`, `profiles` (migration 000023); `edit_requests` đã có từ D-020.
 - FE: một kênh dùng chung `db-changes` (`src/lib/dbChanges.ts`, `useDbChange`), gom thay đổi dồn dập 0,4–1 giây rồi tải lại ngầm (giữ dòng đang hiện). Nối vào: danh sách Nhập phiếu/Bảng kiểm, thẻ số liệu tháng, danh mục (ô chọn + trang Danh mục), thanh nhắc thiếu thông tin, trang In, badge/trang người dùng.
