@@ -36,7 +36,7 @@ function Item({ toast, dispatch }: { toast: ToastItem; dispatch: (a: Action) => 
       <Icon name={isError ? 'alert' : 'check'} className={`mt-0.5 ${isError ? '' : 'text-green-700'}`} />
       <p className="flex-1 break-words">{toast.message}</p>
       <button type="button" onClick={onClose} aria-label="Đóng thông báo"
-        className="-m-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xl leading-none transition-colors duration-150 hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current">×</button>
+        className="-m-1 flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-lg text-xl leading-none transition-colors duration-150 hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-current">×</button>
     </div>
   )
 }
@@ -52,7 +52,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={api}>
       {children}
-      <div aria-live="polite" className="pointer-events-none fixed inset-x-3 bottom-3 z-[60] flex flex-col gap-2 sm:left-auto sm:w-96 print:hidden" data-testid="toast-region">
+      <div aria-live="polite" className="pointer-events-none fixed inset-x-3 top-[4.5rem] z-[60] flex flex-col gap-2 sm:left-auto sm:top-auto sm:bottom-3 sm:w-96 print:hidden" data-testid="toast-region">
         {toasts.map((t) => <Item key={t.id} toast={t} dispatch={dispatch} />)}
       </div>
     </Ctx.Provider>

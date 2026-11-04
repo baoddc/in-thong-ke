@@ -45,7 +45,8 @@ const fetchPlans: Fetcher = async (p) => {
   return { data: rows.error ? null : ((rows.data ?? []) as PlanRpcRow[]).map(fromRpcPlan), error: rows.error, count }
 }
 
-const PILL = 'inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold'
+const noop = () => {}
+const PILL ='inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold'
 
 // Màu theo thẻ: đỏ (thương hiệu), xanh dương (thông tin), cam (khối lượng). Viết nguyên chuỗi để Tailwind quét được.
 const TONES = {
@@ -61,7 +62,7 @@ function StatCard({ label, value, testId, error, icon, tone, className = '' }: {
       <span aria-hidden="true" className={`hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg shadow-sm sm:flex ${t.box}`}><Icon name={icon} size={18} /></span>
       <div className="min-w-0 lg:flex lg:items-baseline lg:gap-2">
         <p className="text-lg font-bold leading-tight tabular-nums text-gray-900 sm:text-xl">{value === null ? '—' : formatNumber(value)}</p>
-        <p className="text-xs leading-tight text-muted">{label}</p>
+        <p className="line-clamp-2 text-[11px] leading-tight text-muted sm:text-xs">{label}</p>
       </div>
     </div>
   )
@@ -93,7 +94,17 @@ export default function PlansPage() {
     if (blocked) return toast.error(BLOCKED_MSG)
     if (isBelowMd()) setModal({ plan: null }); else setInlineKey((k) => k ?? 0)
   }, [blocked, toast])
-  const [statsOpen,, toggleStats] = usePersistentToggle('plans:stats')
+  // D-030: sửa tại chỗ (≥ md, có quyền sửa): chính dòng đó thành dòng nhập; màn nhỏ hoặc chỉ xem → modal. Một dòng sửa tại một thời điểm.
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const editCtl = useRef<InlineControls | null>(null)
+  const openEdit = (r: PlanRow) => {
+    if (isBelowMd() || !canUpdate(r)) return setModal({ plan: r })
+    // đang sửa dòng khác: đóng nó trước (dở dang thì hỏi), không mất dữ liệu đang nhập
+    if (editingId !== null && editingId !== r.id && editCtl.current && !editCtl.current.cancel()) return
+    setEditingId(r.id)
+  }
+  const editing = editingId === null ? undefined : list.rows.find((r) => r.id === editingId) // không còn trong trang → coi như đóng
+  const [statsOpen,, toggleStats] = usePersistentToggle('plans:stats', () => !isSmallScreen())
   const [filtersOpen, setFiltersOpen, toggleFilters] = usePersistentToggle('plans:filters', () => !isSmallScreen())
   const showFilters = useCallback(() => setFiltersOpen(true), [setFiltersOpen])
   useShortcuts(openNew, searchRef, showFilters)
@@ -113,10 +124,10 @@ export default function PlansPage() {
 
   const columns: Column<PlanRow>[] = [
     {
-      key: 'tk', header: 'Số phiếu TK', sort: 'tk_number', nowrap: true,
+      key: 'tk', header: 'Số phiếu TK', sort: 'tk_number', nowrap: true, mobile: 'title',
       render: (r) => (
         <>
-        <button type="button" onClick={() => setModal({ plan: r })} title={canUpdate(r) ? `Sửa phiếu ${r.tk_number}` : `Xem phiếu ${r.tk_number}`} data-testid={`open-${r.tk_number}`}
+        <button type="button" onClick={() => openEdit(r)} title={canUpdate(r) ? `Sửa phiếu ${r.tk_number}` : `Xem phiếu ${r.tk_number}`} data-testid={`open-${r.tk_number}`}
           className="rounded font-bold text-primary underline-offset-2 transition-colors duration-150 hover:text-primary-dark hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{r.tk_number}</button>
           <CopyButton value={r.tk_number} label={`Chép số phiếu ${r.tk_number}`} testId={`copy-${r.tk_number}`} />
           <EditingTag kind="plan" id={r.id} />
@@ -132,8 +143,11 @@ export default function PlansPage() {
     { key: 'mat', header: 'NV xuất VT', render: (r) => <PersonChips names={sortedMaterials(r).flatMap((m) => (m.lookup?.name ? [m.lookup.name] : []))} /> },
     { key: 'note', header: 'Ghi chú', render: (r) => r.note },
     { key: 'audit', header: 'Người tạo / sửa', nowrap: true, render: (r) => <AuditCell row={r} /> },
+  ]
+  // Cột Thao tác đứng đầu (dính trái khi cuộn ngang).
+  columns.unshift(
     {
-      key: 'actions', header: 'Thao tác', nowrap: true,
+      key: 'actions', header: 'Thao tác', nowrap: true, mobile: 'actions',
       render: (r) => {
         const state = canEdit(r) || r.created_by !== profile?.id ? undefined : mine.unlocks.get(r.id) // chỉ người tạo đã quá 24 giờ mới có trạng thái yêu cầu
         const until = mine.unlockOf(r.id)
@@ -143,7 +157,7 @@ export default function PlansPage() {
             {profile && r.created_by === profile.id && !canEdit(r) && !state && !inc.has('plan', r.id) && <Button size="sm" onClick={() => setRequesting(r)} data-testid={`request-edit-${r.tk_number}`}>Yêu cầu sửa</Button>}
             {state?.status === 'pending' && <span className={`${PILL} bg-orange-100 text-orange-900`} title="Yêu cầu sửa đang chờ admin duyệt" data-testid={`edit-pending-${r.tk_number}`}>Chờ duyệt</span>}
             {showUntil && <span className={`${PILL} bg-green-100 text-green-900`} title={`Được sửa đến ${untilLabel(until)}`} data-testid={`edit-unlocked-${r.tk_number}`}>Sửa đến {untilLabel(until)}</span>}
-            <IconButton icon="edit" label={canUpdate(r) ? `Sửa phiếu ${r.tk_number}${showUntil ? ` (được sửa đến ${untilLabel(until)})` : ''}` : `Xem phiếu ${r.tk_number} (${EDIT_DENIED_HINT})`} onClick={() => setModal({ plan: r })} data-testid={`edit-${r.tk_number}`} />
+            <IconButton icon="edit" label={canUpdate(r) ? `Sửa phiếu ${r.tk_number}${showUntil ? ` (được sửa đến ${untilLabel(until)})` : ''}` : `Xem phiếu ${r.tk_number} (${EDIT_DENIED_HINT})`} onClick={() => openEdit(r)} data-testid={`edit-${r.tk_number}`} />
             <Link to={`/in-thong-ke?tk=${encodeURIComponent(r.tk_number)}`} className={iconButtonClass()} aria-label={`In phiếu ${r.tk_number}`} title={`In phiếu ${r.tk_number}`} data-testid={`print-${r.tk_number}`}>
               <Icon name="print" size={18} />
             </Link>
@@ -153,7 +167,7 @@ export default function PlansPage() {
         )
       },
     },
-  ]
+  )
 
   const activeCount = countActiveFilters(p)
   const filtered = activeCount > 0
@@ -188,6 +202,13 @@ export default function PlansPage() {
 
       <DataTable draftRows={<DraftRows table="plans" columnKeys={columns.map((c) => c.key)} />} columns={columns} rows={list.rows} rowKey={(r) => r.id} loading={list.loading} refreshing={list.refreshing}
         error={list.error} onRetry={() => void reload()} sort={p.sort} dir={p.dir} onSort={list.sortBy} testId="plan-table" attached={!list.loading && list.hasData}
+        editRow={editing ? {
+          key: editing.id,
+          node: (
+            <PlanInlineRow key={editing.id} plan={editing} columnKeys={columns.map((c) => c.key)} lookups={lookups} controlsRef={editCtl} onBusy={noop} onCancel={() => setEditingId(null)}
+              onExpired={noop} onSaved={(msg) => { setEditingId(null); toast.success(msg); void reload(); void stats.reload() }} />
+          ),
+        } : undefined}
         topRow={inlineKey !== null && (
           <PlanInlineRow key={inlineKey} columnKeys={columns.map((c) => c.key)} lookups={lookups} controlsRef={inlineCtl} onBusy={setInlineBusy} onCancel={() => setInlineKey(null)}
             onExpired={(msg) => { setInlineKey(null); toast.error(msg) }}

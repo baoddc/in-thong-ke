@@ -9,6 +9,8 @@ import DateInput from './ui/DateInput'
 import InlineEntryRow, { type InlineControls } from './ui/InlineEntryRow'
 import { inputClass, inputSmClass } from './ui/Input'
 
+import type { InspectionRow } from '../types/inspection'
+
 const TK_FIRST = 'Chọn Số phiếu TK trước'
 
 type Props = {
@@ -16,28 +18,30 @@ type Props = {
   lookups: { byKind: (k: string) => LookupItem[]; loading: boolean; error: string; reload: () => Promise<void> }
   onSaved: (message: string) => void
   onCancel: () => void
-  controlsRef: MutableRefObject<InlineControls | null>
-  onBusy: (busy: boolean) => void
+  controlsRef?: MutableRefObject<InlineControls | null>
+  onBusy?: (busy: boolean) => void
+  row?: InspectionRow // có: sửa tại chỗ dòng này (D-030) thay vì thêm mới
 }
 
-// Dòng nhập bảng kiểm mới ngay trên bảng (D-023). Số phiếu TK nhập trước; chưa có thì mọi ô khác bị khóa.
-export default function InspectionInlineRow({ columnKeys, lookups, onSaved, onCancel, controlsRef, onBusy }: Props) {
+// Dòng nhập bảng kiểm mới ngay trên bảng (D-023) hoặc dòng đang sửa tại chỗ (D-030). Thêm mới: Số phiếu TK nhập trước; chưa có thì mọi ô khác bị khóa.
+export default function InspectionInlineRow({ columnKeys, lookups, onSaved, onCancel, controlsRef, onBusy, row }: Props) {
   const { byKind, loading: lookupLoading, error: lookupError, reload } = lookups
   const dateRef = useRef<HTMLInputElement>(null)
   const tkCell = useRef<HTMLDivElement>(null)
   const productCell = useRef<HTMLDivElement>(null)
-  const f = useInspectionForm({ row: null, lookups, validity: dateRef, onSaved: (msg) => onSaved(msg) })
+  const f = useInspectionForm({ row: row ?? null, lookups, validity: dateRef, onSaved: (msg) => onSaved(msg) })
   const { form, set, tick, consTick, known, plan } = f
-  const locked = form.planId === null
+  const editing = !!row
+  const locked = form.planId === null && !(editing && row.plan_id === null) // dòng cũ không có TK vẫn sửa được
   const hint = locked ? TK_FIRST : ''
 
-  useEffect(() => { tkCell.current?.querySelector('input')?.focus() }, [])
+  useEffect(() => { (editing ? productCell : tkCell).current?.querySelector('input')?.focus() }, [editing])
   useEffect(() => { if (tick) productCell.current?.querySelector('input')?.focus() }, [tick])
 
-  // D-025: cho người khác thấy dòng đang nhập và ô đang đứng.
+  // D-025: cho người khác thấy dòng đang nhập và ô đang đứng. Sửa dòng có sẵn không chia sẻ nháp (đã có nhãn "đang sửa").
   const [focus, setFocus] = useState<string | undefined>()
   const nm = (kind: string, id: number | null) => lookupName(byKind(kind), kind, id)
-  useShareDraft({
+  useShareDraft(editing ? null : {
     table: 'details', focus,
     values: {
       date: formatDate(form.exportDate), tk: plan?.tk_number ?? lookupName([], 'plan', form.planId), order: plan?.transport_order_no ?? '', slip: form.slipNo,
@@ -101,8 +105,8 @@ export default function InspectionInlineRow({ columnKeys, lookups, onSaved, onCa
   }
 
   return (
-    <InlineEntryRow testId="inspection-inline-row" columnKeys={columnKeys} cells={cells} busy={f.busy} dirty={f.dirty} saveLabel="Lưu dòng" controlsRef={controlsRef} onBusy={onBusy} onFocusCell={setFocus}
+    <InlineEntryRow testId={editing ? 'inspection-edit-row' : 'inspection-inline-row'} columnKeys={columnKeys} cells={cells} busy={f.busy} dirty={f.dirty} saveLabel="Lưu dòng" controlsRef={controlsRef} onBusy={onBusy} onFocusCell={setFocus}
       cellTitle={(k) => (locked && k !== 'tk' && k !== 'actions' ? TK_FIRST : undefined)}
-      error={f.error || lookupError} onSave={() => void f.save(true)} onCancel={onCancel} />
+      error={f.error || lookupError} onSave={() => void f.save(!editing)} onCancel={onCancel} />
   )
 }

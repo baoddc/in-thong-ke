@@ -25,10 +25,10 @@ export default function IncompleteNotice() {
         <span className="flex-1">
           {blocked
             ? <>Bạn đang bị <b>khóa thao tác</b>: còn <b>{what}</b> quá 24 giờ chưa điền đủ thông tin. Điền đủ các mục dưới đây để mở khóa.</>
-            : <>Bạn có <b>{what}</b> còn thiếu thông tin. Chưa điền đủ trong 24 giờ kể từ lúc tạo sẽ bị khóa thao tác khác.</>}
+            : <>Bạn có <b>{what}</b> còn thiếu thông tin.<span className="max-sm:hidden"> Chưa điền đủ trong 24 giờ kể từ lúc tạo sẽ bị khóa thao tác khác.</span><span className="sm:hidden"> Hạn điền: 24 giờ.</span></>}
         </span>
         {!blocked && ( // bị khóa: luôn hiện danh sách
-          <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="rounded-lg border border-current bg-white px-2 py-1 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="incomplete-toggle">
+          <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="min-h-[44px] rounded-lg border border-current bg-white px-4 py-1 font-medium sm:min-h-0 sm:px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="incomplete-toggle">
             {open ? 'Ẩn' : 'Xem'}
           </button>
         )}
@@ -37,7 +37,7 @@ export default function IncompleteNotice() {
         <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto">
           {items.map((i) => (
             <li key={`${i.item_kind}-${i.id}`} className="rounded bg-white/70 px-2 py-1">
-              <Link className="font-semibold text-primary underline" to={`${i.item_kind === 'plan' ? '/' : '/bang-kiem'}?q=${encodeURIComponent(i.label.split(' · ')[0])}&from=&to=`}>
+              <Link className="inline-block py-2 font-semibold text-primary underline sm:py-0" to={`${i.item_kind === 'plan' ? '/' : '/bang-kiem'}?q=${encodeURIComponent(i.label.split(' · ')[0])}&from=&to=`}>
                 {i.item_kind === 'plan' ? `Phiếu ${i.label}` : `Dòng ${i.label}`}
               </Link>
               {' — thiếu: '}{i.missing.join(', ')}

@@ -20,7 +20,7 @@ vi.mock('./lib/useProfile', () => ({
   useProfile: () => ({ profile: prof.value, isAdmin: prof.value?.role === 'admin' || prof.value?.role === 'root', isRoot: prof.value?.role === 'root', loading: false, error: '' }),
 }))
 
-import { AccessGate, AdminOnly, Layout } from './App'
+import { AccessGate, AdminOnly, Layout, RootOnly } from './App'
 import { ToastProvider } from './components/ui/Toast'
 
 afterEach(() => { cleanup(); localStorage.clear(); prof.value = null })
@@ -73,6 +73,32 @@ describe('Quyền người dùng (D-013)', () => {
     renderLayout()
     expect(screen.queryByTestId('pending-badge')).toBeNull()
     expect(invoke).not.toHaveBeenCalled()
+  })
+
+  it('"Lịch sử thao tác" chỉ hiện cho root; RootOnly chặn admin', () => {
+    prof.value = { id: 'a', full_name: 'Quản trị', role: 'admin', is_active: true }
+    renderLayout()
+    expect(screen.queryByRole('link', { name: 'Lịch sử thao tác' })).toBeNull()
+    cleanup()
+    prof.value = { id: 'r', full_name: 'Bão', role: 'root', is_active: true }
+    renderLayout()
+    expect(screen.getByRole('link', { name: 'Lịch sử thao tác' }).getAttribute('href')).toBe('/lich-su-thao-tac')
+    cleanup()
+    const go = () => render(
+      <MemoryRouter initialEntries={['/ls']}>
+        <Routes>
+          <Route path="/" element={<p>Trang chủ</p>} />
+          <Route path="/ls" element={<RootOnly><p>Trang nhật ký</p></RootOnly>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    go()
+    expect(screen.getByText('Trang nhật ký')).toBeTruthy()
+    cleanup()
+    prof.value = { id: 'a', full_name: 'A', role: 'admin', is_active: true }
+    go()
+    expect(screen.queryByText('Trang nhật ký')).toBeNull()
+    expect(screen.getByText('Trang chủ')).toBeTruthy()
   })
 
   it('route /nguoi-dung chặn user thường (chuyển về /), admin vào được', () => {

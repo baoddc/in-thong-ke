@@ -1,7 +1,7 @@
 import { forwardRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
 
 export const inputClass =
-  'mt-1 block w-full min-h-10 rounded-lg border border-line bg-white px-3 py-2 text-gray-900 placeholder:text-gray-500 transition duration-150 hover:border-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary disabled:bg-gray-100 aria-[invalid=true]:border-danger'
+  'mt-1 block w-full min-h-[44px] sm:min-h-10 rounded-lg border border-line bg-white px-3 py-2 text-gray-900 placeholder:text-gray-500 transition duration-150 hover:border-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary disabled:bg-gray-100 aria-[invalid=true]:border-danger'
 
 /** Nhãn của ô nhập trong form. */
 export const labelClass = 'block text-sm font-medium text-gray-800'

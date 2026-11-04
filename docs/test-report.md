@@ -176,3 +176,30 @@ Tóm tắt: **Cao 0 · Trung bình 3 · Thấp 8**. Không có lỗi mức Cao �
 5. Đối chiếu số liệu DB thật: 21.956 phiếu, 41.799 dòng, 246.043.357,56 kg (đã khớp ở CSV; DB do Lead đã báo khớp, tester không truy cập).
 6. Xuất file PDF/Excel: tính năng chưa làm (CLAUDE.md mục 1.3), plan ghi "Xuất Excel chưa làm".
 7. Mất mạng giữa chừng khi lưu: chỉ kiểm được gián tiếp (lỗi RPC hiện thông báo và nút Lưu bấm lại được); chưa mô phỏng offline thật.
+
+---
+
+## T-088 Giao diện điện thoại — 04/11/2026 (CHƯA HOÀN TẤT — bị chặn đăng nhập)
+
+**Trạng thái:** soát bằng ảnh các trang sau đăng nhập **chưa thực hiện được**. Phiên ADMIN trong cửa sổ Edge (cổng 9333) đã mất: mọi tab (kể cả tab cũ ở /bang-kiem) đều bị chuyển về /dang-nhap, localStorage không còn khóa phiên Supabase. Không có tài khoản thử được ghi trong repo/docs nên QA không tự đăng nhập. Cần Lead đăng nhập lại ADMIN trong cửa sổ 9333 (hoặc cấp tài khoản thử) rồi giao lại T-088c.
+
+| Trang | 360 | 375 | 414 | 1440 | Ghi chú |
+|---|---|---|---|---|---|
+| /dang-nhap | Đạt | Đạt | Đạt | Đạt | Không tràn ngang; ô/nút 43px (làm tròn 44), chữ ô nhập >=16px; tiếng Việt đúng |
+| / , bộ lọc, modal Thêm/Sửa phiếu | Chưa kiểm | Chưa kiểm | Chưa kiểm | Chưa kiểm | Bị chặn đăng nhập |
+| /bang-kiem + modal | Chưa kiểm | Chưa kiểm | Chưa kiểm | Chưa kiểm | Bị chặn |
+| /in-thong-ke, /danh-muc, /yeu-cau-sua, /nguoi-dung, /gioi-thieu, /luong-cong-viec, ngăn kéo menu | Chưa kiểm | Chưa kiểm | Chưa kiểm | Chưa kiểm | Bị chặn |
+| /lich-su-thao-tac | - | - | - | - | Chỉ root; chưa xem bằng ảnh |
+
+Kết quả đã chạy: `npx vitest run` = 38 file đạt, 343 test đạt, 3 expected fail (khớp báo cáo trước).
+
+### Lỗi
+#### BUG-088-01 [Thấp] Liên kết "Đăng ký" ở trang đăng nhập nhỏ hơn 44px
+- Agent cần sửa: frontend
+- Vị trí: /dang-nhap, [data-testid=login-register-link] (52x18px ở 360/375/414)
+- Cách tái hiện: mở /dang-nhap ở 375x812, đo vùng bấm của "Đăng ký".
+- Kết quả mong đợi: vùng bấm >= 44px chiều cao (thêm padding dọc / min-h-11).
+- Ảnh: C:\Users\benhhc\AppData\Local\Temp\claude\26b440d863ced2d0\6d3e4e45-2c22-47eb-b114-a8c4a9a195f6\scratchpad\mobile\qa-login-375.png (và qa-login-360/414/1440.png)
+- Trạng thái: Mở
+
+(Ghi chú: ở 1440 ô nhập/nút cao 35px, chữ ô nhập <16px — đúng ý thiết kế, chỉ áp quy tắc 44px/16px ở điện thoại.)

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useDbChange } from '../lib/dbChanges'
@@ -12,6 +12,7 @@ import PageHeader from '../components/ui/PageHeader'
 import type { PlanRow } from '../types/plan'
 import type { InspectionRow } from '../types/inspection'
 
+const SHEET_PX = 733 // 194mm @96dpi
 type Loaded = { tk: string; plan: PlanRow | null; rows: InspectionRow[] }
 
 export default function PrintPage() {
@@ -47,7 +48,20 @@ export default function PrintPage() {
     setParams(name ? { tk: name } : {}, { replace: true })
   }
 
+  // Xem trước: thu nhỏ trang A4 (194mm ≈ 733px) cho vừa bề ngang khung; chỉ trên màn hình, khi in zoom = 1 (index.css).
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [zoom, setZoom] = useState(1)
   const plan = loaded?.plan ?? null
+  const hasSheet = !!plan && !!loaded
+  useEffect(() => {
+    const el = boxRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const fit = () => setZoom(Math.min(1, el.clientWidth / SHEET_PX) || 1)
+    fit()
+    const ro = new ResizeObserver(fit)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [hasSheet])
   return (
     <div className="space-y-4">
       <div className="print:hidden space-y-4">
@@ -57,7 +71,7 @@ export default function PrintPage() {
             <LookupCombobox key={`tk-${plan?.id ?? 0}`} label="Số phiếu TK" kind="plan" allowAdd={false} server
               known={plan ? [{ id: plan.id, name: plan.tk_number }] : []} selectedIds={plan ? [plan.id] : []} onChange={onChange} testId="print-tk-input" />
           </div>
-          <Button variant="primary" icon="print" onClick={() => window.print()} disabled={!plan} data-testid="print-button">In</Button>
+          <Button variant="primary" icon="print" className="w-full !min-h-[52px] text-base sm:w-auto sm:!min-h-10 sm:text-sm" onClick={() => window.print()} disabled={!plan} data-testid="print-button">In</Button>
         </div>
         {error && (
           <p role="alert" className="flex flex-wrap items-center gap-2 rounded-card border border-danger-line bg-danger-soft p-3 text-danger" data-testid="print-error">
@@ -71,7 +85,9 @@ export default function PrintPage() {
       </div>
       {plan && loaded && (
         <div className="overflow-x-auto rounded-card bg-stone-200 p-2 print:overflow-visible print:rounded-none print:bg-transparent print:p-0">
-          <PrintSheet plan={plan} rows={loaded.rows} />
+          <div ref={boxRef}>
+            <div className="print-zoom" style={{ zoom }}><PrintSheet plan={plan} rows={loaded.rows} /></div>
+          </div>
         </div>
       )}
     </div>

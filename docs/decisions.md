@@ -117,6 +117,31 @@ Mục tiêu: `inspection_details` ≥ 1–5 triệu dòng, `transport_plans` ≥
 - Dải "Đang giữ số" (D-024) bỏ vì đã hiện trong dòng nháp; sidebar "Đang trực tuyến" giữ.
 - Chỉ hiển thị, không khóa, không ảnh hưởng quyền hay dữ liệu.
 
+## D-033 — Sửa các lỗi của security audit run-1 (04/11/2026)
+- Báo cáo audit (quick, chỉ đọc mã nguồn): `C:\Users\benhhc\security-audit-skill\tk\run-1\REPORT.md` — 6 needs_validation, 3 rejected.
+- Đã sửa cả 6: payload presence kiểm kiểu + ErrorBoundary; kênh `presence:kho` private + policy `realtime.messages` (is_active_user); trigger chặn tk_* sai trên insert trực tiếp; nhật ký NV xuất VT dùng snapshot + constraint trigger hoãn (bắt mọi đường ghi), bỏ quyền UPDATE trên tpme; phục hồi `updated_by` trong guard_owner_fields (hồi quy của 000026); trần chờ duyệt nguyên tử trong DB + 5 lần/giờ/IP ở register.
+- Không sửa 3 mục bị bác (require_complete — D-027 chấp nhận; tk_number copy; chuyển dòng sang phiếu khác).
+- Thứ tự áp dụng bắt buộc: chạy migration 000028 → deploy Edge Function register → deploy web → tắt "Allow public access" Realtime.
+
+## D-032 — Root khôi phục dữ liệu gốc từ nhật ký (04/11/2026)
+- Người dùng chọn "root khôi phục từ nhật ký" (không phải xuất file sao lưu / sao lưu định kỳ).
+- RPC `restore_audit(p_id)` (chỉ root): sửa/ẩn → trả ô về giá trị cũ (kể cả danh sách NV xuất VT); xóa → tạo lại đúng dòng (cùng id, người tạo, giờ tạo; phiếu kèm NV xuất VT). Mỗi dòng nhật ký khôi phục 1 lần (`restored_at`); bản ghi đã bị sửa tiếp sau đó → từ chối, khôi phục thao tác mới hơn trước. Ghi thêm dòng nhật ký 'restore'.
+- Sửa kèm D-031: nhật ký xóa phiếu chuyển sang BEFORE DELETE để còn danh sách NV xuất VT (FK cascade xóa trước trigger AFTER). `guard_owner_fields` bỏ qua khi `app.audit_restoring` = 'on' (chỉ restore_audit đặt) để giữ người tạo gốc.
+- Không khôi phục: duyệt/từ chối yêu cầu sửa; thao tác trước khi chạy migration 000025; dòng bảng kiểm khi phiếu của nó đã bị xóa (khôi phục phiếu trước).
+
+## D-031 — Nhật ký thao tác của admin, chỉ root xem (04/11/2026)
+- Người dùng: admin sửa, duyệt sửa, xóa dữ liệu phải được root giám sát; lịch sử chỉ root thấy.
+- Bảng `audit_log` ghi bằng trigger security definer khi người thao tác (auth.uid()) là admin hoặc root: sửa/xóa phiếu, dòng bảng kiểm, danh mục (xóa mục đang dùng = 'archive'); NV xuất VT chỉ ghi khi danh sách thật sự đổi (so câu DELETE/INSERT của RPC sửa phiếu qua biến giao dịch); duyệt/từ chối yêu cầu sửa. Lưu cột cũ → mới (update) hoặc cả dòng (delete).
+- RLS: chỉ root SELECT; thu hồi INSERT/UPDATE/DELETE của authenticated — admin không xóa/sửa được dấu vết. Trang "Lịch sử thao tác" chỉ hiện cho root.
+- Không ghi: người dùng thường, thêm mới, thao tác qua SQL Editor/lịch (không có auth.uid()), quản lý người dùng qua Edge Function (TODO nếu cần). Ghi cả root (root tự thấy thao tác của mình).
+- Chưa có "yêu cầu xóa / duyệt xóa" trong phần mềm — xóa vẫn theo quyền hiện tại; cần thì làm sau.
+
+## D-030 — Sửa tại chỗ trên bảng như Google Sheets; cột Thao tác đứng đầu (04/11/2026)
+- Màn hình ≥ md và có quyền sửa: bấm số phiếu / ✎ thì chính dòng đó thành dòng nhập (`DataTable.editRow`, `PlanInlineRow`/`InspectionInlineRow` nhận `plan`/`row`); Enter lưu, Esc hủy. Màn nhỏ hoặc chỉ xem: modal như cũ.
+- Một dòng sửa tại một thời điểm; chuyển dòng (hoặc Bảng kiểm: chuyển giữa thêm mới và sửa) thì đóng dòng cũ qua `InlineControls.cancel()` — đang dở thì hỏi, từ chối thì ở lại (không mất dữ liệu).
+- Dòng sửa không phát nháp (D-025) — người khác thấy nhãn "đang sửa" qua activity.
+- Cột Thao tác là cột đầu (dính trái) ở cả Nhập phiếu và Bảng kiểm (người dùng yêu cầu).
+
 ## D-029 — Thiếu thông tin quá 24h: khóa thao tác thay vì xóa (04/11/2026)
 - Thay phần "tự xóa" của D-027 (bỏ lịch `purge-incomplete`, bỏ `purge_incomplete()`); điều kiện "đủ thông tin" giữ nguyên D-027.
 - Người tạo có phiếu/dòng còn thiếu đã quá 24h → bị khóa: không giữ số TK / thêm phiếu, dòng; không sửa / xóa phiếu, dòng khác. Chỉ được sửa (hoặc xóa nếu còn quyền) chính các mục còn thiếu; điền đủ là tự mở khóa.

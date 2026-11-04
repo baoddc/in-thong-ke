@@ -61,13 +61,17 @@ export default function InspectionPage() {
   const [requesting, setRequesting] = useState<InspectionRow | null>(null)
 
   const [inline, setInline] = useState(false) // dòng nhập trên bảng (D-023)
+  const [editingId, setEditingId] = useState<number | null>(null) // dòng đang sửa tại chỗ (D-030); chỉ một dòng, và không cùng lúc với dòng thêm mới
   // ≥ md: thêm bằng dòng nhập đầu bảng; điện thoại: modal như cũ. Dòng nhập dở được giữ nguyên khi đổi trang/lọc/sắp xếp.
   const inlineCtl = useRef<InlineControls | null>(null) // nút Lưu/Hủy trên PageHeader gọi đúng hành động của dòng nhập
+  const editCtl = useRef<InlineControls | null>(null) // dòng đang sửa (để hỏi trước khi đóng)
   const [inlineBusy, setInlineBusy] = useState(false)
   const { blocked } = inc
   const openNew = useCallback(() => {
     if (blocked) return toast.error(BLOCKED_MSG)
-    if (isBelowMd()) setModal({ row: null }); else setInline(true)
+    if (isBelowMd()) return setModal({ row: null })
+    if (editCtl.current && !editCtl.current.cancel()) return // đang sửa dở: hỏi trước khi đóng
+    setEditingId(null); setInline(true)
   }, [blocked, toast])
   const [filtersOpen, setFiltersOpen, toggleFilters] = usePersistentToggle('inspection:filters', () => !isSmallScreen())
   const showFilters = useCallback(() => setFiltersOpen(true), [setFiltersOpen])
@@ -84,14 +88,42 @@ export default function InspectionPage() {
     void reload()
   }
 
+  // Sửa tại chỗ (D-030): ≥ md và có quyền sửa → dòng thành ô nhập; ngược lại mở modal (xem / điện thoại).
+  function openRow(r: InspectionRow) {
+    if (isBelowMd() || !canUpdate(r)) return setModal({ row: r })
+    // đóng dòng thêm mới / dòng sửa khác trước — dở dang thì hỏi, không mất dữ liệu đang nhập
+    if (inline && inlineCtl.current && !inlineCtl.current.cancel()) return
+    if (editingId !== null && editingId !== r.id && editCtl.current && !editCtl.current.cancel()) return
+    setInline(false); setEditingId(r.id)
+  }
+  const editingRow = editingId ? list.rows.find((r) => r.id === editingId) : undefined // đổi trang/lọc làm dòng biến mất = đóng
+
   const columns: Column<InspectionRow>[] = [
+    {
+      key: 'actions', header: 'Thao tác', nowrap: true, mobile: 'actions', // cột đầu, dính trái khi cuộn ngang
+      render: (r) => {
+        const own = !!profile && r.created_by === profile.id && !canEdit(r) && !inc.has('detail', r.id) // người tạo, đã quá 24 giờ (dòng còn thiếu thì sửa thẳng, D-029)
+        const until = own ? mine.unlockOfLine(r.id, r.plan_id) : null
+        const pending = own && !until && mine.detailUnlocks.get(r.id)?.status === 'pending'
+        return (
+          <span className="inline-flex items-center gap-0.5">
+            {own && !until && !pending && <Button size="sm" onClick={() => setRequesting(r)} data-testid={`request-edit-${r.id}`}>Yêu cầu sửa</Button>}
+            {pending && <span className={`${PILL} bg-orange-100 text-orange-900`} title="Yêu cầu sửa đang chờ admin duyệt" data-testid={`edit-pending-${r.id}`}>Chờ duyệt</span>}
+            {until && <span className={`${PILL} bg-green-100 text-green-900`} title={`Được sửa đến ${untilLabel(until)}`} data-testid={`edit-unlocked-${r.id}`}>Sửa đến {untilLabel(until)}</span>}
+            <IconButton icon="edit" label={canUpdate(r) ? `Sửa dòng${until ? ` (được sửa đến ${untilLabel(until)})` : ''}` : `Xem dòng (${EDIT_DENIED_HINT})`} onClick={() => openRow(r)} data-testid={`edit-${r.id}`} />
+            <IconButton icon="trash" tone="danger" label={canDelete(r) ? 'Xóa dòng' : `Không xóa được: ${canEdit(r) ? BLOCKED_MSG : EDIT_DENIED_HINT}`} disabled={!canDelete(r)}
+              className="disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent" onClick={() => setDeleting({ row: r, busy: false })} data-testid={`delete-${r.id}`} />
+          </span>
+        )
+      },
+    },
     { key: 'date', header: 'Ngày xuất', sort: 'export_date', nowrap: true, render: (r) => formatDate(r.export_date) },
     {
-      key: 'tk', header: 'Số phiếu TK', sort: 'tk_number', nowrap: true,
+      key: 'tk', header: 'Số phiếu TK', sort: 'tk_number', nowrap: true, mobile: 'title',
       render: (r) => (
         <>
           {r.tk_number ? (
-            <button type="button" onClick={() => setModal({ row: r })} title={canUpdate(r) ? 'Sửa dòng này' : 'Xem dòng này'} data-testid={`open-${r.id}`}
+            <button type="button" onClick={() => openRow(r)} title={canUpdate(r) ? 'Sửa dòng này' : 'Xem dòng này'} data-testid={`open-${r.id}`}
               className="rounded font-bold text-primary underline-offset-2 transition-colors duration-150 hover:text-primary-dark hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{r.tk_number}</button>
           ) : DASH}
           {r.tk_number && <CopyButton value={r.tk_number} label={`Chép số phiếu ${r.tk_number}`} testId={`copy-${r.id}`} />}
@@ -117,24 +149,6 @@ export default function InspectionPage() {
     { key: 'carrier', header: 'Nhà xe', render: (r) => r.carrier_name },
     { key: 'note', header: 'Ghi chú', render: (r) => r.note },
     { key: 'audit', header: 'Người tạo / sửa', nowrap: true, render: (r) => <AuditCell row={r} /> },
-    {
-      key: 'actions', header: 'Thao tác', nowrap: true,
-      render: (r) => {
-        const own = !!profile && r.created_by === profile.id && !canEdit(r) && !inc.has('detail', r.id) // người tạo, đã quá 24 giờ (dòng còn thiếu thì sửa thẳng, D-029)
-        const until = own ? mine.unlockOfLine(r.id, r.plan_id) : null
-        const pending = own && !until && mine.detailUnlocks.get(r.id)?.status === 'pending'
-        return (
-          <span className="inline-flex items-center gap-0.5">
-            {own && !until && !pending && <Button size="sm" onClick={() => setRequesting(r)} data-testid={`request-edit-${r.id}`}>Yêu cầu sửa</Button>}
-            {pending && <span className={`${PILL} bg-orange-100 text-orange-900`} title="Yêu cầu sửa đang chờ admin duyệt" data-testid={`edit-pending-${r.id}`}>Chờ duyệt</span>}
-            {until && <span className={`${PILL} bg-green-100 text-green-900`} title={`Được sửa đến ${untilLabel(until)}`} data-testid={`edit-unlocked-${r.id}`}>Sửa đến {untilLabel(until)}</span>}
-            <IconButton icon="edit" label={canUpdate(r) ? `Sửa dòng${until ? ` (được sửa đến ${untilLabel(until)})` : ''}` : `Xem dòng (${EDIT_DENIED_HINT})`} onClick={() => setModal({ row: r })} data-testid={`edit-${r.id}`} />
-            <IconButton icon="trash" tone="danger" label={canDelete(r) ? 'Xóa dòng' : `Không xóa được: ${canEdit(r) ? BLOCKED_MSG : EDIT_DENIED_HINT}`} disabled={!canDelete(r)}
-              className="disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent" onClick={() => setDeleting({ row: r, busy: false })} data-testid={`delete-${r.id}`} />
-          </span>
-        )
-      },
-    },
   ]
 
   const clearFilters = list.clearFilters
@@ -163,6 +177,11 @@ export default function InspectionPage() {
       <DataTable draftRows={<DraftRows table="details" columnKeys={columns.map((c) => c.key)} />} columns={columns} rows={list.rows} rowKey={(r) => r.id} rowTestId={(r) => `row-${r.id}`}
         loading={list.loading} refreshing={list.refreshing} error={list.error} onRetry={() => void reload()}
         sort={p.sort} dir={p.dir} onSort={list.sortBy} testId="inspection-table" attached={!list.loading && list.hasData}
+        editRow={editingRow ? {
+          key: editingRow.id,
+          node: <InspectionInlineRow key={editingRow.id} row={editingRow} columnKeys={columns.map((c) => c.key)} lookups={lookups} controlsRef={editCtl} onCancel={() => setEditingId(null)}
+            onSaved={(msg) => { toast.success(msg); setEditingId(null); void reload() }} />,
+        } : undefined}
         topRow={inline && (
           <InspectionInlineRow columnKeys={columns.map((c) => c.key)} lookups={lookups} controlsRef={inlineCtl} onBusy={setInlineBusy} onCancel={() => setInline(false)}
             onSaved={(msg) => { toast.success(msg); void reload() }} />

@@ -35,7 +35,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-dark via-primary to-ink p-4">
       <form onSubmit={submit} className="w-full max-w-md animate-pop-in overflow-hidden rounded-2xl bg-white shadow-2xl">
         <img src="/header-daidung.png" alt="Công ty Cổ phần Cơ khí Xây dựng Thương mại Đại Dũng" className="block w-full border-b border-stone-100" />
-        <div className="space-y-4 p-6">
+        <div className="space-y-4 p-4 sm:p-6">
           <div className="space-y-1 text-center">
             <h1 className="text-xl font-bold" data-testid="login-title">In thống kê — Kho An Hạ</h1>
             <p className="text-sm text-muted">Đăng nhập để tiếp tục</p>
@@ -49,7 +49,7 @@ export default function LoginPage() {
               className="pr-20" data-testid="login-password" />
           </Field>
           <button type="button" onClick={() => setShow((s) => !s)} aria-pressed={show} aria-label="Hiện mật khẩu" data-testid="login-toggle-password"
-            className="absolute bottom-0 right-0 h-10 rounded-card px-3 text-sm font-medium text-primary hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+            className="absolute bottom-0 right-0 h-[44px] rounded-card px-3 text-sm font-medium text-primary hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
             {show ? 'Ẩn' : 'Hiện'}
           </button>
         </div>

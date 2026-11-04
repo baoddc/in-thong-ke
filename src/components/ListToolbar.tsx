@@ -26,7 +26,7 @@ export default function ListToolbar({ searchRef, text, onText, placeholder, sear
   const today = todayISO()
   return (
     // pt-3: chừa chỗ cho nhãn nổi nằm trên viền ô
-    <div className="grid grid-cols-2 items-start gap-x-2 gap-y-3 rounded-card border border-stone-200 bg-white p-2 pt-3 shadow-sm sm:flex sm:flex-wrap" data-testid="list-toolbar">
+    <div className="grid grid-cols-2 items-start gap-x-2 gap-y-3 rounded-card border border-stone-200 bg-white p-2 pt-3 shadow-sm max-sm:[&_input]:!text-base sm:flex sm:flex-wrap" data-testid="list-toolbar">
       <Field compact label="Tìm nhanh" className="col-span-2 sm:w-60">
         <span className="relative block">
           <Icon name="search" size={16} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />

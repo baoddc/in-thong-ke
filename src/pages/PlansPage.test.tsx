@@ -38,7 +38,7 @@ vi.mock('../lib/supabase', () => {
       channel: () => { const ch = { on: () => ch, subscribe: (cb: (s: string) => void) => { cb('SUBSCRIBED'); return ch }, track: (p: PresencePayload) => { tracks.push(p); return Promise.resolve('ok') }, untrack: () => Promise.resolve('ok') }; return ch }, // Presence (D-024)
       removeChannel: () => {},
       from: (t: string) => chain(t, t === 'transport_plans' ? [plan] : t === 'edit_requests' ? editRows : []),
-      rpc: (fn: string, args: Record<string, unknown>) => fn === 'release_tk_reservation' || fn === 'create_transport_plan' || fn === 'reserve_tk_number' ? (rpcLog.push([fn, args]), Promise.resolve({ data: fn === 'create_transport_plan' ? { tk_number: 'TK0002' } : fn === 'reserve_tk_number' ? 'TK0002' : null, error: rpcFail && fn === 'create_transport_plan' ? { message: 'boom' } : null })) : fn === 'request_plan_edit' ? (editRpc.push([fn, args]), Promise.resolve({ data: 7, error: null })) : fn === 'count_transport_plans' ? (countCalls.push(args), Promise.resolve(countError ? { data: null, error: { message: 'boom' } } : { data: total ?? null, error: null })) : fn === 'list_transport_plans' ? (rpcCalls.push(args), Promise.resolve({ data: [plan], error: null })) : fn === 'inspection_weight_total' ? Promise.resolve(weightRpc) : Promise.resolve({ data: fn === 'reserve_tk_number' ? 'TK0002' : { tk_number: 'TK0002' }, error: null }),
+      rpc: (fn: string, args: Record<string, unknown>) => fn === 'release_tk_reservation' || fn === 'create_transport_plan' || fn === 'update_transport_plan' || fn === 'reserve_tk_number' ? (rpcLog.push([fn, args]), Promise.resolve({ data: fn === 'create_transport_plan' ? { tk_number: 'TK0002' } : fn === 'reserve_tk_number' ? 'TK0002' : null, error: rpcFail && fn === 'create_transport_plan' ? { message: 'boom' } : null })) : fn === 'request_plan_edit' ? (editRpc.push([fn, args]), Promise.resolve({ data: 7, error: null })) : fn === 'count_transport_plans' ? (countCalls.push(args), Promise.resolve(countError ? { data: null, error: { message: 'boom' } } : { data: total ?? null, error: null })) : fn === 'list_transport_plans' ? (rpcCalls.push(args), Promise.resolve({ data: [plan], error: null })) : fn === 'inspection_weight_total' ? Promise.resolve(weightRpc) : Promise.resolve({ data: fn === 'reserve_tk_number' ? 'TK0002' : { tk_number: 'TK0002' }, error: null }),
     },
   }
 })
@@ -63,10 +63,22 @@ beforeEach(() => { tracks.length = 0; rpcLog.length = 0; rpcFail = false; editRo
 afterEach(() => { cleanup(); window.matchMedia = realMatchMedia })
 
 describe('PlansPage', () => {
-  it('hiện bảng, NV xuất VT nối bằng ", "; Thêm phiếu trên màn nhỏ mở modal có số xem trước', async () => {
+  it('màn rộng: bảng, NV xuất VT nối bằng ", "', async () => {
+    renderPage()
+    const table = await screen.findByTestId('plan-table')
+    expect(table.tagName).toBe('TABLE')
+    expect(table.textContent).toContain('An, Bình')
+  })
+
+  it('màn nhỏ: dạng thẻ hiện đủ mọi trường (số TK, thao tác, NV xuất VT, ghi chú, người tạo); Thêm phiếu mở modal có số xem trước', async () => {
     narrow()
     renderPage()
-    expect((await screen.findByTestId('plan-table')).textContent).toContain('An, Bình')
+    const cards = await screen.findByTestId('plan-table')
+    expect(cards.tagName).toBe('DIV')
+    expect(cards.querySelector('table')).toBeNull()
+    expect(cards.textContent).toContain('TK0001')
+    for (const label of ['NV xuất VT', 'Ghi chú', 'Người tạo / sửa']) expect(cards.textContent).toContain(label) // người dùng: hiện đầy đủ thông tin
+    expect(screen.getByTestId('delete-TK0001')).not.toBeNull()
     expect(screen.queryByTestId('plan-modal')).toBeNull()
     await userEvent.click(screen.getByTestId('add-plan'))
     expect(screen.getByTestId('plan-modal').hasAttribute('open')).toBe(true)
@@ -74,8 +86,9 @@ describe('PlansPage', () => {
     await waitFor(() => expect((screen.getByTestId('tk-number') as HTMLInputElement).value).toBe('TK0002'))
   })
 
-  it('Sửa mở modal đổ sẵn dữ liệu; Hủy khi chưa đổi thì đóng không hỏi', async () => {
+  it('màn nhỏ: Sửa mở modal đổ sẵn dữ liệu; Hủy khi chưa đổi thì đóng không hỏi', async () => {
     const confirm = vi.spyOn(window, 'confirm')
+    narrow()
     renderPage()
     await userEvent.click(await screen.findByTestId('edit-TK0001'))
     expect(screen.getByText('Sửa phiếu TK0001', { selector: 'h2' })).not.toBeNull()
@@ -83,6 +96,28 @@ describe('PlansPage', () => {
     await userEvent.click(screen.getByTestId('plan-cancel'))
     expect(confirm).not.toHaveBeenCalled()
     expect(screen.queryByTestId('plan-modal')).toBeNull()
+  })
+
+  it('D-030: cột Thao tác là cột đầu; ≥ md bấm Sửa → chính dòng thành ô nhập (không modal); Esc về dòng thường; Lưu gọi update_transport_plan đúng id', async () => {
+    renderPage()
+    await userEvent.click(await screen.findByTestId('edit-TK0001'))
+    expect(screen.queryByTestId('plan-modal')).toBeNull()
+    const headers = [...screen.getByTestId('plan-table').querySelectorAll('thead th')].map((h) => h.textContent)
+    expect(headers[0]).toContain('Thao tác')
+    expect(headers[1]).toContain('Số phiếu TK')
+    const row = screen.getByTestId('plan-edit-row')
+    expect(row.parentElement!.children).toHaveLength(1) // dòng thường của TK0001 đã được thay thế
+    expect((screen.getByTestId('inline-tk-number') as HTMLInputElement).value).toBe('TK0001')
+    expect((screen.getByTestId('inline-order-no') as HTMLInputElement).value).toBe('L1')
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByTestId('plan-edit-row')).toBeNull()
+    expect(screen.getByTestId('edit-TK0001')).not.toBeNull()
+    await userEvent.click(screen.getByTestId('edit-TK0001'))
+    await userEvent.type(screen.getByTestId('inline-order-no'), '9')
+    await userEvent.click(screen.getByTestId('plan-edit-row-save'))
+    expect((await screen.findByTestId('toast-success')).textContent).toContain('Đã cập nhật phiếu TK0001')
+    expect(rpcOf('update_transport_plan')[0][1]).toMatchObject({ p_id: 1, p_transport_order_no: 'L19' })
+    expect(screen.queryByTestId('plan-edit-row')).toBeNull()
   })
 
   it('đã sửa form mà Hủy → hỏi xác nhận, từ chối thì giữ modal', async () => {
@@ -318,8 +353,7 @@ describe('PlansPage', () => {
       expect((screen.getByTestId('delete-TK0001') as HTMLButtonElement).disabled).toBe(true)
       expect(screen.queryByTestId('request-edit-TK0001')).toBeNull()
       await userEvent.click(screen.getByTestId('edit-TK0001'))
-      expect(screen.getByText('Sửa phiếu TK0001', { selector: 'h2' })).not.toBeNull()
-      expect(screen.getByTestId('plan-save')).not.toBeNull()
+      expect(screen.getByTestId('plan-edit-row-save')).not.toBeNull()
     })
 
     it('đã duyệt nhưng hết hạn: coi như chưa mở, cho yêu cầu lại', async () => {

@@ -2,7 +2,7 @@ import { useEffect, type MutableRefObject, type ReactNode } from 'react'
 import Button, { IconButton } from './Button'
 
 /** Hành động của dòng nhập, trang gọi từ nút trên PageHeader (cùng validate/confirm như Enter/Esc). */
-export type InlineControls = { save: () => void; cancel: () => void }
+export type InlineControls = { save: () => void; cancel: () => boolean } // cancel: true = đã đóng (người dùng đồng ý bỏ / không có gì để bỏ)
 
 type Props = {
   saveLabel: string // "Lưu phiếu" / "Lưu dòng"
@@ -23,9 +23,10 @@ type Props = {
 /** Dòng nhập đầu bảng kiểu Google Sheets: Tab đổi ô, Enter lưu, Esc hủy (khi danh sách gợi ý đang mở thì Enter/Esc thuộc về ô đó). */
 export default function InlineEntryRow({ columnKeys, cells, error, busy, dirty, onSave, onCancel, testId, cellTitle, onFocusCell, saveLabel, controlsRef, onBusy }: Props) {
   function cancel() {
-    if (busy) return
-    if (dirty && !window.confirm('Bỏ các thay đổi chưa lưu?')) return
+    if (busy) return false
+    if (dirty && !window.confirm('Bỏ các thay đổi chưa lưu?')) return false
     onCancel()
+    return true
   }
   useEffect(() => {
     if (controlsRef) controlsRef.current = { save: () => { if (!busy) onSave() }, cancel }

@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react'
 import { describeActivity, personColor, useDrafts, usePresence, type Peer } from '../lib/presence'
 import { formatCountdown } from '../lib/usePlanForm'
+import { ErrorBoundary } from './ui/ErrorBoundary'
 
 /** Họ tên đầy đủ; trống thì dùng tên đăng nhập. */
-const who = (p: { fullName?: string; username: string }) => p.fullName?.trim() || p.username
+const who = (p: { fullName?: string; username: string }) => (typeof p.fullName === 'string' && p.fullName.trim()) || String(p.username)
+
+/** Dữ liệu từ người khác lỗi → chỉ ẩn phần presence, không sập app. */
+export const OnlineUsers = (props: { showLabels: boolean }) => <ErrorBoundary><OnlineUsersInner {...props} /></ErrorBoundary>
+export const DraftRows = (props: { table: 'plans' | 'details'; columnKeys: string[] }) => <ErrorBoundary><DraftRowsInner {...props} /></ErrorBoundary>
+export const EditingTag = (props: { kind: 'plan' | 'detail'; id: number }) => <ErrorBoundary><EditingTagInner {...props} /></ErrorBoundary>
 
 /** Sidebar: số người trực tuyến + việc từng người (gộp nhiều tab). Chưa kết nối/không có ai → ẩn. */
-export function OnlineUsers({ showLabels }: { showLabels: boolean }) {
+function OnlineUsersInner({ showLabels }: { showLabels: boolean }) {
   const { peers, selfKey } = usePresence()
   if (peers.length === 0) return null
   const byUser = new Map<string, Peer[]>()
@@ -46,7 +52,7 @@ function Countdown({ expiresAt }: { expiresAt: number }) {
 }
 
 /** D-025: dòng nháp chỉ đọc của từng người KHÁC đang thêm dòng ở bảng này (đặt đầu tbody); ô họ đang đứng có khung màu + tên. */
-export function DraftRows({ table, columnKeys }: { table: 'plans' | 'details'; columnKeys: string[] }) {
+function DraftRowsInner({ table, columnKeys }: { table: 'plans' | 'details'; columnKeys: string[] }) {
   const drafts = useDrafts()
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -80,7 +86,7 @@ export function DraftRows({ table, columnKeys }: { table: 'plans' | 'details'; c
 }
 
 /** Nhãn "<user> đang sửa" cho dòng mà người KHÁC đang sửa (màu riêng của người đó). */
-export function EditingTag({ kind, id }: { kind: 'plan' | 'detail'; id: number }) {
+function EditingTagInner({ kind, id }: { kind: 'plan' | 'detail'; id: number }) {
   const { peers, selfKey } = usePresence()
   const p = peers.find((x) => x.key !== selfKey && (kind === 'plan' ? x.activity?.kind === 'editing_plan' && x.activity.planId === id : x.activity?.kind === 'editing_detail' && x.activity.detailId === id))
   if (!p) return null

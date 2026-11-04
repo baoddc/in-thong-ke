@@ -54,7 +54,7 @@ export default function PlanFormModal({ plan, readOnly = false, lookups, onClose
       // Ctrl+Enter = Lưu (bỏ qua nếu ô gợi ý đang chọn bằng Enter)
       onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.defaultPrevented) { e.preventDefault(); formRef.current?.requestSubmit() } }}
       className="p-0 w-full max-w-[640px] max-h-[90vh] overflow-hidden rounded-2xl border-t-4 border-primary-brand shadow-2xl backdrop:bg-slate-900/60 open:flex flex-col max-sm:max-w-none max-sm:max-h-none max-sm:w-screen max-sm:h-dvh max-sm:rounded-none">
-      <form ref={formRef} onSubmit={onSubmit} onInput={touch} onClick={touch}className="flex flex-col min-h-0 flex-1" data-testid="plan-form">
+      <form ref={formRef} onSubmit={onSubmit} onInput={touch} onClick={touch} className="flex flex-col min-h-0 flex-1" data-testid="plan-form">
         <div className="flex shrink-0 items-center justify-between border-b border-stone-200 px-4 py-3">
           <div className="min-w-0">
             <h2 id="plan-modal-title" className="text-lg font-bold">{plan ? `${readOnly ? 'Xem' : 'Sửa'} phiếu ${plan.tk_number}` : 'Thêm phiếu'}</h2>
@@ -92,7 +92,7 @@ export default function PlanFormModal({ plan, readOnly = false, lookups, onClose
           {(error || lookupError || hold.error) && <p role="alert" className="rounded-card border border-danger-line bg-danger-soft p-2 text-danger" data-testid="plan-error">{error || lookupError || hold.error}</p>}
         </fieldset>
         </div>
-        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-stone-200 bg-surface px-4 py-3">
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-stone-200 bg-surface px-4 py-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {!readOnly && <span className="mr-auto hidden text-sm text-muted sm:inline">Ctrl+Enter để lưu</span>}
           <Button onClick={requestClose} data-testid="plan-cancel">{readOnly ? 'Đóng' : 'Hủy'}</Button>
           {!readOnly && (

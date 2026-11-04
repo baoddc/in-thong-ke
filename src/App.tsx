@@ -17,6 +17,7 @@ import LookupsPage from './pages/LookupsPage'
 import WorkflowPage from './pages/WorkflowPage'
 import AboutPage from './pages/AboutPage'
 import UsersPage from './pages/UsersPage'
+import AuditLogPage from './pages/AuditLogPage'
 import { ProfileProvider, useProfile } from './lib/useProfile'
 import { ROLE_LABEL } from './lib/auth'
 import Button from './components/ui/Button'
@@ -38,6 +39,7 @@ const ADMIN_ITEMS: NavItem[] = [ // D-013/D-014: admin và root
   { to: '/yeu-cau-sua', label: 'Yêu cầu sửa', icon: 'edit' }, // D-019
   { to: '/nguoi-dung', label: 'Quản lý người dùng', icon: 'user' },
 ]
+const ROOT_ITEMS: NavItem[] = [{ to: '/lich-su-thao-tac', label: 'Lịch sử thao tác', icon: 'shield' }] // T-085
 
 function readCollapsed() {
   try { return localStorage.getItem(STORAGE_KEY) === '1' } catch { return false }
@@ -57,7 +59,7 @@ export function Layout({ email }: { email: string }) {
 }
 
 function LayoutBody({ email }: { email: string }) {
-  const { profile, isAdmin } = useProfile()
+  const { profile, isAdmin, isRoot } = useProfile()
   const displayName = profile?.full_name || email
   const pending = usePendingCount(isAdmin) // D-015: badge số tài khoản chờ duyệt
   const pendingEdits = useEditPendingCount(isAdmin) // D-019: badge số yêu cầu sửa chờ duyệt
@@ -80,7 +82,7 @@ function LayoutBody({ email }: { email: string }) {
   }
 
   // Sidebar nền tối cố định: mục đang chọn = chữ trắng + vạch đỏ bên trái, luôn đọc được (không phụ thuộc màu nền riêng của mục).
-  const row = `flex min-h-10 items-center gap-3 rounded-lg border-l-4 py-2 whitespace-nowrap transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${showLabels ? 'px-3' : 'justify-center'}`
+  const row = `flex min-h-[48px] items-center gap-3 rounded-lg border-l-4 py-2 md:min-h-10 whitespace-nowrap transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${showLabels ? 'px-3' : 'justify-center'}`
   const link = ({ isActive }: { isActive: boolean }) =>
     `${row} ${isActive ? 'border-primary-brand bg-white/15 font-semibold text-white' : 'border-transparent text-slate-300 hover:bg-white/10 hover:text-white'}`
   const hint = (text: string) => (showLabels ? {} : { title: text, 'aria-label': text })
@@ -88,8 +90,8 @@ function LayoutBody({ email }: { email: string }) {
   return (
     // Từ md: khung đúng bằng màn hình, không cuộn cả trang — bảng tự cuộn bên trong; khi in thì trả về dòng chảy bình thường.
     <div className="min-h-screen bg-surface text-gray-900 md:flex md:h-dvh md:min-h-0 md:overflow-hidden print:block print:h-auto print:overflow-visible">
-      <header className="md:hidden print:hidden flex items-center gap-3 border-b-2 border-primary-brand bg-white p-2 shadow-sm">
-        <button onClick={() => setDrawer(true)} aria-label="Mở menu" className="flex h-10 w-10 items-center justify-center rounded-lg border border-line transition duration-150 hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="open-drawer">
+      <header className="sticky top-0 z-20 md:hidden print:hidden flex items-center gap-3 border-b-2 border-primary-brand bg-white p-2 shadow-sm">
+        <button onClick={() => setDrawer(true)} aria-label="Mở menu" className="flex h-[44px] w-[44px] items-center justify-center rounded-lg border border-line transition duration-150 hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="open-drawer">
           <Icon name="menu" />
         </button>
         <img src="/logo-daidung.png" alt="" className="h-8 w-auto" />
@@ -98,7 +100,7 @@ function LayoutBody({ email }: { email: string }) {
 
       {drawer && <div className="fixed inset-0 z-30 animate-fade-in bg-slate-900/50 md:hidden print:hidden" onClick={() => setDrawer(false)} data-testid="drawer-overlay" />}
 
-      <aside className={`print:hidden fixed inset-y-0 left-0 z-40 flex w-60 flex-col bg-ink p-2 text-slate-200 shadow-xl transition-all duration-200 md:sticky md:top-0 md:h-screen md:translate-x-0 md:shadow-none md:visible ${collapsed ? 'md:w-16' : 'md:w-60'} ${drawer ? 'translate-x-0' : '-translate-x-full invisible'}`}>
+      <aside className={`print:hidden fixed inset-y-0 left-0 z-40 flex w-72 max-w-[85vw] flex-col overflow-y-auto bg-ink md:overflow-visible p-2 text-slate-200 shadow-xl transition-all duration-200 md:sticky md:top-0 md:h-screen md:translate-x-0 md:shadow-none md:visible ${collapsed ? 'md:w-16' : 'md:w-60'} ${drawer ? 'translate-x-0' : '-translate-x-full invisible'}`}>
         <div className={`flex items-center gap-3 px-1 pb-3 pt-2 ${showLabels ? '' : 'justify-center'}`} data-testid="brand">
           <LogoTile className={showLabels ? 'h-11 w-11' : 'h-10 w-10'} />
           {showLabels && (
@@ -109,7 +111,7 @@ function LayoutBody({ email }: { email: string }) {
           )}
         </div>
         <nav aria-label="Menu chính" className="mt-1 flex flex-col gap-1">
-          {(isAdmin ? [...ITEMS, ...ADMIN_ITEMS] : ITEMS).map((i) => {
+          {[...ITEMS, ...(isAdmin ? ADMIN_ITEMS : []), ...(isRoot ? ROOT_ITEMS : [])].map((i) => {
             const isEdits = i.to === '/yeu-cau-sua'
             const count = isEdits ? pendingEdits : i.to === '/nguoi-dung' ? pending : 0
             const what = isEdits ? 'yêu cầu' : 'tài khoản'
@@ -181,6 +183,12 @@ export function AdminOnly({ children }: { children: ReactNode }) {
   return isAdmin ? children : <Navigate to="/" replace />
 }
 
+export function RootOnly({ children }: { children: ReactNode }) { // T-085: nhật ký thao tác chỉ root
+  const { isRoot, loading } = useProfile()
+  if (loading) return null
+  return isRoot ? children : <Navigate to="/" replace />
+}
+
 export default function App() {
   const session = useSession()
   if (session === undefined) return <p className="p-4 text-muted" role="status">Đang tải...</p>
@@ -197,6 +205,7 @@ export default function App() {
         <Route path="/gioi-thieu" element={<AboutPage />} />
         <Route path="/yeu-cau-sua" element={<AdminOnly><EditRequestsPage /></AdminOnly>} />
         <Route path="/nguoi-dung" element={<AdminOnly><UsersPage /></AdminOnly>} />
+        <Route path="/lich-su-thao-tac" element={<RootOnly><AuditLogPage /></RootOnly>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

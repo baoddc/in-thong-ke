@@ -27,7 +27,7 @@ export default function ConfirmDialog({ title, message, confirmLabel = 'Xóa', b
           <p id="confirm-message" className="text-gray-700">{message}</p>
         </div>
       </div>
-      <div className="flex justify-end gap-2 border-t border-stone-200 bg-surface p-3">
+      <div className="flex justify-end gap-2 border-t border-stone-200 bg-surface p-3 max-sm:[&>*]:flex-1">
         <Button autoFocus onClick={onCancel} disabled={busy} data-testid="confirm-cancel">Hủy</Button>
         <Button variant="danger" onClick={onConfirm} disabled={busy} data-testid="confirm-ok">{busy ? 'Đang xử lý...' : confirmLabel}</Button>
       </div>

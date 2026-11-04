@@ -112,7 +112,7 @@ export default function InspectionFormModal({ row, readOnly = false, lookups, on
           {(error || lookupError) && <p role="alert" className="rounded-card border border-danger-line bg-danger-soft p-2 text-danger" data-testid="inspection-error">{error || lookupError}</p>}
         </fieldset>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-stone-200 bg-surface px-4 py-3">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-stone-200 bg-surface px-4 py-3 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {saved && <p role="status" className="mr-auto text-sm font-medium text-success" data-testid="inspection-saved">{saved}</p>}
           <Button onClick={requestClose} data-testid="inspection-cancel">{readOnly ? 'Đóng' : 'Hủy'}</Button>
           {!row && (

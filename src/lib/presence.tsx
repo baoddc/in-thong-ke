@@ -25,11 +25,46 @@ const DraftsCtx = createContext<Draft[]>([]) // tách riêng để trang/bảng 
 export const usePresence = () => useContext(Presence)
 export const useDrafts = () => useContext(DraftsCtx)
 
+// Payload từ người khác là dữ liệu không tin cậy: kiểm kiểu trước khi vào state; sai → bỏ qua.
+const isStr = (v: unknown): v is string => typeof v === 'string'
+const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+
+function parseActivity(v: unknown): { ok: boolean; value: Activity } {
+  if (v === null) return { ok: true, value: null }
+  if (!isObj(v)) return { ok: false, value: null }
+  const bad = { ok: false, value: null }
+  switch (v.kind) {
+    case 'adding_plan': return isStr(v.tk) && isNum(v.expiresAt) ? { ok: true, value: { kind: v.kind, tk: v.tk, expiresAt: v.expiresAt } } : bad
+    case 'editing_plan': return isNum(v.planId) && isStr(v.tk) ? { ok: true, value: { kind: v.kind, planId: v.planId, tk: v.tk } } : bad
+    case 'adding_detail': return v.tk === undefined || isStr(v.tk) ? { ok: true, value: { kind: v.kind, tk: v.tk } } : bad
+    case 'editing_detail': return isNum(v.detailId) && isStr(v.tk) ? { ok: true, value: { kind: v.kind, detailId: v.detailId, tk: v.tk } } : bad
+    default: return bad
+  }
+}
+
+export function parsePeer(key: string, v: unknown): Peer | null {
+  if (!isObj(v) || !isStr(v.userId) || !isStr(v.username) || !isStr(v.fullName) || !isStr(v.page)) return null
+  const a = parseActivity(v.activity)
+  return a.ok ? { key, userId: v.userId, username: v.username, fullName: v.fullName, page: v.page, activity: a.value } : null
+}
+
+export function parseDraft(v: unknown): Draft | null {
+  if (!isObj(v) || !isStr(v.key) || !isStr(v.userId) || !isStr(v.username)) return null
+  if ((v.table !== 'plans' && v.table !== 'details') || v.mode !== 'add' || !isObj(v.values)) return null
+  if (v.fullName !== undefined && !isStr(v.fullName)) return null
+  if (v.focus !== undefined && !isStr(v.focus)) return null
+  if (v.expiresAt !== undefined && !isNum(v.expiresAt)) return null
+  const values: Record<string, string> = {}
+  for (const [k, x] of Object.entries(v.values)) if (isStr(x) || isNum(x)) values[k] = String(x)
+  return { key: v.key, userId: v.userId, username: v.username, fullName: v.fullName, table: v.table, mode: 'add', values, focus: v.focus, expiresAt: v.expiresAt, at: Date.now() }
+}
+
 /** Màu riêng ổn định cho mỗi người (theo userId): solid cho viền/nhãn (chữ trắng đủ tương phản), soft cho nền nhạt. */
 const HUES = [210, 150, 280, 25, 330, 175, 50]
 export function personColor(userId: string) {
   let h = 0
-  for (const c of userId) h = (h * 31 + c.charCodeAt(0)) >>> 0
+  for (const c of String(userId)) h = (h * 31 + c.charCodeAt(0)) >>> 0
   const hue = HUES[h % HUES.length]
   return { solid: `hsl(${hue} 70% 32%)`, soft: `hsl(${hue} 90% 96%)` }
 }
@@ -122,28 +157,32 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     if (!uid) return
     let ch: RealtimeChannel | null = null
     try {
-      ch = supabase.channel('presence:kho', { config: { presence: { key: `${uid}:${tabId}` } } })
+      // private: server kiểm quyền qua policy realtime.messages (chỉ user đã đăng nhập, đang hoạt động); uid chỉ có khi đã có session nên JWT đã sẵn.
+      ch = supabase.channel('presence:kho', { config: { private: true, presence: { key: `${uid}:${tabId}` } } })
       const c = ch
       c.on('presence', { event: 'sync' }, () => {
-        const state = c.presenceState<Omit<Peer, 'key'>>()
-        setPeers(Object.entries(state).flatMap(([key, list]) => (list[0] ? [{ ...list[0], key }] : [])))
+        const state = c.presenceState()
+        setPeers(Object.entries(state).flatMap(([key, list]) => { const p = parsePeer(key, list?.[0]); return p ? [p] : [] }))
         setDrafts((s) => { // người đã rời presence → gỡ nháp
           const keys = Object.keys(s).filter((k) => k in state)
           return keys.length === Object.keys(s).length ? s : Object.fromEntries(keys.map((k) => [k, s[k]]))
         })
       })
       c.on('presence', { event: 'join' }, () => { if (myDrafts.current.size) flush() }) // người mới vào: gửi lại nháp hiện tại
-      c.on('broadcast', { event: 'draft' }, ({ payload }: { payload?: Partial<Draft> & { clear?: boolean } }) => {
-        const k = payload?.key
-        if (!k || k === `${uid}:${tabId}`) return
+      c.on('broadcast', { event: 'draft' }, ({ payload }: { payload?: unknown }) => {
+        const k = isObj(payload) ? payload.key : undefined
+        if (!isStr(k) || !k || k === `${uid}:${tabId}`) return
+        const clear = isObj(payload) && payload.clear === true
+        const draft = clear ? null : parseDraft(payload)
+        if (!clear && !draft) return
         setDrafts((s) => {
-          if (payload.clear) {
+          if (clear) {
             if (!(k in s)) return s
             const n = { ...s }
             delete n[k]
             return n
           }
-          return { ...s, [k]: { ...(payload as Draft), at: Date.now() } }
+          return draft ? { ...s, [k]: draft } : s
         })
       })
       c.subscribe((status: string) => { if (status === 'SUBSCRIBED') { readyRef.current = true; setReady(true); flush() } })

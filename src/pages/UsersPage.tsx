@@ -98,7 +98,7 @@ export default function UsersPage() {
         const can = userActions(profile, u)
         if (u.is_pending) {
           return (
-            <span className="inline-flex gap-1">
+            <span className="inline-flex flex-wrap gap-2 sm:gap-1">
               <Button size="sm" variant="primary" className="!bg-green-700 hover:!bg-green-800" disabled={!can.approve || approving === u.id}
                 onClick={() => void approve(u)} data-testid={`user-approve-${u.username}`}>{approving === u.id ? 'Đang duyệt...' : 'Duyệt'}</Button>
               <Button size="sm" variant="danger" disabled={!can.reject || approving === u.id}
@@ -108,7 +108,7 @@ export default function UsersPage() {
         }
         const toggleHint = can.toggleActive ? undefined : u.role === 'root' ? 'Không thể khóa tài khoản root' : u.id === profile?.id ? 'Bạn không thể tự khóa chính mình' : 'Bạn không có quyền với tài khoản này'
         return (
-          <span className="inline-flex gap-1">
+          <span className="inline-flex flex-wrap gap-2 sm:gap-1">
             <Button size="sm" disabled={!can.edit} onClick={() => setDialog({ kind: 'edit', user: u })} data-testid={`user-edit-${u.username}`}>Sửa</Button>
             <Button size="sm" disabled={!can.resetPassword} onClick={() => setDialog({ kind: 'reset', user: u })} data-testid={`user-reset-${u.username}`}>Đặt lại mật khẩu</Button>
             <Button size="sm" disabled={!can.toggleActive} title={toggleHint}

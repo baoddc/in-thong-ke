@@ -113,15 +113,15 @@ export default function LookupsPage() {
               {g.kinds.map((k) => (
                 <button key={k.kind} role="tab" aria-selected={kind === k.kind} data-testid={`tab-${k.kind}`}
                   onClick={() => { setKind(k.kind); setFilter(''); setPage(1); setMsg(''); setEditId(null); setCode('') }}
-                  className={`min-h-10 rounded-full border px-3 py-2 font-medium transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${kind === k.kind ? 'border-primary bg-primary text-white shadow-sm' : 'border-line bg-white text-gray-800 hover:border-primary-line hover:bg-primary-soft'}`}>{k.label}</button>
+                  className={`min-h-[44px] rounded-full border px-3 py-2 sm:min-h-10 font-medium transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${kind === k.kind ? 'border-primary bg-primary text-white shadow-sm' : 'border-line bg-white text-gray-800 hover:border-primary-line hover:bg-primary-soft'}`}>{k.label}</button>
               ))}
             </div>
           </div>
         ))}
       </div>
-      <form onSubmit={add} className="flex gap-2">
+      <form onSubmit={add} className="flex flex-wrap gap-2">
         {isCons && <Input aria-label="Mã công trình mới" placeholder="Mã CT" value={code} onChange={(e) => setCode(e.target.value)} className="!mt-0 !w-28 min-w-0" data-testid="lookup-new-code" />}
-        <Input aria-label="Tên mục mới" placeholder="Nhập tên mục mới" value={name} onChange={(e) => setName(e.target.value)} className="!mt-0 flex-1 min-w-0" data-testid="lookup-new-name" />
+        <Input aria-label="Tên mục mới" placeholder="Nhập tên mục mới" value={name} onChange={(e) => setName(e.target.value)} className="!mt-0 min-w-[10rem] flex-1" data-testid="lookup-new-name" />
         <Button type="submit" variant="primary" icon="plus" disabled={busy} data-testid="lookup-add">Thêm</Button>
       </form>
       <Input type="search" aria-label="Lọc theo tên" placeholder="Lọc theo tên..." value={filter} onChange={(e) => { setFilter(e.target.value); setPage(1) }} className="!mt-0" data-testid="lookup-filter" />
@@ -137,18 +137,18 @@ export default function LookupsPage() {
       ) : (
         <ul className={`divide-y divide-stone-100 overflow-y-auto ${big && !bigList.error && bigList.total > 0 ? 'rounded-t-card border-b-0' : 'rounded-card'} md:min-h-[15rem] md:flex-1 border border-stone-200 bg-white shadow-card ${big && bigList.refreshing ? 'opacity-60' : ''}`} data-testid="lookup-list">
           {list.map((it) => (
-            <li key={it.id} className="flex items-center gap-2 p-2 transition-colors duration-150 even:bg-stone-50 hover:bg-primary-soft">
+            <li key={it.id} className="flex flex-wrap items-center gap-2 p-2 transition-colors duration-150 even:bg-stone-50 hover:bg-primary-soft">
               {editId === it.id ? (
                 <>
                   {isCons && <Input aria-label="Mã công trình" placeholder="Mã CT" value={editCode} onChange={(e) => setEditCode(e.target.value)} className="!mt-0 !w-24 min-w-0" data-testid="lookup-edit-code" />}
-                  <Input aria-label="Tên mục" value={editName} onChange={(e) => setEditName(e.target.value)} className="!mt-0 flex-1 min-w-0" />
+                  <Input aria-label="Tên mục" value={editName} onChange={(e) => setEditName(e.target.value)} className="!mt-0 min-w-[9rem] flex-1" />
                   <Button size="sm" variant="primary" disabled={busy} onClick={() => save(it)}>Lưu</Button>
                   <Button size="sm" onClick={() => setEditId(null)}>Hủy</Button>
                 </>
               ) : (
                 <>
                   {isCons && <span className="w-24 shrink-0 font-medium break-words" data-testid="lookup-code">{it.code}</span>}
-                  <span className="flex-1 break-words">{it.name}</span>
+                  <span className="min-w-0 flex-1 break-words">{it.name}</span>
                   {isAdmin && ( // D-013: user chỉ thêm mục, không sửa/xóa
                     <>
                       <IconButton icon="edit" label={`Sửa ${it.name}`} onClick={() => { setEditId(it.id); setEditName(it.name); setEditCode(it.code ?? '') }} />

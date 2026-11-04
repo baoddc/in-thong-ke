@@ -15,20 +15,22 @@ const oldRow = { id: 9, plan_id: null, tk_number: null, transport_order_no: null
 // Mọi chuỗi gọi trả về chính nó và có thể await; lookup_items và inspection_details_view có dữ liệu.
 // countCalls: tham số mỗi lần gọi RPC count_inspection_details (D-021)
 // rpcCalls: tham số mỗi lần gọi RPC list_inspection_details (dữ liệu trang, D-017)
-const h = vi.hoisted(() => ({ rpcCalls: [] as Record<string, unknown>[], countCalls: [] as Record<string, unknown>[], count: 41800 as number | null, countError: null as { message: string } | null, rows: [] as unknown[], editRows: [] as unknown[], editRpc: [] as [string, unknown][], inserted: [] as Record<string, unknown>[] }))
+const h = vi.hoisted(() => ({ rpcCalls: [] as Record<string, unknown>[], countCalls: [] as Record<string, unknown>[], count: 41800 as number | null, countError: null as { message: string } | null, rows: [] as unknown[], editRows: [] as unknown[], editRpc: [] as [string, unknown][], inserted: [] as Record<string, unknown>[], updated: [] as Record<string, unknown>[], updatedIds: [] as unknown[] }))
 // Phiếu TK mà ô Số phiếu TK của dòng nhập tìm thấy / tra cứu (D-023)
 const tkPlan = { id: 3, tk_number: 'TK0003', export_date: '2026-10-02', transport_order_no: 'L3', vehicle: { name: '51D-1' }, driver: { name: 'Tài xế A' }, fg_exporter: null, material_exporters: [] }
 vi.mock('../lib/supabase', () => {
   const chain = (data: unknown) => {
     const c: Record<string, unknown> = { then: (r: (v: unknown) => unknown) => r({ data, error: null }) }
-    for (const m of ['select', 'order', 'limit', 'range', 'eq', 'in', 'or', 'gte', 'lte']) c[m] = () => c
+    for (const m of ['select', 'order', 'limit', 'range', 'in', 'or', 'gte', 'lte']) c[m] = () => c
+    c.eq = (col: string, v: unknown) => { if (col === 'id') h.updatedIds.push(v); return c }
+    c.update = (p: Record<string, unknown>) => { h.updated.push(p); return c }
     c.maybeSingle = () => Promise.resolve({ data: tkPlan, error: null }) // tra phiếu của dòng
     c.insert = (p: Record<string, unknown>) => { h.inserted.push(p); return Promise.resolve({ error: null }) }
     return c
   }
   return {
     supabase: {
-      from: (t: string) => chain(t === 'lookup_items' ? lookups : t === 'edit_requests' ? h.editRows : []),
+      from: (t: string) => chain(t === 'lookup_items' ? lookups : t === 'edit_requests' ? h.editRows : t === 'inspection_details' ? [{ id: 9 }] : []),
       rpc: (fn: string, args: Record<string, unknown>) => {
         if (fn === 'request_detail_edit') { h.editRpc.push([fn, args]); return Promise.resolve({ data: 5, error: null }) }
         if (fn === 'count_inspection_details') { h.countCalls.push(args); return Promise.resolve(h.countError ? { data: null, error: h.countError } : { data: h.count, error: null }) }
@@ -54,7 +56,7 @@ beforeAll(() => {
 })
 const realMatchMedia = window.matchMedia
 const narrow = () => { window.matchMedia = ((q: string) => ({ matches: true, media: q })) as unknown as typeof window.matchMedia } // < md: Thêm mở modal
-beforeEach(() => { h.inserted.length = 0; localStorage.clear(); clearListCache(); h.rpcCalls.length = 0; h.countCalls.length = 0; h.count = 41800; h.countError = null; h.rows = []; h.editRows = []; h.editRpc.length = 0 })
+beforeEach(() => { h.inserted.length = 0; h.updated.length = 0; h.updatedIds.length = 0; localStorage.clear(); clearListCache(); h.rpcCalls.length = 0; h.countCalls.length = 0; h.count = 41800; h.countError = null; h.rows = []; h.editRows = []; h.editRpc.length = 0 })
 afterEach(() => { cleanup(); window.matchMedia = realMatchMedia })
 
 describe('InspectionPage', () => {
@@ -236,6 +238,52 @@ describe('InspectionPage', () => {
     expect(localStorage.getItem('tk:ui:inspection:filters')).toBe('0')
   })
 
+  describe('Sửa tại chỗ (D-030)', () => {
+    const mine = () => { h.rows = [{ ...oldRow, plan_id: 3, tk_number: 'TK0003', warehouse_slip_no: 'PXK1', created_by: 'u1', created_at: new Date().toISOString() }] }
+
+    it('Thao tác là cột đầu tiên, trước Ngày xuất', async () => {
+      renderPage()
+      await screen.findByTestId('row-9')
+      const heads = [...screen.getByTestId('inspection-table').querySelectorAll('thead th')].map((th) => th.textContent ?? '')
+      expect(heads[0]).toContain('Thao tác')
+      expect(heads[1]).toContain('Ngày xuất')
+    })
+
+    it('bấm sửa → chính dòng thành ô nhập (không modal); Esc về dòng thường', async () => {
+      mine()
+      renderPage()
+      await userEvent.click(await screen.findByTestId('edit-9'))
+      expect(screen.queryByTestId('inspection-modal')).toBeNull()
+      expect(screen.queryByTestId('row-9')).toBeNull()
+      expect((screen.getByTestId('inline-slip-no') as HTMLInputElement).value).toBe('PXK1')
+      expect((screen.getByTestId('inline-tk') as HTMLInputElement).value).toBe('TK0003')
+      await userEvent.keyboard('{Escape}')
+      expect(screen.queryByTestId('inspection-edit-row')).toBeNull()
+      expect(screen.getByTestId('row-9')).not.toBeNull()
+    })
+
+    it('Lưu → cập nhật đúng dòng, đóng dòng sửa', async () => {
+      mine()
+      renderPage()
+      await userEvent.click(await screen.findByTestId('edit-9'))
+      await userEvent.type(screen.getByTestId('inline-note'), 'ok')
+      await userEvent.click(screen.getByTestId('inspection-edit-row-save'))
+      expect((await screen.findByTestId('toast-success')).textContent).toContain('Đã cập nhật dòng')
+      expect(h.updated[0]).toMatchObject({ note: 'ok' })
+      expect(h.updatedIds).toContain(9)
+      await waitFor(() => expect(screen.queryByTestId('inspection-edit-row')).toBeNull())
+    })
+
+    it('không có quyền sửa → modal chỉ xem', async () => {
+      mine()
+      Object.assign(h.rows[0] as object, { created_by: 'x' })
+      renderPage()
+      await userEvent.click(await screen.findByTestId('edit-9'))
+      expect(screen.getByTestId('readonly-note')).not.toBeNull()
+      expect(screen.queryByTestId('inspection-edit-row')).toBeNull()
+    })
+  })
+
   describe('Yêu cầu sửa dòng quá 24 giờ (D-020)', () => {
     const own = () => { h.rows = [{ ...oldRow, plan_id: 3, tk_number: 'TK0003', warehouse_slip_no: 'PXK1', created_by: 'u1', created_at: '2026-10-01T00:00:00Z' }] }
     const future = () => new Date(Date.now() + 3_600_000).toISOString()
@@ -272,7 +320,7 @@ describe('InspectionPage', () => {
       expect((screen.getByTestId('delete-9') as HTMLButtonElement).disabled).toBe(true)
       expect(screen.queryByTestId('request-edit-9')).toBeNull()
       await userEvent.click(screen.getByTestId('edit-9'))
-      expect(screen.getByTestId('inspection-save')).not.toBeNull()
+      expect(screen.getByTestId('inspection-edit-row-save')).not.toBeNull()
     })
 
     it('dòng của người khác: không có nút "Yêu cầu sửa"', async () => {

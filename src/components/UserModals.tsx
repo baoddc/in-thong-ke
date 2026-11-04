@@ -18,10 +18,10 @@ export function Shell({ title, onClose, busy, testId, footer, children, onSubmit
       <form onSubmit={onSubmit ?? ((e) => e.preventDefault())} noValidate className="flex max-h-[90dvh] flex-col">
         <div className="flex items-center justify-between border-b border-stone-200 px-4 py-3">
           <h2 id={`${testId}-title`} className="text-lg font-bold">{title}</h2>
-          <button type="button" onClick={() => !busy && onClose()} aria-label="Đóng" className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-600 transition-colors duration-150 hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Icon name="close" /></button>
+          <button type="button" onClick={() => !busy && onClose()} aria-label="Đóng" className="flex h-[44px] w-[44px] items-center justify-center rounded-lg text-gray-600 transition-colors duration-150 hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Icon name="close" /></button>
         </div>
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">{children}</div>
-        <div className="flex items-center justify-end gap-2 border-t border-stone-200 bg-surface px-4 py-3">{footer}</div>
+        <div className="flex items-center justify-end gap-2 border-t border-stone-200 bg-surface px-4 py-3 max-sm:[&>*]:flex-1">{footer}</div>
       </form>
     </dialog>
   )

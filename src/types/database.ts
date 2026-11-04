@@ -189,6 +189,52 @@ export type Database = {
         }
         Relationships: []
       }
+      // T-085: nhật ký thao tác của admin — chỉ root đọc; app không ghi (trigger/RPC phía DB ghi).
+      audit_log: {
+        Row: {
+          id: number
+          at: string
+          actor_id: string | null
+          actor_name: string
+          actor_role: string
+          action: string
+          table_name: string
+          row_id: number | null
+          label: string | null
+          changes: Json | null
+          restored_at: string | null
+          restored_by_name: string | null
+        }
+        Insert: {
+          id?: number
+          at?: string
+          actor_id?: string | null
+          actor_name?: string
+          actor_role?: string
+          action?: string
+          table_name?: string
+          row_id?: number | null
+          label?: string | null
+          changes?: Json | null
+          restored_at?: string | null
+          restored_by_name?: string | null
+        }
+        Update: {
+          id?: number
+          at?: string
+          actor_id?: string | null
+          actor_name?: string
+          actor_role?: string
+          action?: string
+          table_name?: string
+          row_id?: number | null
+          label?: string | null
+          changes?: Json | null
+          restored_at?: string | null
+          restored_by_name?: string | null
+        }
+        Relationships: []
+      }
       // D-019: chỉ select (của mình / admin); ghi qua RPC request_plan_edit, decide_edit_request.
       edit_requests: {
         Row: {
@@ -526,6 +572,7 @@ export type Database = {
       }
     }
     Functions: {
+      restore_audit: { Args: { p_id: number }; Returns: string } // T-086: chỉ root
       create_transport_plan: {
         Args: {
           p_export_date: string | null

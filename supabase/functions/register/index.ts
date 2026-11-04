@@ -4,7 +4,8 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { INTERNAL_EMAIL_DOMAIN, makeUsername, nextFreeUsername } from './username.ts'
 
-const MAX_PENDING = 20 // chống spam tối thiểu: số yêu cầu chờ duyệt cùng lúc
+const MAX_PENDING = 20 // thông báo sớm; trần thật nằm ở trigger profiles_pending_cap (000028), phải cùng số
+const MAX_ATTEMPTS_PER_HOUR = 5 // mỗi IP
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -35,6 +36,22 @@ async function handle(req: Request): Promise<Response> {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
+  // Giới hạn theo IP (T-091): cf-connecting-ip do Cloudflare đặt (khó giả); x-forwarded-for lấy phần tử đầu.
+  // shortcut: nếu proxy không ghi đè x-forwarded-for thì client giả được IP; trần chờ duyệt trong DB vẫn là chốt chặn cuối.
+  const ip = (req.headers.get('cf-connecting-ip') ?? req.headers.get('x-forwarded-for')?.split(',')[0] ?? '').trim().slice(0, 64)
+  if (ip) {
+    const since = new Date(Date.now() - 3600_000).toISOString()
+    const { count: tries, error: rlErr } = await admin.from('register_attempts')
+      .select('id', { count: 'exact', head: true }).eq('ip', ip).gte('at', since)
+    if (rlErr) throw rlErr
+    if ((tries ?? 0) >= MAX_ATTEMPTS_PER_HOUR) return fail('Bạn đã thử đăng ký quá nhiều lần, vui lòng thử lại sau', 429)
+    const { error: insErr } = await admin.from('register_attempts').insert({ ip })
+    if (insErr) throw insErr
+    if (Math.random() < 0.05) { // dọn thỉnh thoảng, không cần job riêng
+      await admin.from('register_attempts').delete().lt('at', new Date(Date.now() - 86_400_000).toISOString())
+    }
+  }
+
   const { count, error: cntErr } = await admin.from('profiles').select('id', { count: 'exact', head: true }).eq('is_pending', true)
   if (cntErr) throw cntErr
   if ((count ?? 0) >= MAX_PENDING) return fail('Đang có nhiều yêu cầu chờ duyệt, vui lòng liên hệ quản trị viên', 429)
@@ -61,6 +78,7 @@ async function handle(req: Request): Promise<Response> {
       .insert({ id: created.user.id, username, full_name: fullName, role: 'user', is_active: false, is_pending: true })
     if (!pErr) return json({ username, full_name: fullName }, 201)
     await admin.auth.admin.deleteUser(created.user.id) // không để tài khoản mồ côi
+    if (pErr.code === 'P0001') return fail('Đang có nhiều yêu cầu chờ duyệt, vui lòng liên hệ quản trị viên', 429) // trần trong DB (đua)
     if (pErr.code === '23505') { taken.push(username); continue } // đua tên đăng nhập: thử số kế
     console.error(pErr)
     return fail('Không tạo được hồ sơ người dùng, vui lòng thử lại', 500)

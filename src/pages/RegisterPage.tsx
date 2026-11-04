@@ -57,7 +57,7 @@ export default function RegisterPage() {
             <Link to="/dang-nhap" className={`${buttonClass('primary')} w-full`} data-testid="register-to-login">Về trang đăng nhập</Link>
           </div>
         ) : (
-          <form onSubmit={submit} noValidate className="space-y-4 p-6" data-testid="register-form">
+          <form onSubmit={submit} noValidate className="space-y-4 p-4 sm:p-6" data-testid="register-form">
             <div className="space-y-1 text-center">
               <h1 className="text-xl font-bold" data-testid="register-title">Đăng ký tài khoản</h1>
               <p className="text-sm text-muted">Tài khoản cần quản trị viên duyệt trước khi đăng nhập</p>
@@ -78,7 +78,7 @@ export default function RegisterPage() {
                   onChange={(e) => setPassword(e.target.value)} className="pr-20" data-testid="register-password" />
               </Field>
               <button type="button" onClick={() => setShow((s) => !s)} aria-pressed={show} aria-label="Hiện mật khẩu" data-testid="register-toggle-password"
-                className="absolute right-0 top-6 h-10 rounded-card px-3 text-sm font-medium text-primary hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                className="absolute right-0 top-6 h-[44px] rounded-card px-3 text-sm font-medium text-primary hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                 {show ? 'Ẩn' : 'Hiện'}
               </button>
             </div>

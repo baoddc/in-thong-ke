@@ -58,7 +58,7 @@ export default function EditRequestsPage() {
     {
       key: 'actions', header: 'Thao tác', nowrap: true,
       render: (r) => r.status === 'pending' && (
-        <span className="inline-flex gap-1">
+        <span className="inline-flex flex-wrap gap-2 sm:gap-1">
           <Button size="sm" variant="primary" className="!bg-green-700 hover:!bg-green-800" onClick={() => setDeciding({ req: r, approve: true })} data-testid={`approve-${r.id}`}>Duyệt</Button>
           <Button size="sm" variant="danger" onClick={() => setDeciding({ req: r, approve: false })} data-testid={`reject-${r.id}`}>Từ chối</Button>
         </span>
@@ -71,7 +71,7 @@ export default function EditRequestsPage() {
     <div className="flex flex-col gap-3 md:min-h-0 md:flex-1">
       <PageHeader title="Yêu cầu sửa" description="Duyệt yêu cầu sửa phiếu hoặc dòng bảng kiểm đã quá 24 giờ" />
 
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Lọc theo trạng thái">
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap" role="group" aria-label="Lọc theo trạng thái">
         {FILTERS.map((f) => (
           <Button key={f.value} size="sm" aria-pressed={status === f.value} className={status === f.value ? 'ring-2 ring-primary' : ''} onClick={() => pick(f.value)} data-testid={`filter-${f.value || 'all'}`}>{f.label}</Button>
         ))}

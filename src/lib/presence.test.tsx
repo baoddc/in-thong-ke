@@ -156,6 +156,23 @@ describe('Presence (D-024)', () => {
     expect(h.sent[2].payload).toEqual({ key: self(), clear: true })
   })
 
+  it('kênh private; payload sai kiểu từ người khác bị bỏ qua, không làm sập app; payload hợp lệ vẫn hiện', async () => {
+    mount()
+    expect((h.cfg as { config: { private: boolean } }).config.private).toBe(true)
+    await sync({
+      'x:1': [{ userId: 1, username: 'u', fullName: {}, page: '/', activity: null }],
+      'x:2': [{ userId: 'x2', username: 'u', fullName: '', page: '/', activity: { kind: 'editing_plan', planId: 'a', tk: 'T' } }],
+      'u2:a': [peer('u2', 'hoa.nt', null)],
+    })
+    expect(screen.getAllByTestId('online-user')).toHaveLength(1)
+    await recv({ key: 'y:2', userId: 'b', username: 'b', table: 'plans', mode: 'add', values: { a: {} } }) // giá trị sai bị bỏ, dòng rỗng
+    await recv({ key: 'y:3', userId: 'b', username: 'b', table: 'evil', mode: 'add', values: {} })
+    await recv({ key: 'y:4', userId: {}, username: 'b', table: 'plans', mode: 'add', values: {} })
+    await recv(draftOf('u2:a', { values: { tk: 'TK1', note: 5, bad: {} } }))
+    expect(screen.getAllByTestId('draft-row')).toHaveLength(2) // y:2 (rỗng) + u2:a
+    expect(screen.getAllByTestId('draft-cell-note')[1].textContent).toBe('5')
+  })
+
   it('nhãn "đang sửa" chỉ hiện trên đúng dòng và chỉ cho người khác', async () => {
     mount()
     await sync({
