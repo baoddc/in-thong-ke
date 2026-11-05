@@ -9,13 +9,32 @@ export type DbTable = (typeof DB_TABLES)[number]
 type Listener = (table: DbTable) => void
 const listeners = new Set<Listener>()
 let channel: RealtimeChannel | null = null
+const pending = new Set<DbTable>()
+
+// Tab ẩn không tải lại (mỗi request = 1 dòng log Supabase, gói free 1 GB): ghi nhớ bảng đổi, mở lại tab thì tải một lần.
+const emit = (table: DbTable) => listeners.forEach((l) => l(table))
+function onChange(table: DbTable) {
+  if (document.visibilityState === 'hidden') pending.add(table)
+  else emit(table)
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') return
+  pending.forEach(emit)
+  pending.clear()
+})
 
 // Một kênh dùng chung cho cả app (D-028): mở khi có người nghe đầu tiên, đóng khi người cuối rời đi.
 function open() {
   if (channel) return
   const ch = supabase.channel('db-changes')
-  for (const table of DB_TABLES) ch.on('postgres_changes', { event: '*', schema: 'public', table }, () => listeners.forEach((l) => l(table)))
-  ch.subscribe()
+  for (const table of DB_TABLES) ch.on('postgres_changes', { event: '*', schema: 'public', table }, () => onChange(table))
+  let joined = false
+  // Rớt mạng rồi nối lại → có thể đã lỡ thay đổi: tải lại mọi thứ một lần (thay cho việc hỏi server định kỳ).
+  ch.subscribe((status: string) => {
+    if (status !== 'SUBSCRIBED') return
+    if (joined) DB_TABLES.forEach(onChange)
+    joined = true
+  })
   channel = ch
 }
 function closeIfIdle() {

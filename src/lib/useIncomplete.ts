@@ -18,14 +18,20 @@ export function useIncomplete() {
 
   useEffect(() => {
     let alive = true
-    const load = () => supabase.rpc('my_incomplete_items').then((r) => {
+    let t: ReturnType<typeof setTimeout> | undefined
+    void supabase.rpc('my_incomplete_items').then((r) => {
       if (!alive || r.error) return
       const items = r.data ?? []
-      setState({ items, blocked: items.some((i) => Date.parse(i.due_at) <= Date.now()) })
+      const check = () => {
+        const now = Date.now()
+        setState({ items, blocked: items.some((i) => Date.parse(i.due_at) <= now) })
+        // Hết hạn trong lúc đang mở trang → tự khóa bằng hẹn giờ ở máy, không hỏi lại server mỗi phút (tiết kiệm log).
+        const next = Math.min(...items.map((i) => Date.parse(i.due_at)).filter((d) => d > now))
+        if (Number.isFinite(next)) t = setTimeout(check, Math.min(next - now + 500, 2 ** 31 - 1))
+      }
+      check()
     })
-    void load()
-    const t = setInterval(load, 60_000) // hết hạn trong lúc đang mở trang → khóa mà không cần thao tác
-    return () => { alive = false; clearInterval(t) }
+    return () => { alive = false; clearTimeout(t) }
   }, [tick])
 
   const has = (kind: 'plan' | 'detail', id: number) => state.items.some((i) => i.item_kind === kind && i.id === id)
