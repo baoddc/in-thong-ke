@@ -84,7 +84,7 @@ const GROUPS: FeatureGroup[] = [
       {
         icon: 'shield', color: 'bg-rose-50 text-rose-700', title: 'Phân quyền & an toàn',
         points: [
-          '3 vai trò: Root / Admin / Người dùng.',
+          '2 vai trò: Admin / Người dùng.',
           'Người tạo được sửa/xóa dữ liệu của mình trong 24 giờ, sau đó chỉ admin.',
           'Dữ liệu được bảo vệ ở tầng cơ sở dữ liệu (RLS); mọi thao tác ghi lại người tạo và người sửa lần cuối.',
         ],
@@ -93,7 +93,7 @@ const GROUPS: FeatureGroup[] = [
         icon: 'edit', color: 'bg-pink-50 text-pink-700', title: 'Yêu cầu sửa sau 24 giờ',
         points: [
           'Phiếu hoặc dòng bảng kiểm quá 24 giờ: người tạo bấm "Yêu cầu sửa" kèm lý do.',
-          'Admin/Root duyệt thì được sửa (không xóa) trong 24 giờ.',
+          'Admin duyệt thì được sửa (không xóa) trong 24 giờ.',
           'Thông báo tức thì: admin thấy yêu cầu mới và người yêu cầu thấy kết quả duyệt/từ chối ngay, không cần tải lại trang.',
         ],
       },
@@ -111,15 +111,15 @@ const GROUPS: FeatureGroup[] = [
 
 // true = được, false = không, chuỗi = được kèm điều kiện
 type Cell = boolean | string
-const ROLES = ['Root', 'Admin', 'Người dùng'] as const
-const PERMISSIONS: { label: string; cells: [Cell, Cell, Cell] }[] = [
-  { label: 'Xem dữ liệu', cells: [true, true, true] },
-  { label: 'Nhập phiếu, bảng kiểm', cells: [true, true, true] },
-  { label: 'Sửa/xóa trong 24 giờ', cells: [true, true, 'Của mình'] },
-  { label: 'Sửa sau 24 giờ', cells: [true, true, 'Sau khi duyệt'] },
-  { label: 'Duyệt yêu cầu sửa', cells: [true, true, false] },
-  { label: 'Quản lý tài khoản', cells: [true, 'Người dùng', false] },
-  { label: 'Quản lý admin', cells: [true, false, false] },
+// Không nhắc vai trò root ở giao diện chung (người dùng chốt 04/11/2026: giữ kín sự tồn tại của root).
+const ROLES = ['Admin', 'Người dùng'] as const
+const PERMISSIONS: { label: string; cells: [Cell, Cell] }[] = [
+  { label: 'Xem dữ liệu', cells: [true, true] },
+  { label: 'Nhập phiếu, bảng kiểm', cells: [true, true] },
+  { label: 'Sửa/xóa trong 24 giờ', cells: [true, 'Của mình'] },
+  { label: 'Sửa sau 24 giờ', cells: [true, 'Sau khi duyệt'] },
+  { label: 'Duyệt yêu cầu sửa', cells: [true, false] },
+  { label: 'Quản lý tài khoản', cells: ['Người dùng', false] },
 ]
 
 function PermissionCell({ value }: { value: Cell }) {

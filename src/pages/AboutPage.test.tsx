@@ -28,11 +28,12 @@ describe('Trang Giới thiệu', () => {
     expect(screen.getByTestId('workflow-link').getAttribute('href')).toBe('/luong-cong-viec')
   })
 
-  it('bảng phân quyền có 7 thao tác × 3 vai trò và phím tắt dạng kbd', () => {
+  it('bảng phân quyền có 6 thao tác × 2 vai trò (không nhắc root) và phím tắt dạng kbd', () => {
     renderPage()
     const roles = screen.getByTestId('about-roles')
-    expect(within(roles).getAllByTestId('role-row')).toHaveLength(7)
-    for (const r of ['Root', 'Admin', 'Người dùng']) expect(within(roles).getByRole('columnheader', { name: r })).toBeTruthy()
+    expect(within(roles).getAllByTestId('role-row')).toHaveLength(6)
+    for (const r of ['Admin', 'Người dùng']) expect(within(roles).getByRole('columnheader', { name: r })).toBeTruthy()
+    expect(screen.getByTestId('about-page').textContent).not.toMatch(/root/i)
     const keys = Array.from(screen.getByTestId('about-shortcuts').querySelectorAll('kbd')).map((k) => k.textContent)
     expect(keys).toEqual(['N', '/', 'Ctrl', 'Enter'])
   })
