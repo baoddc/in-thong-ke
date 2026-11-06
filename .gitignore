@@ -21,3 +21,6 @@ tai-lieu-noi-bo/
 .playwright-mcp/
 .archify/
 supabase/.temp/
+
+# Nhat ky sao luu
+*.log

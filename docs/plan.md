@@ -110,6 +110,7 @@ Danh mục do người dùng tự nhập trên trang "Danh mục" (D-005).
 | T-092 | Presence: kiểm kiểu payload, ErrorBoundary, kênh private | frontend | Xong · 344 test |
 | T-093 | Hardening: header bảo mật vercel.json, .gitignore .env.*/__pycache__, Vitest bỏ qua .claude/ | Lead | Xong |
 | T-094 | Giữ kín vai trò root ở giao diện chung: trang Giới thiệu chỉ còn Admin / Người dùng, sơ đồ Luồng công việc bỏ "root"; tài liệu hướng dẫn v2 (18 trang, ảnh chú thích số) ở `tai-lieu-noi-bo/` | Lead | Xong · test AboutPage qua |
+| T-095 | Sao lưu Excel hằng ngày 16:50 vào `Z:\PHONG KHO\NHOM XUAT HANG\sao-luu-du-lieu-thong-ke`: thư mục `sao-luu/` (Python `sao_luu.py`, `test_sao_luu.py`, `dang-ky-lich.ps1`), lịch Task Scheduler `SaoLuuThongKe`. Mỗi thư mục (gốc / Năm / Tháng / Ngày) có đúng 1 file "Tổng hợp …xlsx" (2 sheet: Nhập phiếu, Bảng kiểm) lọc theo Ngày xuất; đọc 1000 dòng/request; chạy ~4 phút. Cần `sao-luu/.env` (tài khoản đọc) | Lead | Xong · đã chạy thật 1.414 file |
 | T-090 | Điện thoại: thẻ Nhập phiếu / Bảng kiểm hiện đầy đủ mọi trường (bỏ `mobile: 'hide'`) | Lead | Xong · 64 test trang qua |
 | T-087 | Khôi phục không sinh dòng 'Sửa' phụ (có nút Khôi phục lòng vòng) + dọn dòng phụ cũ — migration 000027 | Lead | Xong (pglast OK) · chờ chạy 000027 |
 | T-085 | Nhật ký thao tác admin/root, chỉ root xem (D-031) — Lead: migration 000025 (pglast OK); frontend: trang `/lich-su-thao-tac` + RootOnly | Lead + frontend | Xong code · 339 test, build OK · chờ áp migration 000025 |
