@@ -95,13 +95,15 @@ def _norm_tk(raw):
 
 # ---------------------------------------------------------------- ngày
 def parse_date(v):
-    """datetime / 'd/m/yyyy' -> date; None nếu trống; False nếu không đọc được."""
+    """datetime / 'd/m/yyyy' / số serial Excel -> date; None nếu trống; False nếu không đọc được."""
     if v is None or (isinstance(v, str) and not v.strip()):
         return None
     if isinstance(v, dt.datetime):
         return v.date()
     if isinstance(v, dt.date):
         return v
+    if isinstance(v, (int, float)) and not isinstance(v, bool) and 36526 <= v < 73051:  # ô ngày để dạng số (năm 2000-2099): 44940 = 14/01/2023
+        return dt.date(1899, 12, 30) + dt.timedelta(days=int(v))
     m = re.fullmatch(r"\s*(\d{1,2})/(\d{1,2})/(\d{4})\s*", str(v))
     if m:
         try:
@@ -614,6 +616,7 @@ def selftest():
     assert nf(ds, [1, 0, 1], [0, 1, 0]) == {}  # không khớp cả hai
     assert parse_date("05/01/2023") == d(2023, 1, 5) and parse_date("5/1/2023") == d(2023, 1, 5)
     assert parse_date("#REF!") is False and parse_date(None) is None
+    assert parse_date(44940) == d(2023, 1, 14) and parse_date(44940.0) == d(2023, 1, 14) and parse_date(12) is False and parse_date(True) is False
     pn = lambda s: parse_number(s)[0]
     assert pn("1.234,5") == 1234.5 and pn("5,5") == 5.5 and pn("1.234") == 1234 and pn("  5,00 ") == 5
     assert pn("44.2") == 44.2 and pn("05.09") == 5.09 and pn("6.00") == 6 and pn("0.500") == 0.5
