@@ -135,13 +135,13 @@ export default function PlansPage() {
       ),
     },
     { key: 'date', header: 'Ngày xuất', sort: 'export_date', nowrap: true, render: (r) => formatDate(r.export_date) },
-    { key: 'order', header: 'Số lệnh VC', sort: 'transport_order_no', render: (r) => r.transport_order_no },
-    { key: 'type', header: 'Phân loại VC', render: (r) => <Badge name={r.transport_type?.name} /> },
+    { key: 'order', header: 'Số lệnh VC', sort: 'transport_order_no', nowrap: true, render: (r) => r.transport_order_no },
+    { key: 'type', header: 'Phân loại VC', nowrap: true, render: (r) => <Badge name={r.transport_type?.name} /> },
     { key: 'vehicle', header: 'Số xe', nowrap: true, render: (r) => r.vehicle?.name },
-    { key: 'driver', header: 'Tài xế/ phụ xe', render: (r) => r.driver?.name },
+    { key: 'driver', header: 'Tài xế/ phụ xe', nowrap: true, render: (r) => r.driver?.name },
     { key: 'fg', header: 'NV xuất TP/BTP', render: (r) => <PersonChip name={r.fg_exporter?.name} /> },
     { key: 'mat', header: 'NV xuất VT', render: (r) => <PersonChips names={sortedMaterials(r).flatMap((m) => (m.lookup?.name ? [m.lookup.name] : []))} /> },
-    { key: 'note', header: 'Ghi chú', render: (r) => r.note },
+    { key: 'note', header: 'Ghi chú', w: 'min-w-[16rem]', clamp: true, render: (r) => r.note },
     { key: 'audit', header: 'Người tạo / sửa', nowrap: true, render: (r) => <AuditCell row={r} /> },
   ]
   // Cột Thao tác đứng đầu (dính trái khi cuộn ngang).

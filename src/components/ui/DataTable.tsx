@@ -1,5 +1,6 @@
 import { Fragment, useSyncExternalStore, type ReactNode } from 'react'
 import type { SortDir } from '../../lib/listQuery'
+import { useColumnWidths } from '../../lib/useColumnWidths'
 import Button from './Button'
 import Icon from './Icon'
 
@@ -9,6 +10,8 @@ export type Column<T> = {
   sort?: string // tên cột server; có thì tiêu đề bấm để sắp xếp
   numeric?: boolean // căn phải + chữ số đều nhau
   nowrap?: boolean
+  w?: string // lớp Tailwind độ rộng tối thiểu của cột, vd 'min-w-[14rem]': cột chữ dài không bị bóp hẹp
+  clamp?: boolean // chữ dài cắt ở 2 dòng (rê chuột xem đủ) để các dòng cao đều nhau
   render: (row: T) => ReactNode
   // Chế độ thẻ (< md): title = dòng đầu (khóa), actions = nút thao tác bên phải, field = ô nhãn: giá trị, hide = không hiện. Mặc định field.
   mobile?: 'title' | 'actions' | 'field' | 'hide'
@@ -50,6 +53,7 @@ const WIDTHS = ['w-16', 'w-24', 'w-20', 'w-32', 'w-12']
 // Cột đầu dính trái, tiêu đề dính trên (cuộn trong khung, không cuộn cả trang). Bốn trạng thái: tải / lỗi / trống / có dữ liệu.
 export default function DataTable<T>({ columns, rows, rowKey, rowTestId, loading, refreshing, error, onRetry, sort, dir, onSort, empty, testId, attached, topRow, draftRows, editRow }: Props<T>) {
   const below = useIsBelowMd()
+  const { widths, set: setWidth } = useColumnWidths(testId)
   if (error) {
     return (
       <div role="alert" className="flex items-start gap-3 rounded-card border border-danger-line bg-danger-soft p-4 text-danger" data-testid="page-error">
@@ -96,6 +100,33 @@ export default function DataTable<T>({ columns, rows, rowKey, rowTestId, loading
   }
 
   const th = 'px-2.5 py-2 text-left text-xs font-semibold uppercase tracking-wide text-gray-600 whitespace-nowrap bg-stone-100 sticky top-0 border-b border-stone-200'
+  // Độ rộng do người dùng kéo: cố định cột đó (width = min = max), chữ thừa bị cắt/xuống dòng trong ô.
+  const fixed = (key: string) => (widths[key] ? { width: widths[key], minWidth: widths[key], maxWidth: widths[key] } : undefined)
+  // Kéo mép phải tiêu đề để đổi độ rộng; bấm đúp = về mặc định; phím ←/→ chỉnh 16px. Pointer capture giữ con trỏ khi rê ra ngoài mép.
+  const startResize = (e: React.PointerEvent<HTMLElement>, key: string) => {
+    const h = e.currentTarget
+    const x0 = e.clientX
+    const w0 = h.parentElement?.getBoundingClientRect().width ?? 0
+    let w = w0
+    e.preventDefault()
+    h.setPointerCapture?.(e.pointerId)
+    const move = (ev: PointerEvent) => { w = w0 + ev.clientX - x0; setWidth(key, w, false) }
+    const up = () => {
+      h.removeEventListener('pointermove', move)
+      h.removeEventListener('pointerup', up)
+      h.removeEventListener('pointercancel', up)
+      setWidth(key, w, true)
+    }
+    h.addEventListener('pointermove', move)
+    h.addEventListener('pointerup', up)
+    h.addEventListener('pointercancel', up)
+  }
+  const nudge = (e: React.KeyboardEvent<HTMLElement>, key: string) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+    e.preventDefault()
+    const w = widths[key] ?? e.currentTarget.parentElement?.getBoundingClientRect().width ?? 0
+    setWidth(key, w + (e.key === 'ArrowRight' ? 16 : -16), true)
+  }
   return (
     // Từ md: lấp đầy chỗ trống của trang (cha là flex-col), tự cuộn trong khung; điện thoại: giới hạn 70vh, trang cuộn bình thường.
     <div className={`max-h-[70vh] overflow-auto ${attached ? 'rounded-t-card border-b-0' : 'rounded-card'} md:max-h-none md:min-h-[15rem] md:flex-1 border border-stone-200 bg-white shadow-card transition-opacity duration-200 ${refreshing ? 'opacity-60' : ''}`}
@@ -105,7 +136,7 @@ export default function DataTable<T>({ columns, rows, rowKey, rowTestId, loading
           <tr>
             {columns.map((c, i) => (
               <th key={c.key} scope="col" aria-sort={c.sort && c.sort === sort ? (dir === 'asc' ? 'ascending' : 'descending') : undefined}
-                className={`${th} ${i === 0 ? 'left-0 z-20' : 'z-10'} ${c.numeric ? '!text-right' : ''}`}>
+                style={fixed(c.key)} className={`${th} ${i === 0 ? 'left-0 z-20' : 'z-10'} ${c.numeric ? '!text-right' : ''} ${c.w ?? ''} ${widths[c.key] ? 'overflow-hidden text-ellipsis' : ''}`}>
                 {c.sort ? (
                   <button type="button" onClick={() => onSort(c.sort!)} data-testid={`sort-${c.sort}`}
                     className="inline-flex min-h-8 items-center gap-1 rounded font-semibold uppercase tracking-wide transition-colors duration-150 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
@@ -113,6 +144,10 @@ export default function DataTable<T>({ columns, rows, rowKey, rowTestId, loading
                     <span aria-hidden="true" className={c.sort === sort ? 'text-primary' : 'text-gray-400'}>{c.sort === sort ? (dir === 'asc' ? '▲' : '▼') : '↕'}</span>
                   </button>
                 ) : c.header}
+                <span role="separator" aria-orientation="vertical" aria-label={`Kéo để đổi độ rộng cột ${c.header} (bấm đúp: về mặc định)`} aria-valuenow={widths[c.key]} tabIndex={0}
+                  title="Kéo để đổi độ rộng cột · bấm đúp: về mặc định" data-testid={`resize-${c.key}`}
+                  onPointerDown={(e) => startResize(e, c.key)} onDoubleClick={() => setWidth(c.key, null, true)} onKeyDown={(e) => nudge(e, c.key)}
+                  className="absolute right-0 top-0 h-full w-2 cursor-col-resize touch-none select-none before:absolute before:right-0.5 before:top-1/4 before:h-1/2 before:w-px before:bg-stone-300 hover:bg-stone-200 focus-visible:bg-stone-200 focus-visible:outline-none" />
               </th>
             ))}
           </tr>
@@ -132,11 +167,14 @@ export default function DataTable<T>({ columns, rows, rowKey, rowTestId, loading
             ))
             : rows.map((r) => editRow && rowKey(r) === editRow.key ? <Fragment key={rowKey(r)}>{editRow.node}</Fragment> : (
               <tr key={rowKey(r)} data-testid={rowTestId?.(r)} className="border-t border-stone-100 bg-white transition-colors duration-150 even:bg-stone-50 hover:!bg-primary-soft">
-                {columns.map((c, i) => (
-                  <td key={c.key} className={`px-2.5 py-1.5 align-middle ${i === 0 ? 'sticky left-0 bg-inherit font-medium' : ''} ${c.numeric ? 'text-right' : ''} ${c.nowrap || c.numeric ? 'whitespace-nowrap' : ''}`}>
-                    {c.render(r)}
-                  </td>
-                ))}
+                {columns.map((c, i) => {
+                  const content = c.render(r)
+                  return (
+                    <td key={c.key} style={fixed(c.key)} className={`px-2.5 py-1.5 align-middle ${i === 0 ? 'sticky left-0 bg-inherit font-medium' : ''} ${c.numeric ? 'text-right' : ''} ${c.nowrap || c.numeric ? 'whitespace-nowrap' : ''} ${c.w ?? ''} ${widths[c.key] ? 'overflow-hidden text-ellipsis' : ''}`}>
+                      {c.clamp ? <div className={`line-clamp-2 break-words ${widths[c.key] ? '' : 'max-w-[22rem]'}`} title={typeof content === 'string' ? content : undefined}>{content}</div> : content}
+                    </td>
+                  )
+                })}
               </tr>
             ))}
         </tbody>
