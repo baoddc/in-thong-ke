@@ -20,8 +20,8 @@ const cases: [Role, Role, boolean, Action, Role | undefined, boolean][] = [
   ['admin', 'admin', true, 'rename', undefined, true],
   ['admin', 'admin', true, 'reset_password', undefined, true],
   ['admin', 'admin', true, 'view', undefined, true],
-  ['admin', 'admin', false, 'view', undefined, false],
-  ['admin', 'admin', false, 'rename', undefined, false],
+  ['admin', 'admin', false, 'view', undefined, true], // admin thấy nhau
+  ['admin', 'admin', false, 'rename', undefined, false], // nhưng chỉ xem, không sửa được nhau
   ['admin', 'admin', false, 'reset_password', undefined, false],
   ['admin', 'root', false, 'view', undefined, false],
   ['admin', 'root', false, 'rename', undefined, false],

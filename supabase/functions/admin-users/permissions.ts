@@ -34,9 +34,11 @@ export function canManage(callerRole: Role, callerId: string, target: Target, ac
       if (target.role === 'root') return DENIED
       return isRoot || target.role === 'user' ? null : ONLY_USER
     case 'view':
+      // root: mọi người; admin: user, admin khác và chính mình (admin thấy nhau, 08/11/2026) — không bao giờ thấy tài khoản cấp cao nhất
+      return isRoot || self || target.role !== 'root' ? null : DENIED
     case 'rename':
     case 'reset_password':
-      // root: mọi người (kể cả mình); admin: user hoặc chính mình
+      // root: mọi người (kể cả mình); admin: user hoặc chính mình (admin khác chỉ xem, không sửa)
       return isRoot || self || target.role === 'user' ? null : ONLY_USER
   }
 }

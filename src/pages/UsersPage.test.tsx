@@ -66,6 +66,20 @@ describe('UsersPage', () => {
     expect(dialog.textContent).toContain('Quản Trị')
   })
 
+  it('admin thấy admin khác trong danh sách nhưng chỉ để xem: không sửa/đặt lại mật khẩu/khóa, không đổi được ảnh', async () => {
+    users.push({ id: 'a2', username: 'admin2', full_name: 'Quản Lý Hai', role: 'admin', is_active: true, created_at: '2026-10-05T03:00:00Z', email: 'a2@kho-an-ha.local', last_sign_in_at: null })
+    try {
+      setup()
+      await screen.findByTestId('user-table')
+      const row = within(screen.getByTestId('user-row-admin2'))
+      expect(row.getByText('Admin')).toBeTruthy()
+      for (const a of ['edit', 'reset', 'toggle']) expect(off(`user-${a}-admin2`)).toBe(true)
+      expect(screen.queryByTestId('user-avatar-admin2')).toBeNull()
+    } finally {
+      users.splice(users.findIndex((u) => u.id === 'a2'), 1)
+    }
+  })
+
   it('root cũng chỉ đổi được ảnh của chính mình', async () => {
     asRoot()
     setup()
