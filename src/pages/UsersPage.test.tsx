@@ -58,7 +58,7 @@ describe('UsersPage', () => {
     setup()
     await screen.findByTestId('user-table')
     await waitFor(() => expect(within(screen.getByTestId('user-row-bao.lt')).getByTestId('avatar-img')).toBeTruthy()) // thấy ảnh của người khác
-    expect(within(screen.getByTestId('user-row-quoc.lt')).getByTestId('avatar-initial').textContent).toBe('L')
+    expect(within(screen.getByTestId('user-row-quoc.lt')).getByTestId('avatar-initial').getAttribute('data-initials')).toBe('L')
     for (const other of ['bao.lt', 'quoc.lt', 'root', 'duc.nv']) expect(screen.queryByTestId(`user-avatar-${other}`)).toBeNull() // không có nút đổi ảnh người khác
     expect(off('user-avatar-admin')).toBe(false) // dòng của chính mình
     await userEvent.click(screen.getByTestId('user-avatar-admin'))

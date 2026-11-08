@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const { upload, remove, rpc } = vi.hoisted(() => ({ upload: vi.fn(), remove: vi.fn(), rpc: vi.fn() }))
 vi.mock('./supabase', () => ({ supabase: { storage: { from: () => ({ upload, remove }) }, rpc } }))
 
-import { avatarObjectPath, avatarUrl, cropRect, processImage, removeAvatar, saveAvatar } from './avatar'
+import { AVATAR_PATH_RX, avatarObjectPath, avatarUrl, cropRect, processImage, removeAvatar, saveAvatar } from './avatar'
 
 const UID = '55685746-d53a-4cc0-a8c6-13d3ece84f79'
 const webp = new Blob(['x'], { type: 'image/webp' })
@@ -17,9 +17,9 @@ beforeEach(() => {
 
 describe('đường dẫn + cắt ảnh', () => {
   it('đường dẫn khớp ràng buộc DB (<uuid>/<mili-giây>.webp|jpg) và địa chỉ công khai', () => {
-    const rx = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[0-9]{10,16}\.(webp|jpg)$/
     expect(avatarObjectPath(UID, 'webp', 1794000000000)).toBe(`${UID}/1794000000000.webp`)
-    expect(rx.test(avatarObjectPath(UID, 'jpg'))).toBe(true)
+    expect(AVATAR_PATH_RX.test(avatarObjectPath(UID, 'jpg'))).toBe(true)
+    for (const bad of [`../${UID}/1794000000000.webp`, `${UID}/x.webp`, `${UID}/a/1794000000000.webp`, `${UID}/1794000000000.png`]) expect(AVATAR_PATH_RX.test(bad)).toBe(false)
     expect(avatarUrl(`${UID}/1.webp`)).toMatch(/\/storage\/v1\/object\/public\/avatars\/55685746-.*\/1\.webp$/)
   })
 

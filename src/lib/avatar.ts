@@ -5,6 +5,8 @@ export const AVATAR_BUCKET = 'avatars'
 export const AVATAR_SIZE = 256 // px, ảnh vuông
 export const MAX_RAW_BYTES = 8 * 1024 * 1024 // ảnh gốc tối đa 8 MB (sau khi thu nhỏ chỉ còn vài chục KB)
 const ACCEPT = /^image\/(jpeg|png|webp)$/
+/** Mẫu đường dẫn hợp lệ — khớp ràng buộc profiles_avatar_path_chk của DB. */
+export const AVATAR_PATH_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[0-9]{10,16}\.(webp|jpg)$/
 
 /** Địa chỉ công khai của ảnh (bucket công khai). Đường dẫn đổi mỗi lần đổi ảnh nên không bị kẹt ảnh cũ trong bộ nhớ đệm. */
 export const avatarUrl = (path: string) => `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/${AVATAR_BUCKET}/${path}`

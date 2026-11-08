@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -24,7 +24,7 @@ vi.mock('./supabase', () => ({
     removeChannel: () => { h.removed++ },
   },
 }))
-vi.mock('./useProfile', () => ({ useProfile: () => ({ profile: { id: 'me', username: 'bao.lt', full_name: 'Bão' } }) }))
+vi.mock('./useProfile', () => ({ useProfile: () => ({ profile: { id: 'me', username: 'bao.lt', full_name: 'Bão', avatar_path: 'me/1700000000000.webp' } }) }))
 
 import { PresenceProvider, useReportActivity, useShareDraft, type Activity, type DraftBody } from './presence'
 import { DraftRows, EditingTag, OnlineUsers } from '../components/PresenceViews'
@@ -171,6 +171,22 @@ describe('Presence (D-024)', () => {
     await recv(draftOf('u2:a', { values: { tk: 'TK1', note: 5, bad: {} } }))
     expect(screen.getAllByTestId('draft-row')).toHaveLength(2) // y:2 (rỗng) + u2:a
     expect(screen.getAllByTestId('draft-cell-note')[1].textContent).toBe('5')
+  })
+
+  it('ảnh đại diện: gửi kèm khi track; ảnh của người khác chỉ nhận đúng mẫu và đúng thư mục của chính họ', async () => {
+    mount()
+    await waitFor(() => expect(lastTrack()).toMatchObject({ avatarPath: 'me/1700000000000.webp' }))
+    const [U2, U3, U4, U5] = [2, 3, 4, 5].map((n) => `${n}${n}${n}${n}${n}${n}${n}${n}-${n}${n}${n}${n}-4${n}${n}${n}-8${n}${n}${n}-${String(n).repeat(12)}`) // id người dùng là UUID
+    await sync({
+      'a:a': [{ ...peer(U2, 'hoa.nt', null), avatarPath: `${U2}/1700000000000.webp` }],
+      'b:a': [{ ...peer(U3, 'minh.tv', null), avatarPath: `${U2}/1700000000000.webp` }], // trỏ sang ảnh của người khác
+      'c:a': [{ ...peer(U4, 'x', null), avatarPath: `../${U4}/1700000000000.webp` }], // đi ra ngoài thư mục
+      'd:a': [{ ...peer(U5, 'y', null), avatarPath: 5 }], // sai kiểu
+    })
+    const rows = screen.getAllByTestId('online-user')
+    expect(rows).toHaveLength(4)
+    expect(within(rows[0]).getByTestId('avatar-img').getAttribute('src')).toContain(`/avatars/${U2}/1700000000000.webp`)
+    for (const r of rows.slice(1)) expect(within(r).queryByTestId('avatar-img')).toBeNull()
   })
 
   it('nhãn "đang sửa" chỉ hiện trên đúng dòng và chỉ cho người khác', async () => {

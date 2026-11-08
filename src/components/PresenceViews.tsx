@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { describeActivity, personColor, useDrafts, usePresence, type Peer } from '../lib/presence'
 import { formatCountdown } from '../lib/usePlanForm'
+import Avatar from './ui/Avatar'
 import { ErrorBoundary } from './ui/ErrorBoundary'
 
 /** Họ tên đầy đủ; trống thì dùng tên đăng nhập. */
@@ -29,10 +30,15 @@ function OnlineUsersInner({ showLabels }: { showLabels: boolean }) {
         {others.map(([id, tabs]) => {
           const act = tabs.find((t) => t.activity)?.activity ?? null
           return (
-            <li key={id} className="text-xs leading-tight text-slate-200" data-testid="online-user">
-              <span aria-hidden="true" className="mr-1 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: personColor(id).solid }} />
-              <span className="font-medium" title={tabs[0].username}>{who(tabs[0])}</span>
-              {act && <span className="block text-slate-400">{describeActivity(act)}</span>}
+            <li key={id} className="flex items-center gap-1.5 text-xs leading-tight text-slate-200" data-testid="online-user">
+              {/* viền màu riêng của từng người (cùng màu với nhãn "đang sửa"/dòng nháp) */}
+              <span aria-hidden="true" className="inline-block shrink-0 rounded-full p-[1.5px]" style={{ backgroundColor: personColor(id).solid }}>
+                <Avatar name={who(tabs[0])} path={tabs[0].avatarPath} className="h-5 w-5 text-[10px]" />
+              </span>
+              <span className="min-w-0">
+                <span className="font-medium" title={tabs[0].username}>{who(tabs[0])}</span>
+                {act && <span className="block text-slate-400">{describeActivity(act)}</span>}
+              </span>
             </li>
           )
         })}

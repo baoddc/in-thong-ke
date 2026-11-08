@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { recall } from './lookupSearch'
+import { AVATAR_PATH_RX } from './avatar'
 import { useProfile } from './useProfile'
 
 /** D-024: ai đang làm gì. Chỉ để biết, không khóa; do client tự khai nên không dùng để phân quyền. */
@@ -13,7 +14,7 @@ export type Activity =
   | { kind: 'editing_detail'; detailId: number; tk: string }
   | null
 
-export type Peer = { key: string; userId: string; username: string; fullName: string; page: string; activity: Activity }
+export type Peer = { key: string; userId: string; username: string; fullName: string; page: string; avatarPath: string | null; activity: Activity }
 /** D-025: nháp dòng nhập phát qua broadcast (không lưu DB). values = chuỗi hiển thị theo khóa cột của bảng. */
 export type DraftBody = { table: 'plans' | 'details'; values: Record<string, string>; expiresAt?: number; focus?: string }
 export type Draft = DraftBody & { key: string; userId: string; username: string; fullName?: string; mode: 'add'; at: number }
@@ -46,7 +47,9 @@ function parseActivity(v: unknown): { ok: boolean; value: Activity } {
 export function parsePeer(key: string, v: unknown): Peer | null {
   if (!isObj(v) || !isStr(v.userId) || !isStr(v.username) || !isStr(v.fullName) || !isStr(v.page)) return null
   const a = parseActivity(v.activity)
-  return a.ok ? { key, userId: v.userId, username: v.username, fullName: v.fullName, page: v.page, activity: a.value } : null
+  // Ảnh do người khác tự khai → chỉ nhận đường dẫn đúng mẫu VÀ nằm trong thư mục của chính người đó (không trỏ sang ảnh người khác / ra ngoài bucket)
+  const avatarPath = isStr(v.avatarPath) && AVATAR_PATH_RX.test(v.avatarPath) && v.avatarPath.startsWith(`${v.userId}/`) ? v.avatarPath : null
+  return a.ok ? { key, userId: v.userId, username: v.username, fullName: v.fullName, page: v.page, avatarPath, activity: a.value } : null
 }
 
 export function parseDraft(v: unknown): Draft | null {
@@ -216,7 +219,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
     if (!ready || !profile) return
     const t = setTimeout(() => {
       try {
-        void Promise.resolve(chRef.current?.track({ userId: profile.id, username: profile.username, fullName: profile.full_name ?? '', page: pathname, activity: JSON.parse(activityJson) })).catch(() => {})
+        void Promise.resolve(chRef.current?.track({ userId: profile.id, username: profile.username, fullName: profile.full_name ?? '', page: pathname, avatarPath: profile.avatar_path ?? null, activity: JSON.parse(activityJson) })).catch(() => {})
       } catch { /* bỏ qua */ }
     }, DEBOUNCE_MS)
     return () => clearTimeout(t)
