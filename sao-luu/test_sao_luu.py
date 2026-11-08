@@ -59,4 +59,21 @@ with tempfile.TemporaryDirectory() as d:
     s.publish(d / "moi.tmp", d / "Tổng hợp Ngày 06-11-2026.xlsx")
     assert sorted(p.name for p in d.iterdir()) == ["Năm 2025", "Tổng hợp Ngày 06-11-2026.xlsx", "ghi-chu.xlsx"]
     assert (d / "Tổng hợp Ngày 06-11-2026.xlsx").read_text() == "moi"
+# Phạm vi chỉ định (--ngay/--thang/--nam/--toan-bo): nhận nhiều kiểu ngày, sai định dạng thì báo lỗi
+assert s.scope_labels(["05/11/2026", "2026-11-06"], ["10/2026", "2026-11"], ["2025"]) == {
+    "Ngày 05-11-2026", "Ngày 06-11-2026", "Tháng 10-2026", "Tháng 11-2026", "Năm 2025"}
+assert s.scope_labels() == set()
+from argparse import Namespace  # noqa: E402
+
+# --toan-bo (hoặc không tham số) = sao lưu đầy đủ, không lọc; có chỉ định thì chỉ các phạm vi đó
+assert s.chosen_labels(None) == set()
+assert s.chosen_labels(Namespace(ngay=None, thang=None, nam=None, toan_bo=True)) == set()
+assert s.chosen_labels(Namespace(ngay=["05/11/2026"], thang=None, nam=None, toan_bo=True)) == set()
+assert s.chosen_labels(Namespace(ngay=["05/11/2026"], thang=None, nam=["2025"], toan_bo=False)) == {"Ngày 05-11-2026", "Năm 2025"}
+for bad in (dict(ngay=["31/02/2026"]), dict(thang=["13/2026"]), dict(nam=["abc"])):
+    try:
+        s.scope_labels(**bad)
+        raise SystemExit(f"phải báo lỗi: {bad}")
+    except ValueError:
+        pass
 print("OK")

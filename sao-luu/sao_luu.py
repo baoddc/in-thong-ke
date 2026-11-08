@@ -5,6 +5,7 @@ Cấu hình:  .env.local ở thư mục gốc (VITE_SUPABASE_URL, VITE_SUPABASE_
            sao-luu/.env (BACKUP_USERNAME, BACKUP_PASSWORD, BACKUP_DIR tùy chọn)
 Chỉ ĐỌC dữ liệu bằng một tài khoản thường (qua RLS); không ghi gì lên Supabase.
 """
+import argparse
 import os
 import sys
 from datetime import date, datetime, timedelta, timezone
@@ -174,6 +175,33 @@ def make_jobs(base: Path, now: datetime, plan_rows, detail_rows):
     return jobs
 
 
+def _parse_date(v: str, fmts, what: str, example: str):
+    for f in fmts:
+        try:
+            return datetime.strptime(v.strip(), f).date()
+        except ValueError:
+            pass
+    raise ValueError(f"{what} '{v}' không đúng định dạng (ví dụ: {example})")
+
+
+def scope_labels(ngay=None, thang=None, nam=None) -> set:
+    """Tham số dòng lệnh -> tập nhãn phạm vi, khớp nhãn của make_jobs. Sai định dạng -> ValueError."""
+    labels = set()
+    for v in ngay or []:
+        labels.add(f"Ngày {_parse_date(v, ('%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d'), 'Ngày', '05/11/2026'):%d-%m-%Y}")
+    for v in thang or []:
+        labels.add(f"Tháng {_parse_date(v, ('%m/%Y', '%m-%Y', '%Y-%m'), 'Tháng', '10/2026'):%m-%Y}")
+    for v in nam or []:
+        labels.add(f"Năm {_parse_date(v, ('%Y',), 'Năm', '2025'):%Y}")
+    return labels
+
+
+def chosen_labels(args) -> set:
+    """Không tham số hoặc --toan-bo = sao lưu ĐẦY ĐỦ từ trước đến giờ (mọi năm/tháng/ngày có dữ liệu + file Toàn bộ): tập rỗng = không lọc.
+    Còn lại: chỉ các phạm vi chỉ định."""
+    return set() if args is None or args.toan_bo else scope_labels(args.ngay, args.thang, args.nam)
+
+
 class Api:
     def __init__(self, url: str, key: str):
         self.url = url.rstrip("/")
@@ -211,7 +239,8 @@ class Api:
         return names
 
 
-def main() -> None:
+def main(args=None) -> None:
+    labels = chosen_labels(args)  # rỗng = sao lưu đầy đủ như lịch hằng ngày
     env = load_env()
     url, key = env.get("VITE_SUPABASE_URL", "").strip(), env.get("VITE_SUPABASE_PUBLISHABLE_KEY", "").strip()
     user, password = env.get("BACKUP_USERNAME", "").strip(), env.get("BACKUP_PASSWORD", "").strip()
@@ -235,6 +264,13 @@ def main() -> None:
     plan_rows, detail_rows = build_rows(plans, details, lookups, api.user_names(ids))
 
     jobs = make_jobs(base, now, plan_rows, detail_rows)
+    if labels:  # chỉ làm mới phạm vi được chỉ định; phạm vi không có dữ liệu thì báo, không tạo file rỗng
+        missing = sorted(labels - {j[2] for j in jobs})
+        jobs = [j for j in jobs if j[2] in labels]
+        if missing:
+            log(f"Không có dữ liệu cho: {', '.join(missing)} (không tạo file)")
+        if not jobs:
+            return
     tmps = [j[1].with_name(j[1].name + ".tmp") for j in jobs]
     try:
         for (folder, _, _, sheets), tmp in zip(jobs, tmps):
@@ -248,16 +284,21 @@ def main() -> None:
         raise
     d = now.date()
     now_labels = {"Toàn bộ", f"Năm {d:%Y}", f"Tháng {d:%m-%Y}", f"Ngày {d:%d-%m-%Y}"}
-    log(f"OK  {base}  {len(jobs)} file. " + "; ".join(f"{label}: {len(s[0][2])} phiếu, {len(s[1][2])} dòng" for _, _, label, s in jobs if label in now_labels))
+    log(f"OK  {base}  {len(jobs)} file. " + "; ".join(f"{label}: {len(s[0][2])} phiếu, {len(s[1][2])} dòng" for _, _, label, s in jobs if labels or label in now_labels))
 
 
 if __name__ == "__main__":
     for stream in (sys.stdout, sys.stderr):  # pythonw (chạy ẩn theo lịch) không có console
         if stream:
             stream.reconfigure(encoding="utf-8", errors="replace")
+    ap = argparse.ArgumentParser(description="Sao lưu Nhập phiếu + Bảng kiểm ra Excel. Không có tham số = sao lưu đầy đủ (lịch 16:50). Có tham số = chỉ làm mới phạm vi chỉ định.")
+    ap.add_argument("--ngay", nargs="+", metavar="NGÀY", help="ngày, vd 05/11/2026 (hoặc 2026-11-05)")
+    ap.add_argument("--thang", nargs="+", metavar="THÁNG", help="tháng, vd 10/2026 (hoặc 2026-10)")
+    ap.add_argument("--nam", nargs="+", metavar="NĂM", help="năm, vd 2025")
+    ap.add_argument("--toan-bo", action="store_true", help="sao lưu đầy đủ từ trước đến giờ (mọi năm, tháng, ngày có dữ liệu), như lịch 16:50")
     code = 0
     try:
-        main()
+        main(ap.parse_args() if len(sys.argv) > 1 else None)
     except Exception as e:  # noqa: BLE001
         log(f"LỖI  {e}")
         code = 1
