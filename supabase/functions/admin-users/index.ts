@@ -23,7 +23,7 @@ const checkPassword = (v: unknown) =>
   typeof v !== 'string' || v.length < 6 ? 'Mật khẩu phải có ít nhất 6 ký tự' : v.length > 72 ? 'Mật khẩu tối đa 72 ký tự' : null
 
 // shortcut: chỉ ~vài chục tài khoản; list gom hết profiles + auth users, nâng cấp phân trang phía server nếu >> 1000 người.
-async function listAll(admin: SupabaseClient) {
+async function listAll(admin: SupabaseClient, hideTop: boolean) {
   const users: { id: string; email?: string; last_sign_in_at?: string }[] = []
   for (let page = 1; ; page++) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 })
@@ -39,7 +39,8 @@ async function listAll(admin: SupabaseClient) {
     if (data.length < 1000) break
   }
   const byId = new Map(users.map((u) => [u.id, u]))
-  const nameOf = new Map(profiles.map((p) => [p.id, p.full_name]))
+  // Người gọi không phải tài khoản cao nhất thì không được biết tên nó: "Duyệt bởi / Tạo bởi" của tài khoản đó để trống (giữ kín, người dùng chốt 08/11/2026)
+  const nameOf = new Map(profiles.filter((p) => !(hideTop && p.role === 'root')).map((p) => [p.id, p.full_name]))
   return profiles.map((p) => ({
     ...p,
     created_by_name: (p.created_by && nameOf.get(p.created_by)) || null,
@@ -89,7 +90,7 @@ async function handle(req: Request): Promise<Response> {
 
   switch (body.action) {
     case 'list':
-      return json((await listAll(admin)).filter((p) => canManage(myRole, myId, p, 'view') === null))
+      return json((await listAll(admin, myRole !== 'root')).filter((p) => canManage(myRole, myId, p, 'view') === null))
 
     case 'preview_username': {
       const base = makeUsername(str(body.full_name))

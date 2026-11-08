@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const h = vi.hoisted(() => ({
-  sync: null as null | (() => void), state: {} as Record<string, unknown[]>, tracks: [] as unknown[], removed: 0, untracked: 0, cfg: null as unknown,
+  sync: null as null | (() => void), state: {} as Record<string, unknown[]>, tracks: [] as unknown[], removed: 0, untracked: 0, cfg: null as unknown, role: 'admin',
   handlers: {} as Record<string, (p: unknown) => void>, sent: [] as { event: string; payload: Record<string, unknown> }[],
 }))
 vi.mock('./supabase', () => ({
@@ -24,7 +24,7 @@ vi.mock('./supabase', () => ({
     removeChannel: () => { h.removed++ },
   },
 }))
-vi.mock('./useProfile', () => ({ useProfile: () => ({ profile: { id: 'me', username: 'bao.lt', full_name: 'Bão', avatar_path: 'me/1700000000000.webp' } }) }))
+vi.mock('./useProfile', () => ({ useProfile: () => ({ profile: { id: 'me', username: 'bao.lt', full_name: 'Bão', avatar_path: 'me/1700000000000.webp', role: h.role } }) }))
 
 import { PresenceProvider, useReportActivity, useShareDraft, type Activity, type DraftBody } from './presence'
 import { DraftRows, EditingTag, OnlineUsers } from '../components/PresenceViews'
@@ -48,7 +48,7 @@ const sync = (state: Record<string, unknown[]>) => act(async () => { h.state = s
 const self = () => (h.cfg as { config: { presence: { key: string } } }).config.presence.key
 const lastTrack = () => h.tracks[h.tracks.length - 1] as { activity: Activity; username: string; page: string }
 
-beforeEach(() => { h.state = {}; h.tracks = []; h.removed = 0; h.untracked = 0; h.sync = null; h.handlers = {}; h.sent = [] })
+beforeEach(() => { h.state = {}; h.tracks = []; h.removed = 0; h.untracked = 0; h.sync = null; h.handlers = {}; h.sent = []; h.role = 'admin' })
 afterEach(() => { cleanup(); vi.useRealTimers() })
 
 describe('Presence (D-024)', () => {
@@ -187,6 +187,23 @@ describe('Presence (D-024)', () => {
     expect(rows).toHaveLength(4)
     expect(within(rows[0]).getByTestId('avatar-img').getAttribute('src')).toContain(`/avatars/${U2}/1700000000000.webp`)
     for (const r of rows.slice(1)) expect(within(r).queryByTestId('avatar-img')).toBeNull()
+  })
+
+  it('tài khoản cao nhất hoạt động ẩn: không track, không phát bản nháp, không báo đang làm gì; vẫn xem được người khác', async () => {
+    h.role = 'root'
+    mount({ kind: 'adding_plan', tk: 'TK2026/11-005', expiresAt: Date.now() + 300_000 }, { table: 'plans', values: { tk: 'TK1' } })
+    await new Promise((r) => setTimeout(r, 600)) // quá thời gian gom (200 ms) của cả track lẫn bản nháp
+    expect(h.tracks).toHaveLength(0)
+    expect(h.sent).toHaveLength(0)
+    await sync({ 'u2:a': [peer('u2', 'hoa.nt', null)] })
+    expect(screen.getAllByTestId('online-user')).toHaveLength(1) // vẫn thấy người khác
+  })
+
+  it('người dùng thường (không phải tài khoản cao nhất) vẫn track và phát bản nháp bình thường', async () => {
+    h.role = 'user'
+    mount({ kind: 'adding_plan', tk: 'TK2026/11-005', expiresAt: Date.now() + 300_000 }, { table: 'plans', values: { tk: 'TK1' } })
+    await waitFor(() => expect(h.tracks.length).toBeGreaterThan(0))
+    await waitFor(() => expect(h.sent.length).toBeGreaterThan(0))
   })
 
   it('nhãn "đang sửa" chỉ hiện trên đúng dòng và chỉ cho người khác', async () => {

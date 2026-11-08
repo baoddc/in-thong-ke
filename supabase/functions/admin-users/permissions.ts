@@ -8,6 +8,8 @@ export type Target = { id: string | null; role: Role; pending?: boolean }
 export const isRole = (v: unknown): v is Role => v === 'root' || v === 'admin' || v === 'user'
 
 const ONLY_USER = 'Admin chỉ quản lý tài khoản người dùng'
+// Thông điệp trung tính: không nhắc tới tài khoản cấp cao nhất (giữ kín với mọi người dùng, kể cả khi gửi lệnh trực tiếp lên server)
+const DENIED = 'Bạn không có quyền thực hiện thao tác này'
 
 export function canManage(callerRole: Role, callerId: string, target: Target, action: Action, newRole?: Role): string | null {
   if (callerRole !== 'root' && callerRole !== 'admin') return 'Chỉ quản trị viên mới được quản lý người dùng'
@@ -16,12 +18,12 @@ export function canManage(callerRole: Role, callerId: string, target: Target, ac
 
   switch (action) {
     case 'create':
-      if (target.role === 'root') return 'Không thể tạo tài khoản root'
-      if (target.role === 'admin' && !isRoot) return 'Chỉ root được tạo admin'
+      if (target.role === 'root') return DENIED
+      if (target.role === 'admin' && !isRoot) return DENIED
       return null
     case 'change_role':
-      if (!isRoot) return 'Chỉ root được đổi vai trò'
-      if (target.role === 'root') return 'Không thể đổi vai trò của root'
+      if (!isRoot) return DENIED
+      if (target.role === 'root') return DENIED
       if (newRole !== 'admin' && newRole !== 'user') return 'Chỉ được đặt vai trò admin hoặc người dùng'
       return null
     case 'approve':
@@ -29,7 +31,7 @@ export function canManage(callerRole: Role, callerId: string, target: Target, ac
       return target.pending && target.role === 'user' ? null : 'Chỉ duyệt hoặc từ chối được tài khoản đang chờ duyệt'
     case 'set_active':
       if (target.pending) return 'Tài khoản đang chờ duyệt: hãy dùng Duyệt hoặc Từ chối'
-      if (target.role === 'root') return 'Không thể khóa hoặc mở khóa tài khoản root'
+      if (target.role === 'root') return DENIED
       return isRoot || target.role === 'user' ? null : ONLY_USER
     case 'view':
     case 'rename':

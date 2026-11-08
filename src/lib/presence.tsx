@@ -128,10 +128,12 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   const sent = useRef(false) // đã gửi nháp (để biết có cần gửi "xóa")
   const readyRef = useRef(false)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const who = useRef({ key: '', userId: '', username: '', fullName: '' })
+  const who = useRef({ key: '', userId: '', username: '', fullName: '', hidden: false })
   const uid = profile?.id
   const selfKey = uid ? `${uid}:${tabId}` : ''
-  useEffect(() => { who.current = { key: selfKey, userId: uid ?? '', username: profile?.username ?? '', fullName: profile?.full_name ?? '' } }, [selfKey, uid, profile?.username, profile?.full_name])
+  // Tài khoản cao nhất hoạt động ẩn: không track, không phát bản nháp → không ai thấy trong "Đang trực tuyến" (vẫn nhận để xem người khác). Giữ kín với mọi người dùng (08/11/2026).
+  const hidden = profile?.role === 'root'
+  useEffect(() => { who.current = { key: selfKey, userId: uid ?? '', username: profile?.username ?? '', fullName: profile?.full_name ?? '', hidden } }, [selfKey, uid, profile?.username, profile?.full_name, hidden])
 
   const report = useMemo(() => (owner: string, a: Activity) => {
     if (a) owners.current.set(owner, a); else owners.current.delete(owner)
@@ -142,7 +144,7 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
   const flush = useCallback(() => {
     timer.current = null
     const ch = chRef.current
-    if (!ch || !readyRef.current || !who.current.key) return
+    if (!ch || !readyRef.current || !who.current.key || who.current.hidden) return
     const body = [...myDrafts.current.values()].pop()
     if (!body && !sent.current) return
     sent.current = !!body
@@ -216,14 +218,14 @@ export function PresenceProvider({ children }: { children: ReactNode }) {
 
   const activityJson = JSON.stringify(activity)
   useEffect(() => {
-    if (!ready || !profile) return
+    if (!ready || !profile || hidden) return
     const t = setTimeout(() => {
       try {
         void Promise.resolve(chRef.current?.track({ userId: profile.id, username: profile.username, fullName: profile.full_name ?? '', page: pathname, avatarPath: profile.avatar_path ?? null, activity: JSON.parse(activityJson) })).catch(() => {})
       } catch { /* bỏ qua */ }
     }, DEBOUNCE_MS)
     return () => clearTimeout(t)
-  }, [ready, profile, pathname, activityJson])
+  }, [ready, profile, hidden, pathname, activityJson])
 
   const value = useMemo(() => ({ peers, selfKey, report, setDraft }), [peers, selfKey, report, setDraft])
   const draftList = useMemo(() => Object.values(drafts), [drafts])

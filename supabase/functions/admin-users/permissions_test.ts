@@ -70,6 +70,18 @@ Deno.test('approve/reject chỉ cho user đang chờ duyệt; set_active không 
 })
 
 Deno.test('thông điệp lỗi chính', () => {
-  assertEquals(canManage('admin', ME, { id: null, role: 'admin' }, 'create'), 'Chỉ root được tạo admin')
+  assertEquals(canManage('admin', ME, { id: null, role: 'admin' }, 'create'), 'Bạn không có quyền thực hiện thao tác này')
   assertEquals(canManage('admin', ME, { id: OTHER, role: 'admin' }, 'set_active'), 'Admin chỉ quản lý tài khoản người dùng')
+})
+
+// Giữ kín tài khoản cấp cao nhất: không thông điệp lỗi nào gửi tới admin được nhắc tới "root"
+Deno.test('thông điệp lỗi không nhắc tới root', () => {
+  const targets: Role[] = ['root', 'admin', 'user']
+  const actions: Action[] = ['view', 'create', 'rename', 'change_role', 'set_active', 'reset_password', 'approve', 'reject']
+  for (const t of targets) for (const a of actions) {
+    for (const pending of [false, true]) {
+      const msg = canManage('admin', ME, { id: OTHER, role: t, pending }, a, 'root')
+      if (msg !== null) assertEquals(/root/i.test(msg), false, `${t} ${a}: ${msg}`)
+    }
+  }
 })
