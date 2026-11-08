@@ -21,6 +21,8 @@ import AuditLogPage from './pages/AuditLogPage'
 import { ProfileProvider, useProfile } from './lib/useProfile'
 import { ROLE_LABEL } from './lib/auth'
 import Button from './components/ui/Button'
+import Avatar from './components/ui/Avatar'
+import AvatarDialog from './components/AvatarDialog'
 import { PresenceProvider } from './lib/presence'
 import { OnlineUsers } from './components/PresenceViews'
 
@@ -66,6 +68,7 @@ function LayoutBody({ email }: { email: string }) {
   useEditRequestNotices(profile?.id, isAdmin) // D-020: thông báo tức thì khi yêu cầu sửa được duyệt/từ chối
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [drawer, setDrawer] = useState(false) // ngăn kéo trên màn hình nhỏ
+  const [avatarOpen, setAvatarOpen] = useState(false)
   const showLabels = !collapsed || drawer // ngăn kéo luôn hiện nhãn
 
   useEffect(() => {
@@ -136,7 +139,14 @@ function LayoutBody({ email }: { email: string }) {
           </button>
           {showLabels && (
             <div className="flex items-center gap-2 px-2 py-1" data-testid="user-chip">
-              <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">{(displayName[0] ?? '?').toLocaleUpperCase('vi')}</span>
+              {profile
+                ? (
+                  <button type="button" onClick={() => setAvatarOpen(true)} title="Đổi ảnh đại diện" aria-label="Đổi ảnh đại diện" data-testid="avatar-button"
+                    className="shrink-0 rounded-full transition duration-150 hover:ring-2 hover:ring-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
+                    <Avatar name={displayName} path={profile.avatar_path} />
+                  </button>
+                )
+                : <Avatar name={displayName} />}
               <div className="min-w-0 leading-tight">
                 <p className="truncate text-sm text-slate-100" data-testid="user-name" title={displayName}>{displayName}</p>
                 {profile && <span className={`mt-0.5 inline-block rounded px-1.5 text-xs font-medium ${profile.role === 'root' ? 'bg-amber-400 font-bold text-slate-900' : 'bg-white/15 text-slate-200'}`} data-testid="user-role">{ROLE_LABEL[profile.role]}</span>}
@@ -153,6 +163,8 @@ function LayoutBody({ email }: { email: string }) {
         <IncompleteNotice />
         <Outlet />
       </main>
+
+      {avatarOpen && profile && <AvatarDialog userId={profile.id} name={displayName} path={profile.avatar_path} onClose={() => setAvatarOpen(false)} />}
     </div>
   )
 }

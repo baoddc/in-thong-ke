@@ -14,7 +14,9 @@ Object.assign(users[1], { approved_by_name: 'Quản Trị', approved_at: '2026-1
 Object.assign(users[2], { created_by_name: 'Bão Root' })
 const invoke = vi.fn()
 const me = { id: 'a1', role: 'admin', is_active: true }
-vi.mock('../lib/supabase', () => ({ supabase: { functions: { invoke: (n: string, o: unknown) => invoke(n, o) } } }))
+// profiles.select('id, avatar_path') (useAvatarPaths): chỉ bao.lt có ảnh
+const avatarQuery = { select: () => avatarQuery, not: () => avatarQuery, limit: () => Promise.resolve({ data: [{ id: 'u1', avatar_path: 'u1/1700000000000.webp' }], error: null }) }
+vi.mock('../lib/supabase', () => ({ supabase: { functions: { invoke: (n: string, o: unknown) => invoke(n, o) }, from: () => avatarQuery } }))
 vi.mock('../lib/useProfile', () => ({ useProfile: () => ({ profile: me, isAdmin: true, isRoot: me.role === 'root', loading: false, error: '' }) }))
 
 import UsersPage from './UsersPage'
@@ -50,6 +52,27 @@ describe('UsersPage', () => {
     expect(admin.getByText('30/10/2026 14:05')).toBeTruthy()
     expect(within(screen.getByTestId('user-row-quoc.lt')).getByText('Đã khóa')).toBeTruthy()
     expect(within(screen.getByTestId('user-row-bao.lt')).getByText('Chưa đăng nhập')).toBeTruthy()
+  })
+
+  it('ảnh đại diện: ai cũng thấy ảnh (chưa có thì chữ cái đầu), nhưng CHỈ chủ tài khoản bấm đổi được — admin/root cũng không đổi hộ người khác', async () => {
+    setup()
+    await screen.findByTestId('user-table')
+    await waitFor(() => expect(within(screen.getByTestId('user-row-bao.lt')).getByTestId('avatar-img')).toBeTruthy()) // thấy ảnh của người khác
+    expect(within(screen.getByTestId('user-row-quoc.lt')).getByTestId('avatar-initial').textContent).toBe('L')
+    for (const other of ['bao.lt', 'quoc.lt', 'root', 'duc.nv']) expect(screen.queryByTestId(`user-avatar-${other}`)).toBeNull() // không có nút đổi ảnh người khác
+    expect(off('user-avatar-admin')).toBe(false) // dòng của chính mình
+    await userEvent.click(screen.getByTestId('user-avatar-admin'))
+    const dialog = await screen.findByTestId('avatar-dialog')
+    expect(dialog.textContent).toContain('Quản Trị')
+  })
+
+  it('root cũng chỉ đổi được ảnh của chính mình', async () => {
+    asRoot()
+    setup()
+    await screen.findByTestId('user-table')
+    expect(screen.queryByTestId('user-avatar-bao.lt')).toBeNull()
+    expect(screen.queryByTestId('user-avatar-admin')).toBeNull()
+    expect(off('user-avatar-root')).toBe(false)
   })
 
   it('không cho tự khóa chính mình; người khác thì được', async () => {

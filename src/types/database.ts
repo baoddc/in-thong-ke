@@ -495,6 +495,7 @@ export type Database = {
           role: 'admin' | 'user' | 'root'
           is_active: boolean
           is_pending: boolean
+          avatar_path: string | null // T-099: <user_id>/<ms>.webp|jpg trong bucket 'avatars'
           created_by: string | null
           approved_by: string | null
           approved_at: string | null
@@ -508,6 +509,7 @@ export type Database = {
           role?: 'admin' | 'user' | 'root'
           is_active?: boolean
           is_pending?: boolean
+          avatar_path?: string | null
           created_by?: string | null
           approved_by?: string | null
           approved_at?: string | null
@@ -521,6 +523,7 @@ export type Database = {
           role?: 'admin' | 'user' | 'root'
           is_active?: boolean
           is_pending?: boolean
+          avatar_path?: string | null
           created_by?: string | null
           approved_by?: string | null
           approved_at?: string | null
@@ -774,6 +777,10 @@ export type Database = {
       next_tk_number: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      set_avatar: {
+        Args: { p_path: string | null }
+        Returns: undefined
       }
       reserve_tk_number: {
         Args: Record<PropertyKey, never>

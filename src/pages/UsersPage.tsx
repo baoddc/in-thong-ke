@@ -3,7 +3,10 @@ import { formatDateTime } from '../lib/format'
 import { ROLE_LABEL, userActions, type Role } from '../lib/auth'
 import { callAdmin, countPending, messageOf, useAdminUsers, type AdminUser } from '../lib/useAdminUsers'
 import { useProfile } from '../lib/useProfile'
+import { useAvatarPaths } from '../lib/useAvatarPaths'
 import { CreateUserModal, CredentialsDialog, EditUserModal, ResetPasswordModal } from '../components/UserModals'
+import AvatarDialog from '../components/AvatarDialog'
+import Avatar from '../components/ui/Avatar'
 import Button from '../components/ui/Button'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import DataTable, { type Column } from '../components/ui/DataTable'
@@ -14,6 +17,7 @@ import { useToast } from '../components/ui/Toast'
 type Dialog =
   | { kind: 'create' }
   | { kind: 'edit'; user: AdminUser }
+  | { kind: 'avatar'; user: AdminUser }
   | { kind: 'reset'; user: AdminUser }
   | { kind: 'toggle'; user: AdminUser; busy: boolean }
   | { kind: 'reject'; user: AdminUser; busy: boolean }
@@ -38,6 +42,7 @@ export default function UsersPage() {
   const toast = useToast()
   const { profile, isRoot } = useProfile()
   const { users, loading, error, reload } = useAdminUsers()
+  const { paths: avatars, reload: reloadAvatars } = useAvatarPaths()
   const [dialog, setDialog] = useState<Dialog | null>(null)
   const [onlyPending, setOnlyPending] = useState(false)
   const [approving, setApproving] = useState<string | null>(null)
@@ -85,7 +90,23 @@ export default function UsersPage() {
   }
 
   const columns: Column<AdminUser>[] = [
-    { key: 'name', header: 'Họ tên', render: (u) => u.full_name },
+    {
+      key: 'name', header: 'Họ tên',
+      // Ảnh đại diện chỉ chủ tài khoản được đổi (kể cả admin/root cũng không): chỉ dòng của chính mình bấm được
+      render: (u) => (
+        <span className="inline-flex items-center gap-2">
+          {u.id === profile?.id
+            ? (
+              <button type="button" onClick={() => setDialog({ kind: 'avatar', user: u })} data-testid={`user-avatar-${u.username}`} title="Đổi ảnh đại diện của bạn" aria-label="Đổi ảnh đại diện của bạn"
+                className="shrink-0 rounded-full transition duration-150 hover:ring-2 hover:ring-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                <Avatar name={u.full_name} path={avatars[u.id]} />
+              </button>
+            )
+            : <Avatar name={u.full_name} path={avatars[u.id]} />}
+          {u.full_name}
+        </span>
+      ),
+    },
     { key: 'username', header: 'Tên đăng nhập', nowrap: true, render: (u) => u.username },
     { key: 'role', header: 'Vai trò', render: (u) => <span className={`${pill} ${ROLE_PILL[u.role]}`}>{ROLE_LABEL[u.role]}</span> },
     { key: 'status', header: 'Trạng thái', render: statusPill },
@@ -144,6 +165,9 @@ export default function UsersPage() {
       {dialog?.kind === 'edit' && (
         <EditUserModal user={dialog.user} showRole={isRoot} canChangeRole={userActions(profile, dialog.user).changeRole} onClose={close}
           onSaved={() => { toast.success(`Đã cập nhật ${dialog.user.username}`); close(); void reload() }} />
+      )}
+      {dialog?.kind === 'avatar' && (
+        <AvatarDialog userId={dialog.user.id} name={dialog.user.full_name} path={avatars[dialog.user.id] ?? null} onClose={close} onChanged={reloadAvatars} />
       )}
       {dialog?.kind === 'reset' && (
         <ResetPasswordModal user={dialog.user} onClose={close}
