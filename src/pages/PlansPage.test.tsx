@@ -18,6 +18,10 @@ const offsets = () => rpcCalls.map((a) => a.p_offset)
 let total: number | undefined
 let weightRpc: { data: unknown; error: { message: string } | null } = { data: 246043357.56, error: null }
 let deleteData: unknown[] | null = null // kết quả `.delete().select()`; null: trả về phiếu (xóa được)
+let deleteError: { code: string } | null = null // lỗi của `.delete()` (23503: phiếu còn dòng bảng kiểm)
+let lineCount: number | null = null // số dòng bảng kiểm của phiếu (đếm khi xóa lỗi 23503)
+const navigateSpy = vi.fn()
+vi.mock('react-router-dom', async (orig) => ({ ...(await orig<typeof import('react-router-dom')>()), useNavigate: () => navigateSpy }))
 let editRows: unknown[] = [] // edit_requests của mình (D-019)
 const editRpc: [string, unknown][] = [] // lời gọi request_plan_edit
 const rpcLog: [string, unknown][] = [] // lời gọi reserve/release/create (dòng nhập, D-023)
@@ -29,7 +33,12 @@ let rpcFail = false // create_transport_plan trả lỗi
 // Mọi chuỗi gọi trả về chính nó và có thể await; ghi lại lời gọi để kiểm tra truy vấn phân trang.
 vi.mock('../lib/supabase', () => {
   const chain = (t: string, data: unknown) => {
-    const c: Record<string, unknown> = { then: (r: (v: unknown) => unknown) => r({ data: t === 'transport_plans' && deleteData && calls.some((x) => x[0] === 'delete') ? deleteData : data, error: null, count: t === 'transport_plans' ? total : undefined }) }
+    const c: Record<string, unknown> = {
+      then: (r: (v: unknown) => unknown) => {
+        const deleted = t === 'transport_plans' && calls.some((x) => x[0] === 'delete') // tính lúc await (sau khi delete được gọi)
+        return r({ data: deleted && deleteData ? deleteData : data, error: deleted ? deleteError : null, count: t === 'transport_plans' ? total : t === 'inspection_details' ? lineCount : undefined })
+      },
+    }
     for (const m of ['select', 'order', 'limit', 'range', 'eq', 'in', 'or', 'gte', 'lte', 'lt', 'delete']) c[m] = (...a: unknown[]) => { if (t === 'transport_plans') calls.push([m, ...a]); return c }
     return c
   }
@@ -59,7 +68,7 @@ beforeAll(() => {
 })
 const realMatchMedia = window.matchMedia
 const narrow = () => { window.matchMedia = ((q: string) => ({ matches: true, media: q })) as unknown as typeof window.matchMedia } // < md: Thêm mở modal
-beforeEach(() => { tracks.length = 0; rpcLog.length = 0; rpcFail = false; editRows = []; editRpc.length = 0; Object.assign(me, { id: 'a1', role: 'admin' }); Object.assign(plan, { created_by: null, created_at: '2026-10-01T00:00:00Z' }); deleteData = null; localStorage.clear(); clearListCache(); calls.length = 0; rpcCalls.length = 0; countCalls.length = 0; countError = false; total = undefined; weightRpc = { data: 246043357.56, error: null } })
+beforeEach(() => { deleteError = null; lineCount = null; navigateSpy.mockClear(); tracks.length = 0; rpcLog.length = 0; rpcFail = false; editRows = []; editRpc.length = 0; Object.assign(me, { id: 'a1', role: 'admin' }); Object.assign(plan, { created_by: null, created_at: '2026-10-01T00:00:00Z' }); deleteData = null; localStorage.clear(); clearListCache(); calls.length = 0; rpcCalls.length = 0; countCalls.length = 0; countError = false; total = undefined; weightRpc = { data: 246043357.56, error: null } })
 afterEach(() => { cleanup(); window.matchMedia = realMatchMedia })
 
 describe('PlansPage', () => {
@@ -281,6 +290,27 @@ describe('PlansPage', () => {
     expect(calls).toContainEqual(['delete'])
   })
 
+  it('xóa phiếu còn dòng bảng kiểm (lỗi 23503): báo số dòng và chuyển thẳng sang Bảng kiểm đã lọc theo số TK, không lọc ngày', async () => {
+    deleteError = { code: '23503' }
+    lineCount = 3
+    renderPage()
+    await userEvent.click(await screen.findByTestId('delete-TK0001'))
+    await userEvent.click(screen.getByTestId('confirm-ok'))
+    expect((await screen.findByTestId('toast-error')).textContent).toContain('còn 3 dòng bảng kiểm')
+    expect(navigateSpy).toHaveBeenCalledWith('/bang-kiem?q=TK0001&from=&to=')
+    expect(screen.queryByTestId('toast-success')).toBeNull()
+  })
+
+  it('lỗi ràng buộc nhưng không có dòng bảng kiểm nào (do bảng khác): giữ thông báo lỗi cũ, không chuyển trang', async () => {
+    deleteError = { code: '23503' }
+    lineCount = 0
+    renderPage()
+    await userEvent.click(await screen.findByTestId('delete-TK0001'))
+    await userEvent.click(screen.getByTestId('confirm-ok'))
+    expect((await screen.findByTestId('toast-error')).textContent).toContain('đang được dùng')
+    expect(navigateSpy).not.toHaveBeenCalled()
+  })
+
   it('user không phải người tạo: Xóa bị khóa kèm giải thích, Sửa mở modal chỉ xem (không có nút Lưu)', async () => {
     Object.assign(me, { id: 'u2', role: 'user' })
     Object.assign(plan, { created_by: 'u1', created_at: new Date().toISOString() })
@@ -413,19 +443,19 @@ describe('PlansPage', () => {
       expect(document.activeElement).toBe(screen.getByTestId('inline-transport-type'))
     })
 
-    it('Enter lưu bằng create_transport_plan như modal; dòng nhập reset và giữ số TK mới', async () => {
+    it('Enter lưu bằng create_transport_plan như modal; lưu xong dòng nhập đóng lại, không tự mở dòng mới (không giữ thêm số TK)', async () => {
       renderPage()
       await userEvent.click(await screen.findByTestId('add-plan'))
       await waitFor(() => expect((screen.getByTestId('inline-tk-number') as HTMLInputElement).value).toBe('TK0002'))
       await userEvent.type(screen.getByTestId('inline-order-no'), 'L9{Enter}')
       expect((await screen.findByTestId('toast-success')).textContent).toContain('Đã lưu phiếu TK0002')
       expect(rpcOf('create_transport_plan')[0][1]).toMatchObject({ p_transport_order_no: 'L9', p_material_exporter_ids: [], p_note: null })
-      expect((screen.getByTestId('inline-order-no') as HTMLInputElement).value).toBe('')
-      await waitFor(() => expect(rpcOf('reserve_tk_number')).toHaveLength(2)) // giữ số mới cho dòng kế
+      await waitFor(() => expect(screen.queryByTestId('plan-inline-row')).toBeNull())
+      expect(rpcOf('reserve_tk_number')).toHaveLength(1) // không giữ số TK mới cho dòng kế
       expect(rpcOf('release_tk_reservation')).toHaveLength(0) // máy chủ đã xóa chỗ giữ khi lưu
     })
 
-    it('nút "Lưu phiếu" trên header gọi create_transport_plan như Enter; "Hủy" đóng dòng và release; ẩn khi không có dòng nhập', async () => {
+    it('nút "Lưu phiếu" trên header gọi create_transport_plan như Enter, lưu xong đóng dòng; "Hủy" đóng dòng và release; ẩn khi không có dòng nhập', async () => {
       renderPage()
       await screen.findByTestId('add-plan')
       expect(screen.queryByTestId('header-save')).toBeNull()
@@ -435,10 +465,14 @@ describe('PlansPage', () => {
       await userEvent.click(screen.getByTestId('header-save'))
       expect((await screen.findByTestId('toast-success')).textContent).toContain('Đã lưu phiếu TK0002')
       expect(rpcOf('create_transport_plan')[0][1]).toMatchObject({ p_transport_order_no: 'L9' })
+      await waitFor(() => expect(screen.queryByTestId('plan-inline-row')).toBeNull()) // lưu xong dòng đóng, không tự mở dòng mới
+      expect(screen.queryByTestId('header-save')).toBeNull()
+      expect(rpcOf('reserve_tk_number')).toHaveLength(1)
+      // mở lại rồi "Hủy": release số đang giữ
+      await userEvent.click(screen.getByTestId('add-plan'))
       await waitFor(() => expect(rpcOf('reserve_tk_number')).toHaveLength(2))
       await userEvent.click(screen.getByTestId('header-cancel')) // dòng mới chưa gõ → không confirm
       expect(screen.queryByTestId('plan-inline-row')).toBeNull()
-      expect(screen.queryByTestId('header-save')).toBeNull()
       expect(rpcOf('release_tk_reservation')).toHaveLength(1)
     })
 

@@ -219,8 +219,8 @@ export default function InspectionPage() {
         topRow={inline && newRows.map(({ key, seed, ctl, nextSeed }) => (
           <InspectionInlineRow key={key} seed={seed} columnKeys={columns.map((c) => c.key)} lookups={lookups} controlsRef={ctl} nextSeedRef={nextSeed} onBusy={newRows.length === 1 ? setInlineBusy : undefined}
             onAddRow={(from) => addRows(1, from)} onCancel={() => setNewRows((rs) => rs.filter((r) => r.key !== key))}
-            // nhiều dòng: dòng đã lưu thì biến khỏi danh sách nhập (đã hiện trong bảng); còn đúng một dòng thì giữ lại để nhập tiếp như trước
-            onSaved={(msg) => { toast.success(msg); void reload(); setNewRows((rs) => (rs.length > 1 ? rs.filter((r) => r.key !== key) : rs)) }} />
+            // lưu xong thì dòng nhập đóng lại (đã hiện trong bảng), không tự mở dòng mới; muốn thêm thì bấm "Thêm dòng" / "+"
+            onSaved={(msg) => { toast.success(msg); void reload(); setNewRows((rs) => rs.filter((r) => r.key !== key)) }} />
         ))}
         empty={filtered ? (
           <EmptyState title="Không có dòng nào khớp bộ lọc." hint="Thử đổi từ khóa, khoảng ngày hoặc bộ lọc.">

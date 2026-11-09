@@ -118,6 +118,6 @@ export default function InspectionInlineRow({ columnKeys, lookups, onSaved, onCa
       extraActions={onAddRow && !editing && (
         <IconButton icon="plus" label="Thêm dòng bên dưới (giữ số phiếu, ngày, công trình… của dòng này)" disabled={f.busy} onClick={() => onAddRow(f.nextForm())} data-testid="inspection-inline-row-add" />
       )}
-      error={f.error || lookupError} onSave={() => f.save(!editing)} onCancel={onCancel} />
+      error={f.error || lookupError} onSave={() => f.save(false)} onCancel={onCancel} />
   )
 }

@@ -171,17 +171,15 @@ describe('InspectionPage', () => {
       expect(field('inline-export-date').value).toBe('02/10/2026')
     })
 
-    it('Enter lưu bằng insert như modal; sau lưu dòng nhập xóa mặt hàng/số lượng nhưng giữ số TK', async () => {
+    it('Enter lưu bằng insert như modal; lưu xong dòng nhập đóng lại, không tự mở dòng mới', async () => {
       await open()
       await pickTk()
       await waitFor(() => expect(field('inline-quantity').disabled).toBe(false))
       await userEvent.type(field('inline-quantity'), '2{Enter}')
       expect((await screen.findByTestId('toast-success')).textContent).toContain('Đã lưu dòng')
       expect(h.inserted[0]).toMatchObject({ plan_id: 3, export_date: '2026-10-02', quantity: 2, delivery_unit_id: 5 })
-      expect(field('inline-quantity').value).toBe('')
-      expect(field('inline-tk').value).toBe('TK0003')
-      expect(field('inline-quantity').disabled).toBe(false)
-      expect(screen.getByTestId('inspection-inline-row')).not.toBeNull()
+      await waitFor(() => expect(screen.queryByTestId('inspection-inline-row')).toBeNull())
+      expect(screen.queryByTestId('header-save')).toBeNull()
     })
 
     it('chưa chọn số TK mà Enter → báo lỗi dưới dòng, không insert', async () => {
@@ -197,7 +195,7 @@ describe('InspectionPage', () => {
       expect(screen.queryByTestId('inspection-inline-row')).toBeNull()
     })
 
-    it('nút "Lưu dòng" trên header insert như Enter; "Hủy" đóng dòng; ẩn khi không có dòng nhập', async () => {
+    it('nút "Lưu dòng" trên header insert như Enter, lưu xong đóng dòng; "Hủy" đóng dòng; ẩn khi không có dòng nhập', async () => {
       renderPage()
       await screen.findByTestId('add-inspection')
       expect(screen.queryByTestId('header-save')).toBeNull()
@@ -209,6 +207,11 @@ describe('InspectionPage', () => {
       await userEvent.click(screen.getByTestId('header-save'))
       expect((await screen.findByTestId('toast-success')).textContent).toContain('Đã lưu dòng')
       expect(h.inserted[0]).toMatchObject({ plan_id: 3, quantity: 2 })
+      await waitFor(() => expect(screen.queryByTestId('inspection-inline-row')).toBeNull()) // lưu xong đóng, không tự mở dòng mới
+      expect(screen.queryByTestId('header-save')).toBeNull()
+      // mở lại, gõ dở rồi "Hủy": hỏi xác nhận trước khi bỏ
+      await userEvent.click(screen.getByTestId('add-inspection'))
+      await pickTk()
       vi.spyOn(window, 'confirm').mockReturnValue(true)
       await userEvent.click(screen.getByTestId('header-cancel'))
       expect(screen.queryByTestId('inspection-inline-row')).toBeNull()
@@ -251,15 +254,15 @@ describe('InspectionPage', () => {
         expect(screen.getByTestId('header-save').textContent).toBe('Lưu tất cả (2)')
       })
 
-      it('"Lưu tất cả" lưu lần lượt từ trên xuống; dòng đã lưu biến khỏi danh sách nhập, còn lại một dòng để nhập tiếp', async () => {
+      it('"Lưu tất cả" lưu lần lượt từ trên xuống; dòng đã lưu biến khỏi danh sách nhập, lưu hết thì không còn dòng nhập nào (không tự mở dòng mới)', async () => {
         await firstRowThenAdd('2')
         await userEvent.type(cell(1, 'inline-quantity'), '3')
         await userEvent.click(screen.getByTestId('header-save'))
         await waitFor(() => expect(h.inserted).toHaveLength(2))
         expect(h.inserted.map((p) => p.quantity)).toEqual([2, 3]) // đúng thứ tự trên màn hình
         expect(h.inserted.every((p) => p.plan_id === 3)).toBe(true)
-        await waitFor(() => expect(rows()).toHaveLength(1))
-        expect(screen.getByTestId('header-save').textContent).toBe('Lưu dòng')
+        await waitFor(() => expect(screen.queryByTestId('inspection-inline-row')).toBeNull())
+        expect(screen.queryByTestId('header-save')).toBeNull()
       })
 
       it('dòng đầu thiếu số phiếu: "Lưu tất cả" dừng ngay ở dòng đó, báo lỗi, không lưu dòng nào', async () => {

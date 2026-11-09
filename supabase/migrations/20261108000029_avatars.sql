@@ -29,6 +29,9 @@ create policy avatars_delete on storage.objects for delete to authenticated
          and (storage.foldername(name))[1] = (select auth.uid())::text);
 
 -- ---------- 4. Gắn ảnh vào hồ sơ của CHÍNH MÌNH (profiles không cho ghi trực tiếp nên đi qua hàm này; p_path = null: gỡ ảnh) ----------
+-- Bản đầu có tham số "đổi cho ai" (p_user) cho admin đổi ảnh người khác: BỎ (quy tắc chốt 08/11/2026: chỉ chủ tài khoản). create or replace không xóa hàm khác tham số nên phải drop.
+drop function if exists public.set_avatar(uuid, text);
+
 create or replace function public.set_avatar(p_path text)
 returns void language plpgsql security definer set search_path = ''
 as $$
@@ -54,6 +57,7 @@ begin
   assert exists (select 1 from storage.buckets where id = 'avatars' and public and file_size_limit = 204800), 'thiếu bucket avatars';
   assert (select count(*) from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname in ('avatars_select', 'avatars_insert', 'avatars_delete')) = 3, 'thiếu policy avatars';
   assert not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname in ('avatars_insert', 'avatars_delete') and (qual ilike '%is_admin%' or with_check ilike '%is_admin%')), 'policy avatars không được cho admin can thiệp';
+  assert (select count(*) from pg_proc where proname = 'set_avatar' and pronamespace = 'public'::regnamespace) = 1, 'chỉ được có một hàm set_avatar (chỉ chủ tài khoản)';
   assert has_function_privilege('authenticated', 'public.set_avatar(text)', 'execute')
      and not has_function_privilege('anon', 'public.set_avatar(text)', 'execute'), 'quyền gọi set_avatar sai';
 end $$;

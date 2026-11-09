@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { errorMessage, formatDate, formatNumber } from '../lib/format'
 import { useLookups } from '../lib/useLookups'
@@ -71,6 +71,7 @@ function StatCard({ label, value, testId, error, icon, tone, className = '' }: {
 export default function PlansPage() {
   const lookups = useLookups()
   const toast = useToast()
+  const navigate = useNavigate()
   const stats = useMonthStats()
   const { profile } = useProfile()
   const mine = useMyEditRequests(profile?.id)
@@ -85,7 +86,7 @@ export default function PlansPage() {
   const [deleting, setDeleting] = useState<{ plan: PlanRow; busy: boolean } | null>(null)
   const [requesting, setRequesting] = useState<PlanRow | null>(null)
 
-  const [inlineKey, setInlineKey] = useState<number | null>(null) // dòng nhập trên bảng (D-023); null: đóng, số đổi sau mỗi lần lưu để dòng mới giữ số TK mới
+  const [inlineKey, setInlineKey] = useState<number | null>(null) // dòng nhập trên bảng (D-023); null: đóng. Lưu xong thì đóng, không tự mở dòng mới
   // ≥ md: thêm bằng dòng nhập đầu bảng; điện thoại: modal như cũ. Dòng nhập dở được giữ nguyên khi đổi trang/lọc/sắp xếp.
   const inlineCtl = useRef<InlineControls | null>(null) // nút Lưu/Hủy trên PageHeader gọi đúng hành động của dòng nhập
   const [inlineBusy, setInlineBusy] = useState(false)
@@ -114,7 +115,15 @@ export default function PlansPage() {
     setDeleting({ ...deleting, busy: true })
     const { data, error } = await supabase.from('transport_plans').delete().eq('id', deleting.plan.id).select('id')
     const tk = deleting.plan.tk_number
+    const planId = deleting.plan.id
     setDeleting(null)
+    if (error?.code === '23503') { // phiếu còn dòng bảng kiểm: chuyển thẳng sang các dòng đó để xóa trước
+      const { count } = await supabase.from('inspection_details').select('id', { count: 'exact', head: true }).eq('plan_id', planId)
+      if (count) {
+        toast.error(`Phiếu ${tk} còn ${count} dòng bảng kiểm nên chưa xóa được. Đã chuyển sang Bảng kiểm: hãy xóa các dòng đó trước, rồi quay lại xóa phiếu.`)
+        return navigate(`/bang-kiem?${new URLSearchParams({ q: tk, from: '', to: '' })}`) // from/to rỗng: không lọc theo ngày hôm nay
+      }
+    }
     if (error) return toast.error(errorMessage(error))
     if (!data?.length) return toast.error(`Bạn không có quyền xóa phiếu ${tk}. ${EDIT_DENIED_HINT}.`) // RLS chặn: 0 dòng bị xóa
     toast.success(`Đã xóa phiếu ${tk}`)
@@ -212,7 +221,7 @@ export default function PlansPage() {
         topRow={inlineKey !== null && (
           <PlanInlineRow key={inlineKey} columnKeys={columns.map((c) => c.key)} lookups={lookups} controlsRef={inlineCtl} onBusy={setInlineBusy} onCancel={() => setInlineKey(null)}
             onExpired={(msg) => { setInlineKey(null); toast.error(msg) }}
-            onSaved={(msg) => { setInlineKey((k) => (k ?? 0) + 1); toast.success(msg); void reload(); void stats.reload() }} />
+            onSaved={(msg) => { setInlineKey(null); toast.success(msg); void reload(); void stats.reload() }} />
         )}
         empty={filtered ? (
           <EmptyState title="Không có phiếu nào khớp bộ lọc." hint="Thử đổi từ khóa hoặc khoảng ngày.">
