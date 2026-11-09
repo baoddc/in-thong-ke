@@ -1,4 +1,4 @@
-import { useEffect, type MutableRefObject, type ReactNode } from 'react'
+import { useEffect, type KeyboardEvent, type MutableRefObject, type ReactNode } from 'react'
 import Button, { IconButton } from './Button'
 
 /** Hành động của dòng nhập, trang gọi từ nút trên PageHeader (cùng validate/confirm như Enter/Esc). */
@@ -20,6 +20,20 @@ type Props = {
   testId: string
   cellTitle?: (key: string) => string | undefined
   onFocusCell?: (key: string) => void // ô đang đứng (D-025: người khác thấy khung ô)
+}
+
+/** ← → sang ô nhập kế bên khi con trỏ đã ở mép chữ (còn chữ để lướt thì giữ hành vi thường). */
+function moveCell(e: KeyboardEvent<HTMLElement>) {
+  const el = e.target
+  if (!(el instanceof HTMLInputElement) || el.selectionStart === null) return // không phải ô chữ (vd ô ngày dạng chọn)
+  const left = e.key === 'ArrowLeft'
+  if (el.selectionStart !== el.selectionEnd || (left ? el.selectionStart !== 0 : el.selectionEnd !== el.value.length)) return
+  const inputs = [...e.currentTarget.querySelectorAll<HTMLInputElement>('input:not([disabled]):not([readonly])')].filter((i) => i.tabIndex >= 0)
+  const next = inputs[inputs.indexOf(el) + (left ? -1 : 1)]
+  if (!next) return
+  e.preventDefault()
+  next.focus()
+  next.select()
 }
 
 /** Dòng nhập đầu bảng kiểu Google Sheets: Tab đổi ô, Enter lưu, Esc hủy (khi danh sách gợi ý đang mở thì Enter/Esc thuộc về ô đó). */
@@ -46,6 +60,7 @@ export default function InlineEntryRow({ columnKeys, cells, error, busy, dirty, 
           if (e.defaultPrevented) return // ô gợi ý đang mở đã xử lý phím này
           if (e.key === 'Enter' && !(e.target as HTMLElement).closest('button')) { e.preventDefault(); if (!busy) onSave() }
           else if (e.key === 'Escape') { e.preventDefault(); cancel() }
+          else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.shiftKey && !e.ctrlKey && !e.altKey) moveCell(e)
         }}>
         {columnKeys.map((k, i) => (
           <td key={k} title={cellTitle?.(k)} onFocus={() => onFocusCell?.(k)} className={`px-2 py-1.5 align-top ${i === 0 ? 'sticky left-0 bg-inherit' : ''} ${k === 'actions' ? 'whitespace-nowrap' : 'min-w-[9rem]'}`}>

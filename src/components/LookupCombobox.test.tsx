@@ -41,6 +41,16 @@ describe('LookupCombobox', () => {
     expect(input.value).toBe('Đặng Văn Bảyx')
   })
 
+  it('Tab chọn mục đầu của gợi ý; không có gợi ý (chỉ "Thêm") thì không tạo mới', async () => {
+    render(<Host />)
+    const input = screen.getByRole('combobox') as HTMLInputElement
+    await userEvent.type(input, 'van{Tab}')
+    expect(input.value).toBe('Nguyễn Văn Sáu')
+    await userEvent.clear(input)
+    await userEvent.type(input, 'zzz{Tab}')
+    expect(input.value).toBe('zzz')
+  })
+
   it('chọn nhiều: thêm chip, xóa chữ, ẩn mục đã chọn; bấm × để bỏ', async () => {
     render(<Host multiple />)
     const input = screen.getByRole('combobox') as HTMLInputElement

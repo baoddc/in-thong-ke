@@ -121,6 +121,8 @@ export default function LookupCombobox({ label, kind, items: rawItems = [], serv
     } else if (e.key === 'Enter' && open) {
       e.preventDefault() // không gửi form khi đang chọn
       if (cur >= 0) pick(cur)
+    } else if (e.key === 'Tab' && open && cur >= 0 && cur < opts.length) {
+      choose(opts[cur]) // Tab chọn mục đang sáng (mặc định mục đầu) rồi sang ô kế; không tạo mục mới bằng Tab
     } else if (e.key === 'Escape') {
       if (open) e.preventDefault() // Esc chỉ đóng danh sách gợi ý, không đóng modal chứa nó
       setOpen(false)
