@@ -1,5 +1,7 @@
 import { Fragment } from 'react'
 import { badgeTone, initials } from '../../lib/badgeColor'
+import { useAvatarByName } from '../../lib/useAvatarByName'
+import Avatar from './Avatar'
 
 /** Nhãn màu; màu ổn định theo nội dung (cùng tên → cùng màu). Không có nội dung thì không hiện gì. */
 export function Badge({ name }: { name: string | null | undefined }) {
@@ -9,11 +11,14 @@ export function Badge({ name }: { name: string | null | undefined }) {
 
 /** Người: ô tròn chữ cái đầu + tên. Chữ cái đầu vẽ bằng CSS (data-initials) nên không lẫn vào nội dung văn bản. */
 export function PersonChip({ name }: { name: string | null | undefined }) {
+  const path = useAvatarByName(name ?? '')
   if (!name) return null
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-      <span aria-hidden="true" data-initials={initials(name)}
-        className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ring-1 ring-inset before:content-[attr(data-initials)] ${badgeTone(name)}`} />
+      {path
+        ? <Avatar name={name} path={path} className="h-6 w-6 text-[11px]" />
+        : <span aria-hidden="true" data-initials={initials(name)}
+            className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ring-1 ring-inset before:content-[attr(data-initials)] ${badgeTone(name)}`} />}
       {name}
     </span>
   )

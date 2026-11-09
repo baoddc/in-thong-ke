@@ -700,6 +700,10 @@ export type Database = {
         }
         Returns: number
       }
+      get_avatar_paths: {
+        Args: Record<string, never>
+        Returns: { full_name: string; avatar_path: string }[]
+      }
       get_user_names: {
         Args: { p_ids: string[] }
         Returns: { id: string; full_name: string; username: string }[]
