@@ -2,7 +2,8 @@ import { useEffect, type MutableRefObject, type ReactNode } from 'react'
 import Button, { IconButton } from './Button'
 
 /** Hành động của dòng nhập, trang gọi từ nút trên PageHeader (cùng validate/confirm như Enter/Esc). */
-export type InlineControls = { save: () => void; cancel: () => boolean } // cancel: true = đã đóng (người dùng đồng ý bỏ / không có gì để bỏ)
+// save: true = đã lưu xong (chỉ dòng có `onSave` trả kết quả — Bảng kiểm; dòng khác luôn false). cancel: true = đã đóng (người dùng đồng ý bỏ / không có gì để bỏ)
+export type InlineControls = { save: () => Promise<boolean>; cancel: () => boolean }
 
 type Props = {
   saveLabel: string // "Lưu phiếu" / "Lưu dòng"
@@ -13,15 +14,16 @@ type Props = {
   error: string
   busy: boolean
   dirty: boolean
-  onSave: () => void
+  onSave: () => void | Promise<boolean | void>
   onCancel: () => void
+  extraActions?: ReactNode // nút thêm cạnh Lưu/Hủy trong ô Thao tác (vd "+ thêm dòng bên dưới")
   testId: string
   cellTitle?: (key: string) => string | undefined
   onFocusCell?: (key: string) => void // ô đang đứng (D-025: người khác thấy khung ô)
 }
 
 /** Dòng nhập đầu bảng kiểu Google Sheets: Tab đổi ô, Enter lưu, Esc hủy (khi danh sách gợi ý đang mở thì Enter/Esc thuộc về ô đó). */
-export default function InlineEntryRow({ columnKeys, cells, error, busy, dirty, onSave, onCancel, testId, cellTitle, onFocusCell, saveLabel, controlsRef, onBusy }: Props) {
+export default function InlineEntryRow({ columnKeys, cells, error, busy, dirty, onSave, onCancel, testId, cellTitle, onFocusCell, saveLabel, controlsRef, onBusy, extraActions }: Props) {
   function cancel() {
     if (busy) return false
     if (dirty && !window.confirm('Bỏ các thay đổi chưa lưu?')) return false
@@ -29,7 +31,7 @@ export default function InlineEntryRow({ columnKeys, cells, error, busy, dirty, 
     return true
   }
   useEffect(() => {
-    if (controlsRef) controlsRef.current = { save: () => { if (!busy) onSave() }, cancel }
+    if (controlsRef) controlsRef.current = { save: async () => (busy ? false : (await onSave()) === true), cancel }
   })
   useEffect(() => {
     onBusy?.(busy)
@@ -51,6 +53,7 @@ export default function InlineEntryRow({ columnKeys, cells, error, busy, dirty, 
               <span className="inline-flex items-center gap-0.5">
                 <Button variant="primary" size="sm" disabled={busy} onClick={onSave} data-testid={`${testId}-save`}>{saveLabel}</Button>
                 <IconButton icon="close" label="Hủy dòng" disabled={busy} onClick={cancel} data-testid={`${testId}-cancel`} />
+                {extraActions}
               </span>
             ) : cells[k]}
           </td>

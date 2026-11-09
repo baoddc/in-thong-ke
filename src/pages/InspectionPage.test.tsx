@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -213,6 +213,85 @@ describe('InspectionPage', () => {
       await userEvent.click(screen.getByTestId('header-cancel'))
       expect(screen.queryByTestId('inspection-inline-row')).toBeNull()
       expect(screen.queryByTestId('header-save')).toBeNull()
+    })
+
+    describe('thêm nhiều dòng cùng lúc', () => {
+      const rows = () => screen.getAllByTestId('inspection-inline-row')
+      const cell = (i: number, id: string) => within(rows()[i]).getByTestId(id) as HTMLInputElement
+      const addBelow = async () => userEvent.click(screen.getAllByTestId('inspection-inline-row-add')[0])
+      // dòng đầu: chọn số TK + nhập số lượng, rồi bấm "+" để thêm dòng bên dưới
+      const firstRowThenAdd = async (qty: string) => {
+        await open()
+        await pickTk()
+        await waitFor(() => expect(field('inline-quantity').disabled).toBe(false))
+        await userEvent.type(field('inline-quantity'), qty)
+        await addBelow()
+      }
+
+      it('"+" thêm dòng nhập mới bên dưới, điền sẵn số phiếu/ngày, trống mặt hàng/số lượng, nhảy tới ô Mặt hàng; header thành "Lưu tất cả (2)"', async () => {
+        await firstRowThenAdd('2')
+        expect(rows()).toHaveLength(2)
+        expect(cell(1, 'inline-tk').value).toBe('TK0003')
+        expect(cell(1, 'inline-quantity').value).toBe('') // số lượng của dòng trước không chép sang
+        expect(cell(1, 'inline-quantity').disabled).toBe(false)
+        expect(cell(0, 'inline-quantity').value).toBe('2') // dòng trước giữ nguyên
+        await waitFor(() => expect(document.activeElement).toBe(cell(1, 'inline-product')))
+        expect(screen.getByTestId('header-save').textContent).toBe('Lưu tất cả (2)')
+        expect(screen.getByTestId('header-cancel').textContent).toBe('Hủy tất cả')
+      })
+
+      it('bấm "Thêm dòng" khi đang mở dòng nhập thì thêm tiếp một dòng (điền sẵn số phiếu của dòng cuối), không cần lưu dòng trước', async () => {
+        await open()
+        await pickTk()
+        await waitFor(() => expect(field('inline-quantity').disabled).toBe(false))
+        await userEvent.click(screen.getByTestId('add-inspection'))
+        expect(rows()).toHaveLength(2)
+        expect(cell(1, 'inline-tk').value).toBe('TK0003')
+        expect(cell(1, 'inline-quantity').value).toBe('')
+        expect(screen.getByTestId('header-save').textContent).toBe('Lưu tất cả (2)')
+      })
+
+      it('"Lưu tất cả" lưu lần lượt từ trên xuống; dòng đã lưu biến khỏi danh sách nhập, còn lại một dòng để nhập tiếp', async () => {
+        await firstRowThenAdd('2')
+        await userEvent.type(cell(1, 'inline-quantity'), '3')
+        await userEvent.click(screen.getByTestId('header-save'))
+        await waitFor(() => expect(h.inserted).toHaveLength(2))
+        expect(h.inserted.map((p) => p.quantity)).toEqual([2, 3]) // đúng thứ tự trên màn hình
+        expect(h.inserted.every((p) => p.plan_id === 3)).toBe(true)
+        await waitFor(() => expect(rows()).toHaveLength(1))
+        expect(screen.getByTestId('header-save').textContent).toBe('Lưu dòng')
+      })
+
+      it('dòng đầu thiếu số phiếu: "Lưu tất cả" dừng ngay ở dòng đó, báo lỗi, không lưu dòng nào', async () => {
+        await open()
+        await addBelow() // hai dòng trống
+        expect(rows()).toHaveLength(2)
+        await userEvent.click(screen.getByTestId('header-save'))
+        await waitFor(() => expect(screen.getAllByTestId('inspection-inline-row-error')).toHaveLength(1)) // chỉ dòng đầu báo lỗi: dừng, chưa xét dòng sau
+        expect(screen.getByTestId('inspection-inline-row-error').textContent).toContain('Vui lòng chọn số phiếu thống kê.')
+        expect(h.inserted).toHaveLength(0)
+      })
+
+      it('X đóng riêng từng dòng; "Hủy tất cả" đóng hết (hỏi trước nếu đang gõ dở)', async () => {
+        await firstRowThenAdd('2')
+        await userEvent.click(within(rows()[1]).getByTestId('inspection-inline-row-cancel')) // dòng 2 chưa gõ gì → đóng luôn
+        expect(rows()).toHaveLength(1)
+        expect(cell(0, 'inline-quantity').value).toBe('2') // dòng 1 còn nguyên
+        await addBelow()
+        const ask = vi.spyOn(window, 'confirm').mockReturnValue(true)
+        await userEvent.click(screen.getByTestId('header-cancel'))
+        expect(ask).toHaveBeenCalled() // dòng 1 đang gõ dở
+        expect(screen.queryByTestId('inspection-inline-row')).toBeNull()
+        expect(screen.queryByTestId('header-save')).toBeNull()
+      })
+
+      it('giữ lại dòng khi người dùng không đồng ý bỏ dữ liệu đang gõ', async () => {
+        await firstRowThenAdd('2')
+        vi.spyOn(window, 'confirm').mockReturnValue(false)
+        await userEvent.click(screen.getByTestId('header-cancel'))
+        expect(rows()).toHaveLength(2) // không mất gì
+        expect(cell(0, 'inline-quantity').value).toBe('2')
+      })
     })
   })
 

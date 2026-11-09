@@ -22,27 +22,27 @@ describe('DataTable: kéo giãn cột', () => {
     const h = screen.getByTestId('resize-a')
     expect(th('Cột A').style.width).toBe('')
     fireEvent.pointerDown(h, { clientX: 100, pointerId: 1 })
-    fireEvent.pointerMove(h, { clientX: 220, pointerId: 1 })
-    fireEvent.pointerUp(h, { clientX: 220, pointerId: 1 })
-    expect(th('Cột A').style.width).toBe('120px') // jsdom không có layout: rộng gốc 0 + 120px kéo
+    fireEvent.pointerMove(h, { clientX: 300, pointerId: 1 })
+    fireEvent.pointerUp(h, { clientX: 300, pointerId: 1 })
+    expect(th('Cột A').style.width).toBe('200px') // jsdom không có layout: rộng gốc 0 + 200px kéo
     expect(th('Cột B').style.width).toBe('') // cột khác không đổi
     unmount()
     render(table()) // mở lại: đọc từ localStorage
-    expect(th('Cột A').style.width).toBe('120px')
+    expect(th('Cột A').style.width).toBe('200px')
     fireEvent.pointerDown(screen.getByTestId('resize-a'), { clientX: 100, pointerId: 1 })
     fireEvent.pointerMove(screen.getByTestId('resize-a'), { clientX: 0, pointerId: 1 })
     fireEvent.pointerUp(screen.getByTestId('resize-a'), { clientX: 0, pointerId: 1 })
-    expect(th('Cột A').style.width).toBe('56px') // tối thiểu
+    expect(th('Cột A').style.width).toBe('144px') // tối thiểu = bề rộng ô nhập của dòng nhập
     fireEvent.doubleClick(screen.getByTestId('resize-a'))
     expect(th('Cột A').style.width).toBe('')
   })
 
   it('phím mũi tên chỉnh độ rộng; dữ liệu lưu hỏng thì bỏ qua', () => {
-    window.localStorage.setItem('col-w:t-resize', '{"a":"abc","b":5}') // sai kiểu / dưới mức tối thiểu
+    window.localStorage.setItem('col-w:t-resize', '{"a":"abc","b":100}') // sai kiểu / dưới mức tối thiểu (độ rộng cũ hẹp hơn 144px bị bỏ)
     render(table())
     expect(th('Cột A').style.width).toBe('')
     expect(th('Cột B').style.width).toBe('')
     fireEvent.keyDown(screen.getByTestId('resize-b'), { key: 'ArrowRight' })
-    expect(th('Cột B').style.width).toBe('56px') // jsdom không có layout: 0 + 16 → nâng lên mức tối thiểu 56px
+    expect(th('Cột B').style.width).toBe('144px') // jsdom không có layout: 0 + 16 → nâng lên mức tối thiểu 144px
   })
 })

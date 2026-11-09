@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 
 const KEY = 'col-w:'
-export const MIN_COL_W = 56
+export const MIN_COL_W = 144 // = 9rem, bằng ô nhập của dòng nhập tại chỗ: hẹp hơn thì ô nhập tràn sang cột bên và đè nút Lưu. Độ rộng đã lưu nhỏ hơn mức này tự bị bỏ.
 export const MAX_COL_W = 800
 
 function read(key: string): Record<string, number> {

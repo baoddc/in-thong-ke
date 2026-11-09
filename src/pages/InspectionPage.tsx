@@ -1,10 +1,11 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef, useState, type MutableRefObject } from 'react'
 import { supabase } from '../lib/supabase'
 import { errorMessage, formatDate, formatNumber } from '../lib/format'
 import { useLookups } from '../lib/useLookups'
 import { countActiveFilters, type ListConfig } from '../lib/listQuery'
 import { rpcCount, rpcList } from '../lib/listRpc'
 import { useListPage, type Fetcher } from '../lib/useListPage'
+import type { InspectionForm } from '../lib/useInspectionForm'
 import { useShortcuts } from '../lib/useShortcuts'
 import { isBelowMd, isSmallScreen, usePersistentToggle } from '../lib/usePersistentToggle'
 import { AuditCell } from '../components/AuditInfo'
@@ -41,6 +42,8 @@ const fetchRows: Fetcher = async (p) => {
   return { data: rows.data, error: rows.error, count }
 }
 
+const MAX_NEW_ROWS = 20 // số dòng nhập mở cùng lúc
+type NewRow = { key: number; seed?: InspectionForm; ctl: MutableRefObject<InlineControls | null>; nextSeed: MutableRefObject<(() => InspectionForm) | null> }
 const DASH = '—' // dòng cũ chưa có số phiếu TK
 const PILL = 'inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold'
 
@@ -60,19 +63,48 @@ export default function InspectionPage() {
   const [deleting, setDeleting] = useState<{ row: InspectionRow; busy: boolean } | null>(null)
   const [requesting, setRequesting] = useState<InspectionRow | null>(null)
 
-  const [inline, setInline] = useState(false) // dòng nhập trên bảng (D-023)
+  // Dòng nhập trên bảng (D-023): có thể mở NHIỀU dòng cùng lúc (nút "+" thêm dòng bên dưới, điền sẵn phiếu/ngày/công trình… của dòng trước).
+  const [newRows, setNewRows] = useState<NewRow[]>([]) // ctl: Lưu/Hủy của từng dòng, để nút trên PageHeader gọi đúng
+  const inline = newRows.length > 0
+  const nextKey = useRef(1)
+  const makeRow = (seed?: InspectionForm): NewRow => ({ key: nextKey.current++, seed, ctl: { current: null }, nextSeed: { current: null } }) // chỉ gọi trong hàm xử lý bấm nút
   const [editingId, setEditingId] = useState<number | null>(null) // dòng đang sửa tại chỗ (D-030); chỉ một dòng, và không cùng lúc với dòng thêm mới
   // ≥ md: thêm bằng dòng nhập đầu bảng; điện thoại: modal như cũ. Dòng nhập dở được giữ nguyên khi đổi trang/lọc/sắp xếp.
-  const inlineCtl = useRef<InlineControls | null>(null) // nút Lưu/Hủy trên PageHeader gọi đúng hành động của dòng nhập
   const editCtl = useRef<InlineControls | null>(null) // dòng đang sửa (để hỏi trước khi đóng)
   const [inlineBusy, setInlineBusy] = useState(false)
+  const [savingAll, setSavingAll] = useState(false)
   const { blocked } = inc
+  /** Thêm `count` dòng nhập mới, điền sẵn phiếu/ngày/công trình… (`seed`, hoặc của dòng cuối). Tối đa MAX_NEW_ROWS dòng cùng lúc. */
+  const addRows = useCallback((count: number, seed?: InspectionForm) => {
+    const room = MAX_NEW_ROWS - newRows.length
+    if (room <= 0) return toast.error(`Tối đa ${MAX_NEW_ROWS} dòng nhập cùng lúc. Hãy lưu bớt rồi thêm tiếp.`)
+    const from = seed ?? newRows[newRows.length - 1]?.nextSeed.current?.()
+    const add = Array.from({ length: Math.min(count, room) }, () => makeRow(from))
+    if (count > room) toast.error(`Chỉ thêm được ${room} dòng (tối đa ${MAX_NEW_ROWS} dòng nhập cùng lúc).`)
+    setNewRows((rs) => [...rs, ...add])
+  }, [newRows, toast])
   const openNew = useCallback(() => {
     if (blocked) return toast.error(BLOCKED_MSG)
     if (isBelowMd()) return setModal({ row: null })
     if (editCtl.current && !editCtl.current.cancel()) return // đang sửa dở: hỏi trước khi đóng
-    setEditingId(null); setInline(true)
-  }, [blocked, toast])
+    setEditingId(null)
+    if (newRows.length === 0) setNewRows([makeRow()])
+    else addRows(1) // đang mở dòng nhập: bấm "Thêm dòng" / phím N là thêm tiếp một dòng
+  }, [blocked, toast, newRows.length, addRows])
+  /** Đóng mọi dòng nhập; dòng nào đang gõ dở thì hỏi từng dòng. false = người dùng giữ lại (dừng, không mất dữ liệu). */
+  function cancelNew(): boolean {
+    for (const { ctl } of newRows) if (!ctl.current?.cancel()) return false
+    return true
+  }
+  /** Lưu lần lượt từng dòng nhập từ trên xuống; dừng ở dòng đầu tiên lỗi/thiếu thông tin (dòng đó hiện thông báo, các dòng đã lưu thì biến khỏi danh sách nhập). */
+  async function saveAll() {
+    setSavingAll(true)
+    try {
+      for (const { ctl } of newRows) if (ctl.current && !(await ctl.current.save())) break
+    } finally {
+      setSavingAll(false)
+    }
+  }
   const [filtersOpen, setFiltersOpen, toggleFilters] = usePersistentToggle('inspection:filters', () => !isSmallScreen())
   const showFilters = useCallback(() => setFiltersOpen(true), [setFiltersOpen])
   useShortcuts(openNew, searchRef, showFilters)
@@ -92,9 +124,9 @@ export default function InspectionPage() {
   function openRow(r: InspectionRow) {
     if (isBelowMd() || !canUpdate(r)) return setModal({ row: r })
     // đóng dòng thêm mới / dòng sửa khác trước — dở dang thì hỏi, không mất dữ liệu đang nhập
-    if (inline && inlineCtl.current && !inlineCtl.current.cancel()) return
+    if (!cancelNew()) return
     if (editingId !== null && editingId !== r.id && editCtl.current && !editCtl.current.cancel()) return
-    setInline(false); setEditingId(r.id)
+    setEditingId(r.id)
   }
   const editingRow = editingId ? list.rows.find((r) => r.id === editingId) : undefined // đổi trang/lọc làm dòng biến mất = đóng
 
@@ -162,8 +194,10 @@ export default function InspectionPage() {
         <Button variant="primary" size="sm" icon="plus" onClick={openNew} title="Thêm dòng (phím N)" data-testid="add-inspection">Thêm dòng</Button>
         {inline && (
           <>
-            <Button variant="primary" size="sm" disabled={inlineBusy} onClick={() => inlineCtl.current?.save()} data-testid="header-save">{inlineBusy ? 'Đang lưu…' : 'Lưu dòng'}</Button>
-            <Button size="sm" disabled={inlineBusy} onClick={() => inlineCtl.current?.cancel()} data-testid="header-cancel">Hủy</Button>
+            <Button variant="primary" size="sm" disabled={inlineBusy || savingAll} onClick={() => (newRows.length > 1 ? void saveAll() : void newRows[0].ctl.current?.save())} data-testid="header-save">
+              {inlineBusy || savingAll ? 'Đang lưu…' : newRows.length > 1 ? `Lưu tất cả (${newRows.length})` : 'Lưu dòng'}
+            </Button>
+            <Button size="sm" disabled={inlineBusy || savingAll} onClick={() => void cancelNew()} data-testid="header-cancel">{newRows.length > 1 ? 'Hủy tất cả' : 'Hủy'}</Button>
           </>
         )}
       </PageHeader>
@@ -182,10 +216,12 @@ export default function InspectionPage() {
           node: <InspectionInlineRow key={editingRow.id} row={editingRow} columnKeys={columns.map((c) => c.key)} lookups={lookups} controlsRef={editCtl} onCancel={() => setEditingId(null)}
             onSaved={(msg) => { toast.success(msg); setEditingId(null); void reload() }} />,
         } : undefined}
-        topRow={inline && (
-          <InspectionInlineRow columnKeys={columns.map((c) => c.key)} lookups={lookups} controlsRef={inlineCtl} onBusy={setInlineBusy} onCancel={() => setInline(false)}
-            onSaved={(msg) => { toast.success(msg); void reload() }} />
-        )}
+        topRow={inline && newRows.map(({ key, seed, ctl, nextSeed }) => (
+          <InspectionInlineRow key={key} seed={seed} columnKeys={columns.map((c) => c.key)} lookups={lookups} controlsRef={ctl} nextSeedRef={nextSeed} onBusy={newRows.length === 1 ? setInlineBusy : undefined}
+            onAddRow={(from) => addRows(1, from)} onCancel={() => setNewRows((rs) => rs.filter((r) => r.key !== key))}
+            // nhiều dòng: dòng đã lưu thì biến khỏi danh sách nhập (đã hiện trong bảng); còn đúng một dòng thì giữ lại để nhập tiếp như trước
+            onSaved={(msg) => { toast.success(msg); void reload(); setNewRows((rs) => (rs.length > 1 ? rs.filter((r) => r.key !== key) : rs)) }} />
+        ))}
         empty={filtered ? (
           <EmptyState title="Không có dòng nào khớp bộ lọc." hint="Thử đổi từ khóa, khoảng ngày hoặc bộ lọc.">
             <Button onClick={clearFilters}>Xóa bộ lọc</Button>

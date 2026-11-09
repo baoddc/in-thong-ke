@@ -10,6 +10,7 @@ import type { PlanRow } from '../types/plan'
 import type { InspectionRow } from '../types/inspection'
 
 export type InspectionIdKey = 'deliveryUnitId' | 'receivingUnitId' | 'exportTypeId' | 'productId' | 'unitId' | 'carrierId'
+export type InspectionForm = Form
 type Form = {
   planId: number | null; exportDate: string; slipNo: string; constructionId: number | null; workItem: string
   deliveryUnitId: number | null | undefined // undefined: chưa chọn → mặc định "Kho An Hạ"
@@ -34,10 +35,11 @@ type Props = {
   lookups: { byKind: (k: string) => LookupItem[]; loading: boolean; reload: () => Promise<void> }
   validity: RefObject<{ reportValidity: () => boolean }> // form (modal) hoặc ô ngày (dòng nhập): kiểm tra ngày gõ sai trước khi lưu
   onSaved: (message: string, keepOpen: boolean) => void
+  seed?: Form | null // dòng thêm mới khởi tạo sẵn từ dòng trước (nút "+ thêm dòng bên dưới")
 }
 
 /** State + kiểm tra + lưu của form dòng bảng kiểm, dùng chung cho modal và dòng nhập trên bảng. */
-export function useInspectionForm({ row, readOnly = false, lookups, validity, onSaved }: Props) {
+export function useInspectionForm({ row, readOnly = false, lookups, validity, onSaved, seed }: Props) {
   const { byKind } = lookups
   // Tên các id có sẵn trong dòng đang sửa (view) → ô tìm phía server hiện ngay, không gọi thêm.
   const known: Record<string, Opt[]> = {
@@ -45,7 +47,7 @@ export function useInspectionForm({ row, readOnly = false, lookups, validity, on
     receiving_unit: row?.receiving_unit_id ? [{ id: row.receiving_unit_id, name: row.receiving_unit_name ?? '' }] : [],
     construction: row?.construction_id ? [{ id: row.construction_id, name: row.construction_name ?? '', code: row.construction_code }] : [],
   }
-  const [initial, setInitial] = useState(() => fromRow(row))
+  const [initial, setInitial] = useState(() => seed ?? fromRow(row))
   const [form, setForm] = useState(initial)
   const [pending, setPending] = useState<Record<string, boolean>>({}) // ô đơn có chữ nhưng chưa chọn
   const [planInfo, setPlanInfo] = useState<PlanRow | null>(null)
@@ -83,15 +85,20 @@ export function useInspectionForm({ row, readOnly = false, lookups, validity, on
   const set = <K extends keyof Form>(k: K, v: Form[K]) => { setSaved(''); setForm((f) => ({ ...f, [k]: v })) }
   const dirty = JSON.stringify(form) !== JSON.stringify(initial) || Object.values(pending).some(Boolean)
 
-  async function save(andNext: boolean) {
-    if (busy || readOnly) return
-    if (!validity.current?.reportValidity()) return // vd ngày xuất gõ sai (nút "Lưu và thêm dòng tiếp" không qua kiểm tra của form)
-    if (form.planId === null && tkRequired) return setError('Vui lòng chọn số phiếu thống kê.')
-    if (Object.values(pending).some(Boolean)) return setError('Có ô đã gõ chữ nhưng chưa chọn từ danh mục. Vui lòng chọn một mục hoặc xóa chữ.')
+  /** Dòng của form "Lưu và thêm dòng tiếp": giữ phiếu/ngày/công trình/đơn vị…, bỏ trống mặt hàng, ĐVT, số lượng, khối lượng, ghi chú. */
+  const nextForm = (): Form => ({ ...form, deliveryUnitId, productId: null, unitId: null, quantity: '', weight: '', note: '' })
+
+  /** true = đã lưu (để "Lưu tất cả" biết có nên lưu dòng kế tiếp); false = chưa lưu (lỗi/thiếu thông tin, đã hiện thông báo). */
+  async function save(andNext: boolean): Promise<boolean> {
+    const fail = (message: string) => { setError(message); return false }
+    if (busy || readOnly) return false
+    if (!validity.current?.reportValidity()) return false // vd ngày xuất gõ sai (nút "Lưu và thêm dòng tiếp" không qua kiểm tra của form)
+    if (form.planId === null && tkRequired) return fail('Vui lòng chọn số phiếu thống kê.')
+    if (Object.values(pending).some(Boolean)) return fail('Có ô đã gõ chữ nhưng chưa chọn từ danh mục. Vui lòng chọn một mục hoặc xóa chữ.')
     const quantity = parseVnNumber(form.quantity)
-    if (Number.isNaN(quantity)) return setError(`Số lượng xuất (PCS): ${NUM_ERR}`)
+    if (Number.isNaN(quantity)) return fail(`Số lượng xuất (PCS): ${NUM_ERR}`)
     const weight = parseVnNumber(form.weight)
-    if (Number.isNaN(weight)) return setError(`Tổng khối lượng: ${NUM_ERR}`)
+    if (Number.isNaN(weight)) return fail(`Tổng khối lượng: ${NUM_ERR}`)
     setBusy(true)
     setError('')
     setSaved('')
@@ -116,15 +123,19 @@ export function useInspectionForm({ row, readOnly = false, lookups, validity, on
       ? await supabase.from('inspection_details').update(payload).eq('id', row.id).select('id')
       : await supabase.from('inspection_details').insert(payload)
     setBusy(false)
-    if (res.error) return setError(errorMessage(res.error))
-    if (row && !res.data?.length) return setError(`Bạn không có quyền sửa dòng này. ${EDIT_DENIED_HINT}.`) // RLS chặn: 0 dòng được cập nhật
-    if (!andNext) return onSaved(row ? 'Đã cập nhật dòng' : 'Đã lưu dòng', false)
-    const next = { ...form, deliveryUnitId, productId: null, unitId: null, quantity: '', weight: '', note: '' }
+    if (res.error) return fail(errorMessage(res.error))
+    if (row && !res.data?.length) return fail(`Bạn không có quyền sửa dòng này. ${EDIT_DENIED_HINT}.`) // RLS chặn: 0 dòng được cập nhật
+    if (!andNext) {
+      onSaved(row ? 'Đã cập nhật dòng' : 'Đã lưu dòng', false)
+      return true
+    }
+    const next = nextForm()
     setForm(next)
     setInitial(next)
     setTick((t) => t + 1)
     setSaved('Đã lưu dòng. Nhập dòng tiếp theo.')
     onSaved('Đã lưu dòng', true)
+    return true
   }
 
   /** Thuộc tính nối ô LookupCombobox ô đơn với form. */
@@ -159,5 +170,5 @@ export function useInspectionForm({ row, readOnly = false, lookups, validity, on
     onPending: (p: boolean) => setPending((s) => ({ ...s, shipper: p })),
   }
 
-  return { form, set, error, busy, saved, tick, consTick, dirty, known, tkRequired, plan, shippers, planShipper, save, selectProps, constructionProps, tkProps, shipperProps }
+  return { form, set, error, busy, saved, tick, consTick, dirty, known, tkRequired, plan, shippers, planShipper, save, nextForm, selectProps, constructionProps, tkProps, shipperProps }
 }
