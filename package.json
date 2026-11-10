@@ -1,6 +1,8 @@
 {
   "name": "in-thong-ke",
   "private": true,
+  "author": "Mr.Storm",
+  "license": "MIT",
   "version": "0.1.0",
   "type": "module",
   "scripts": {

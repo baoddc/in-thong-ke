@@ -234,7 +234,10 @@ export default function AboutPage() {
       </section>
 
       <footer className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-muted">
-        <p>Phiên bản 30/10/2026</p>
+        <div className="flex flex-wrap gap-x-3">
+          <p>Phiên bản 30/10/2026</p>
+          <p data-testid="credit-about">Phát triển bởi Mr.Storm · © 2026</p>
+        </div>
         <Link to="/luong-cong-viec" data-testid="workflow-link" className="font-medium text-primary underline underline-offset-2 hover:text-primary-dark">Xem trang Luồng công việc</Link>
       </footer>
     </div>
