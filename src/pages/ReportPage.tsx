@@ -56,7 +56,7 @@ function MonthChart({ year, months, prev }: { year: number; months: MonthRow[]; 
       <ol aria-hidden="true" className="flex h-60 w-9 shrink-0 flex-col-reverse justify-between pb-6 text-right text-[11px] tabular-nums text-muted">
         {axis.ticks.map((t) => <li key={t} className="-mb-1.5 leading-3">{formatNumber(t)}</li>)}
       </ol>
-      <div className="min-w-0 flex-1 overflow-x-auto">
+      <div className="-mt-4 min-w-0 flex-1 overflow-x-auto overflow-y-hidden pt-4">
         <div className="relative min-w-[30rem]">
           <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-[calc(15rem-1.5rem)]">
             {axis.ticks.map((t, i) => <div key={t} className="absolute inset-x-0 border-t border-stone-200" style={{ bottom: `${i * 25}%` }} />)}
