@@ -203,3 +203,32 @@ Kết quả đã chạy: `npx vitest run` = 38 file đạt, 343 test đạt, 3 e
 - Trạng thái: Mở
 
 (Ghi chú: ở 1440 ô nhập/nút cao 35px, chữ ô nhập <16px — đúng ý thiết kế, chỉ áp quy tắc 44px/16px ở điện thoại.)
+
+## Trang Báo cáo (/bao-cao) - 10/11/2026 (chưa có Task ID)
+Kết quả: `npm run typecheck` đạt; `npm run lint` đạt; `npm run test` = 376 đạt, 2 lỗi, 3 expected fail (trước khi thêm test mới). Test mới: `src/pages/ReportPage.edge.test.tsx` (năm trống đạt; RPC lỗi để `it.fails`).
+
+### BUG-RP-00 [Vừa] App.test.tsx chưa cập nhật menu có mục "Báo cáo"
+- Agent cần sửa: frontend (cập nhật test)
+- Vị trí: src/App.test.tsx:161 (2 test "có 6 mục theo thứ tự...", "đủ 6 mục...") đang mong đợi 6 mục, thực tế 7 (thêm "Báo cáo" sau "In thống kê")
+- Trạng thái: Mở
+
+### BUG-RP-01 [Vừa] Lỗi tải báo cáo vẫn hiện số 0 và "Năm X chưa có dữ liệu"
+- Agent cần sửa: frontend
+- Vị trí: src/pages/ReportPage.tsx:52-54,100; src/lib/useReport.ts:23
+- Cách tái hiện: RPC inspection_stats trả lỗi -> thông báo lỗi hiện nhưng KPI "0 tấn / 0 dòng" và dòng "chưa có dữ liệu" vẫn hiện, gây hiểu nhầm là năm không có số liệu.
+- Mong đợi: khi có lỗi, KPI hiện "—" và không hiện dòng "chưa có dữ liệu".
+- Test: src/pages/ReportPage.edge.test.tsx (it.fails)
+- Trạng thái: Mở
+
+### BUG-RP-02 [Thấp] Đổi năm nhanh có thể bị kết quả cũ ghi đè
+- Agent cần sửa: frontend
+- Vị trí: src/lib/useReport.ts:15-36 (không hủy/bỏ qua phản hồi của năm cũ; reload do useDbChange cũng dùng chung)
+- Mong đợi: chỉ nhận kết quả của năm đang chọn. Chưa có test tái hiện (cần kiểm tay).
+- Trạng thái: Mở
+
+### BUG-RP-03 [Thấp] Tháng dưới 0,5 tấn hiện "0" nhưng cột vẫn có chiều cao; tổng các dòng loại hình có thể lệch ±1 so với tổng do làm tròn từng dòng
+- Agent cần sửa: frontend (chấp nhận được nếu Lead coi là đúng thiết kế "làm tròn đến tấn")
+- Vị trí: src/pages/ReportPage.tsx:9,64
+- Trạng thái: Mở
+
+Đã kiểm, không lỗi: chia cho 0 (pct trả "—", chiều cao cột 0), key_name null -> "Chưa chọn loại hình", tháng thiếu -> 0, khoảng [YYYY-01-01, YYYY+1-01-01) khớp RPC (p_to loại trừ), danh sách năm từ năm hiện tại xuống 2024, trạng thái tải hiện "—".

@@ -704,6 +704,14 @@ export type Database = {
         Args: Record<string, never>
         Returns: { full_name: string; avatar_path: string }[]
       }
+      report_matrix: {
+        Args: { p_from: string; p_to: string; p_by: 'product' | 'project'; p_project?: string | null; p_limit?: number | null }
+        Returns: { row_key: string; export_type_id: number | null; row_count: number; weight_kg_sum: number }[]
+      }
+      report_projects: {
+        Args: { p_from: string; p_to: string }
+        Returns: { project: string; row_count: number; weight_kg_sum: number }[]
+      }
       get_user_names: {
         Args: { p_ids: string[] }
         Returns: { id: string; full_name: string; username: string }[]

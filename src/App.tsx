@@ -14,6 +14,7 @@ import PlansPage from './pages/PlansPage'
 import InspectionPage from './pages/InspectionPage'
 import PrintPage from './pages/PrintPage'
 import LookupsPage from './pages/LookupsPage'
+import ReportPage from './pages/ReportPage'
 import WorkflowPage from './pages/WorkflowPage'
 import AboutPage from './pages/AboutPage'
 import UsersPage from './pages/UsersPage'
@@ -33,6 +34,7 @@ const ITEMS: NavItem[] = [
   { to: '/', label: 'Nhập phiếu', icon: 'plan', end: true },
   { to: '/bang-kiem', label: 'Bảng kiểm', icon: 'inspection' },
   { to: '/in-thong-ke', label: 'In thống kê', icon: 'print' },
+  { to: '/bao-cao', label: 'Báo cáo', icon: 'scale' },
   { to: '/danh-muc', label: 'Danh mục', icon: 'lookup' },
   { to: '/luong-cong-viec', label: 'Luồng công việc', icon: 'workflow' },
   { to: '/gioi-thieu', label: 'Giới thiệu', icon: 'info' },
@@ -213,6 +215,7 @@ export default function App() {
         <Route path="/" element={<PlansPage />} />
         <Route path="/bang-kiem" element={<InspectionPage />} />
         <Route path="/in-thong-ke" element={<PrintPage />} />
+        <Route path="/bao-cao" element={<ReportPage />} />
         <Route path="/danh-muc" element={<LookupsPage />} />
         <Route path="/luong-cong-viec" element={<WorkflowPage />} />
         <Route path="/gioi-thieu" element={<AboutPage />} />

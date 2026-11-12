@@ -25,11 +25,16 @@ export default {
         'fade-in': { from: { opacity: '0' }, to: { opacity: '1' } },
         'pop-in': { from: { opacity: '0', transform: 'scale(0.97) translateY(4px)' }, to: { opacity: '1', transform: 'none' } },
         'slide-up': { from: { opacity: '0', transform: 'translateY(8px)' }, to: { opacity: '1', transform: 'none' } },
+        'grow-y': { from: { transform: 'scaleY(0)' }, to: { transform: 'none' } },
+        'grow-x': { from: { transform: 'scaleX(0)' }, to: { transform: 'none' } },
       },
       animation: {
         'fade-in': 'fade-in 180ms ease-out',
         'pop-in': 'pop-in 180ms ease-out',
         'slide-up': 'slide-up 200ms ease-out',
+        // biểu đồ trang Báo cáo: cột/thanh mọc ra; backwards = đứng ở 0 trong lúc chờ animation-delay
+        'grow-y': 'grow-y 700ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards',
+        'grow-x': 'grow-x 700ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards',
       },
     },
   },
