@@ -162,7 +162,7 @@ function LayoutBody({ email }: { email: string }) {
         </div>
       </aside>
 
-      <main id="noi-dung" className="min-w-0 flex-1 p-3 md:flex md:min-h-0 md:flex-col md:overflow-y-auto md:p-6 print:block print:overflow-visible print:p-0">
+      <main id="noi-dung" className="min-w-0 flex-1 p-3 md:flex md:min-h-0 md:flex-col md:overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:p-6 print:block print:overflow-visible print:p-0">
         <IncompleteNotice />
         <Outlet />
       </main>

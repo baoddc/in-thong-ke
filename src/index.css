@@ -4,6 +4,10 @@
 
 /* Cỡ chữ gốc: 15px trên điện thoại (vùng chạm ≥ 37px), 14px từ 640px. Mọi cỡ Tailwind theo rem nên co theo; bản in dùng pt/mm. */
 html { font-size: 93.75%; }
+
+/* Ẩn thanh cuộn của cả trang (vẫn cuộn được bằng chuột, bàn phím, cảm ứng). Bảng và ô gợi ý giữ thanh cuộn riêng. */
+html, body, #noi-dung { scrollbar-width: none; }
+html::-webkit-scrollbar, body::-webkit-scrollbar, #noi-dung::-webkit-scrollbar { display: none; }
 @media (min-width: 640px) { html { font-size: 87.5%; } }
 @media print { html { font-size: 100%; } }
 
