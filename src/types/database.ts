@@ -492,7 +492,7 @@ export type Database = {
           id: string
           username: string
           full_name: string
-          role: 'admin' | 'user' | 'root'
+          role: 'admin' | 'user' | 'root' | 'viewer'
           is_active: boolean
           is_pending: boolean
           avatar_path: string | null // T-099: <user_id>/<ms>.webp|jpg trong bucket 'avatars'
@@ -506,7 +506,7 @@ export type Database = {
           id: string
           username: string
           full_name: string
-          role?: 'admin' | 'user' | 'root'
+          role?: 'admin' | 'user' | 'root' | 'viewer'
           is_active?: boolean
           is_pending?: boolean
           avatar_path?: string | null
@@ -520,7 +520,7 @@ export type Database = {
           id?: string
           username?: string
           full_name?: string
-          role?: 'admin' | 'user' | 'root'
+          role?: 'admin' | 'user' | 'root' | 'viewer'
           is_active?: boolean
           is_pending?: boolean
           avatar_path?: string | null

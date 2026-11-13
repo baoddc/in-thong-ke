@@ -12,6 +12,7 @@ import PageHeader from '../components/ui/PageHeader'
 import Pagination from '../components/ui/Pagination'
 import { useToast } from '../components/ui/Toast'
 import { useProfile } from '../lib/useProfile'
+import { isViewerRole } from '../lib/auth'
 import { useDbChange } from '../lib/dbChanges'
 
 // Nhóm tab theo vị trí: từ 'construction' trở đi thuộc "Bảng kiểm chi tiết".
@@ -46,7 +47,8 @@ function useBigLookups(kind: string, q: string, page: number, size: number) {
 export default function LookupsPage() {
   const { byKind, loading, error: loadError, reload } = useLookups()
   const toast = useToast()
-  const { isAdmin } = useProfile()
+  const { isAdmin, profile } = useProfile()
+  const viewer = isViewerRole(profile?.role) // Chỉ xem: không thêm mục
   const [kind, setKind] = useState<string>(KINDS[0].kind)
   const [name, setName] = useState('')
   const [filter, setFilter] = useState('')
@@ -119,11 +121,13 @@ export default function LookupsPage() {
           </div>
         ))}
       </div>
-      <form onSubmit={add} className="flex flex-wrap gap-2">
-        {isCons && <Input aria-label="Mã công trình mới" placeholder="Mã CT" value={code} onChange={(e) => setCode(e.target.value)} className="!mt-0 !w-28 min-w-0" data-testid="lookup-new-code" />}
-        <Input aria-label="Tên mục mới" placeholder="Nhập tên mục mới" value={name} onChange={(e) => setName(e.target.value)} className="!mt-0 min-w-[10rem] flex-1" data-testid="lookup-new-name" />
-        <Button type="submit" variant="primary" icon="plus" disabled={busy} data-testid="lookup-add">Thêm</Button>
-      </form>
+      {!viewer && (
+        <form onSubmit={add} className="flex flex-wrap gap-2">
+          {isCons && <Input aria-label="Mã công trình mới" placeholder="Mã CT" value={code} onChange={(e) => setCode(e.target.value)} className="!mt-0 !w-28 min-w-0" data-testid="lookup-new-code" />}
+          <Input aria-label="Tên mục mới" placeholder="Nhập tên mục mới" value={name} onChange={(e) => setName(e.target.value)} className="!mt-0 min-w-[10rem] flex-1" data-testid="lookup-new-name" />
+          <Button type="submit" variant="primary" icon="plus" disabled={busy} data-testid="lookup-add">Thêm</Button>
+        </form>
+      )}
       <Input type="search" aria-label="Lọc theo tên" placeholder="Lọc theo tên..." value={filter} onChange={(e) => { setFilter(e.target.value); setPage(1) }} className="!mt-0" data-testid="lookup-filter" />
       {(msg || (big ? bigList.error : loadError)) && <p role="alert" className="rounded-card border border-danger-line bg-danger-soft p-2 text-danger" data-testid="lookup-error">{msg || (big ? bigList.error : loadError)}</p>}
       {(big ? bigList.loading : loading) ? (

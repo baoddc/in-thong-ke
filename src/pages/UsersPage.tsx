@@ -24,7 +24,7 @@ type Dialog =
   | { kind: 'credentials'; title: string; username: string; password: string }
 
 const pill = 'inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold'
-const ROLE_PILL: Record<Role, string> = { root: 'bg-amber-300 text-slate-900', admin: 'bg-primary-soft text-primary-dark', user: 'bg-stone-200 text-gray-800' }
+const ROLE_PILL: Record<Role, string> = { root: 'bg-amber-300 text-slate-900', admin: 'bg-primary-soft text-primary-dark', user: 'bg-stone-200 text-gray-800', viewer: 'bg-sky-100 text-sky-900' }
 
 function statusPill(u: AdminUser) {
   if (u.is_pending) return <span className={`${pill} bg-orange-100 text-orange-900`}>Chờ duyệt</span>
@@ -160,10 +160,10 @@ export default function UsersPage() {
           : <EmptyState title="Chưa có người dùng nào." hint="Bấm “Thêm người dùng” để tạo tài khoản đầu tiên." />} />
 
       {dialog?.kind === 'create' && (
-        <CreateUserModal canPickRole={isRoot} onClose={close} onCreated={(u, password) => { void reload(); setDialog({ kind: 'credentials', title: 'Đã tạo tài khoản', username: u.username, password }) }} />
+        <CreateUserModal canPickRole canMakeAdmin={isRoot} onClose={close} onCreated={(u, password) => { void reload(); setDialog({ kind: 'credentials', title: 'Đã tạo tài khoản', username: u.username, password }) }} />
       )}
       {dialog?.kind === 'edit' && (
-        <EditUserModal user={dialog.user} showRole={isRoot} canChangeRole={userActions(profile, dialog.user).changeRole} onClose={close}
+        <EditUserModal user={dialog.user} showRole canMakeAdmin={isRoot} canChangeRole={userActions(profile, dialog.user).changeRole} onClose={close}
           onSaved={() => { toast.success(`Đã cập nhật ${dialog.user.username}`); close(); void reload() }} />
       )}
       {dialog?.kind === 'avatar' && (

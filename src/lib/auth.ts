@@ -4,10 +4,13 @@ import type { Database } from '../types/database'
 export const INTERNAL_EMAIL_DOMAIN = 'kho-an-ha.local'
 
 /** D-014: 'root' (duy nhất 1) > 'admin' > 'user'. Khai báo đủ 3 vai trò ở đây để không phụ thuộc thứ tự cập nhật database.ts. */
-export type Role = 'root' | 'admin' | 'user'
+export type Role = 'root' | 'admin' | 'user' | 'viewer'
 export type Profile = Omit<Database['public']['Tables']['profiles']['Row'], 'role'> & { role: Role }
 
-export const ROLE_LABEL: Record<Role, string> = { root: 'Root', admin: 'Admin', user: 'Người dùng' }
+export const ROLE_LABEL: Record<Role, string> = { root: 'Root', admin: 'Admin', user: 'Người dùng', viewer: 'Chỉ xem' }
+
+/** 'viewer' chỉ xem/in/xuất, không thêm/sửa/xóa gì (chặn thật bằng RLS ở migration 000034; ở đây chỉ ẩn nút). */
+export const isViewerRole = (role: Role | null | undefined): boolean => role === 'viewer'
 
 /** Quyền dữ liệu của admin = root (D-014). */
 export const isAdminRole = (role: Role | null | undefined): boolean => role === 'admin' || role === 'root'
@@ -27,7 +30,8 @@ export function userActions(me: Pick<Profile, 'id' | 'role'> | null | undefined,
     const isRootTarget = target.role === 'root'
     return { ...none, edit: true, resetPassword: true, toggleActive: !isRootTarget && !self, changeRole: !isRootTarget && !self }
   }
-  if (self || target.role === 'user') return { ...none, edit: true, resetPassword: true, toggleActive: !self }
+  const plain = target.role === 'user' || target.role === 'viewer'
+  if (self || plain) return { ...none, edit: true, resetPassword: true, toggleActive: !self, changeRole: plain && !self } // admin chỉ đổi Người dùng ↔ Chỉ xem
   return none
 }
 
@@ -73,7 +77,7 @@ export function canEditRow(
   createdAt: string | null | undefined,
   now: number | Date = Date.now(),
 ): boolean {
-  if (!profile?.is_active) return false
+  if (!profile?.is_active || isViewerRole(profile.role)) return false
   if (isAdminRole(profile.role)) return true
   if (!createdBy || !createdAt || createdBy !== profile.id) return false
   const age = Number(now) - Date.parse(createdAt)
@@ -92,5 +96,5 @@ export function canUpdateRow(
   now: number | Date = Date.now(),
 ): boolean {
   if (canEditRow(profile, createdBy, createdAt, now)) return true
-  return !!profile?.is_active && !!createdBy && createdBy === profile.id && !!unlockUntil && Date.parse(unlockUntil) > Number(now)
+  return !!profile?.is_active && !isViewerRole(profile.role) && !!createdBy && createdBy === profile.id && !!unlockUntil && Date.parse(unlockUntil) > Number(now)
 }

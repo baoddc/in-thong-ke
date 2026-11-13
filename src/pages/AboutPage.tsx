@@ -84,7 +84,7 @@ const GROUPS: FeatureGroup[] = [
       {
         icon: 'shield', color: 'bg-rose-50 text-rose-700', title: 'Phân quyền & an toàn',
         points: [
-          '2 vai trò: Admin / Người dùng.',
+          '3 vai trò: Admin / Người dùng / Chỉ xem.',
           'Người tạo được sửa/xóa dữ liệu của mình trong 24 giờ, sau đó chỉ admin.',
           'Dữ liệu được bảo vệ ở tầng cơ sở dữ liệu (RLS); mọi thao tác ghi lại người tạo và người sửa lần cuối.',
         ],
@@ -112,14 +112,14 @@ const GROUPS: FeatureGroup[] = [
 // true = được, false = không, chuỗi = được kèm điều kiện
 type Cell = boolean | string
 // Không nhắc vai trò root ở giao diện chung (người dùng chốt 04/11/2026: giữ kín sự tồn tại của root).
-const ROLES = ['Admin', 'Người dùng'] as const
-const PERMISSIONS: { label: string; cells: [Cell, Cell] }[] = [
-  { label: 'Xem dữ liệu', cells: [true, true] },
-  { label: 'Nhập phiếu, bảng kiểm', cells: [true, true] },
-  { label: 'Sửa/xóa trong 24 giờ', cells: [true, 'Của mình'] },
-  { label: 'Sửa sau 24 giờ', cells: [true, 'Sau khi duyệt'] },
-  { label: 'Duyệt yêu cầu sửa', cells: [true, false] },
-  { label: 'Quản lý tài khoản', cells: ['Người dùng', false] },
+const ROLES = ['Admin', 'Người dùng', 'Chỉ xem'] as const
+const PERMISSIONS: { label: string; cells: [Cell, Cell, Cell] }[] = [
+  { label: 'Xem, in, xuất dữ liệu', cells: [true, true, true] },
+  { label: 'Nhập phiếu, bảng kiểm', cells: [true, true, false] },
+  { label: 'Sửa/xóa trong 24 giờ', cells: [true, 'Của mình', false] },
+  { label: 'Sửa sau 24 giờ', cells: [true, 'Sau khi duyệt', false] },
+  { label: 'Duyệt yêu cầu sửa', cells: [true, false, false] },
+  { label: 'Quản lý tài khoản', cells: ['Người dùng, Chỉ xem', false, false] },
 ]
 
 function PermissionCell({ value }: { value: Cell }) {

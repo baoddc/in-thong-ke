@@ -75,7 +75,7 @@ export function CredentialsDialog({ title, username, password, onClose }: { titl
   )
 }
 
-export function CreateUserModal({ canPickRole, onClose, onCreated }: { canPickRole: boolean; onClose: () => void; onCreated: (user: AdminUser, password: string) => void }) {
+export function CreateUserModal({ canPickRole, canMakeAdmin = false, onClose, onCreated }: { canPickRole: boolean; canMakeAdmin?: boolean; onClose: () => void; onCreated: (user: AdminUser, password: string) => void }) {
   const toast = useToast()
   const [fullName, setFullName] = useState('')
   const [password, setPassword] = useState('')
@@ -129,11 +129,12 @@ export function CreateUserModal({ canPickRole, onClose, onCreated }: { canPickRo
         {shown?.error && <p className="mt-1 text-sm text-danger" role="alert" data-testid="username-preview-error">{shown.error}</p>}
       </div>
       <PasswordField value={password} onChange={setPassword} error={errors.password} testId="user-create" />
-      {canPickRole && ( // chỉ root chọn vai trò; admin luôn tạo 'user' (D-014)
+      {canPickRole && ( // chọn vai trò; chỉ cấp cao nhất được tạo admin
         <Field label="Vai trò">
           <Select value={role} onChange={(e) => setRole(e.target.value as Role)} data-testid="user-role-select">
             <option value="user">{ROLE_LABEL.user}</option>
-            <option value="admin">{ROLE_LABEL.admin}</option>
+            <option value="viewer">{ROLE_LABEL.viewer}</option>
+            {canMakeAdmin && <option value="admin">{ROLE_LABEL.admin}</option>}
           </Select>
         </Field>
       )}
@@ -142,7 +143,7 @@ export function CreateUserModal({ canPickRole, onClose, onCreated }: { canPickRo
   )
 }
 
-export function EditUserModal({ user, showRole, canChangeRole, onClose, onSaved }: { user: AdminUser; showRole: boolean; canChangeRole: boolean; onClose: () => void; onSaved: () => void }) {
+export function EditUserModal({ user, showRole, canChangeRole, canMakeAdmin = false, onClose, onSaved }: { user: AdminUser; showRole: boolean; canChangeRole: boolean; canMakeAdmin?: boolean; onClose: () => void; onSaved: () => void }) {
   const toast = useToast()
   const [fullName, setFullName] = useState(user.full_name)
   const [role, setRole] = useState<Role>(user.role)
@@ -177,11 +178,12 @@ export function EditUserModal({ user, showRole, canChangeRole, onClose, onSaved 
         <Input autoFocus value={fullName} aria-invalid={!!nameError} onChange={(e) => setFullName(e.target.value)} data-testid="user-edit-fullname" />
       </Field>
       {showRole && (
-        <Field label="Vai trò" hint={canChangeRole ? undefined : user.role === 'root' ? 'Không thể đổi vai trò của tài khoản root.' : 'Bạn không thể tự đổi vai trò của chính mình.'}>
+        <Field label="Vai trò" hint={canChangeRole ? undefined : user.role === 'root' ? 'Không thể đổi vai trò của tài khoản root.' : user.role === 'admin' && !canMakeAdmin ? 'Bạn không có quyền đổi vai trò của tài khoản admin.' : 'Bạn không thể tự đổi vai trò của chính mình.'}>
           <Select value={role} disabled={!canChangeRole} onChange={(e) => setRole(e.target.value as Role)} data-testid="user-edit-role">
             {user.role === 'root' && <option value="root">{ROLE_LABEL.root}</option>}
             <option value="user">{ROLE_LABEL.user}</option>
-            <option value="admin">{ROLE_LABEL.admin}</option>
+            <option value="viewer">{ROLE_LABEL.viewer}</option>
+            {(canMakeAdmin || user.role === 'admin') && <option value="admin">{ROLE_LABEL.admin}</option>}
           </Select>
         </Field>
       )}

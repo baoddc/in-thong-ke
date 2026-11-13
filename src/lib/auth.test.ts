@@ -28,6 +28,15 @@ describe('canEditRow', () => {
   it('nhận cả Date cho now', () => {
     expect(canEditRow(user, 'u1', at(2), new Date(now))).toBe(true)
   })
+  it('Chỉ xem (viewer): không sửa/xóa được gì, kể cả dòng do mình tạo còn trong 24 giờ hoặc đã được mở khóa', () => {
+    const viewer = { id: 'v1', role: 'viewer', is_active: true } satisfies Pick<Profile, 'id' | 'role' | 'is_active'>
+    expect(canEditRow(viewer, 'v1', at(1), now)).toBe(false)
+    expect(canUpdateRow(viewer, 'v1', at(30), new Date(now + 5 * H).toISOString(), now)).toBe(false)
+  })
+  it('admin quản lý được tài khoản viewer như user; viewer không quản lý ai', () => {
+    expect(userActions(admin, { id: 'v1', role: 'viewer' }).resetPassword).toBe(true)
+    expect(userActions({ id: 'v1', role: 'viewer' }, { id: 'u1', role: 'user' }).edit).toBe(false)
+  })
 })
 
 describe('canUpdateRow (D-019)', () => {
@@ -70,7 +79,7 @@ describe('userActions (D-014)', () => {
     ['root → user', R, U, all],
     ['root → admin', R, A, all],
     ['root → chính mình: không khóa, không đổi vai trò', R, R, { ...all, toggleActive: false, changeRole: false }],
-    ['admin → user: không đổi vai trò', A, U, { ...all, changeRole: false }],
+    ['admin → user: đổi vai trò được (Người dùng ↔ Chỉ xem)', A, U, all],
     ['admin → chính mình: sửa tên + đặt lại mật khẩu, không khóa', A, A, { ...all, toggleActive: false, changeRole: false }],
     ['admin → admin khác', A, A2, none],
     ['admin → root', A, R, none],
@@ -87,7 +96,7 @@ describe('userActions (D-014)', () => {
     expect(userActions(R, P)).toEqual(only)
     expect(userActions(A, P)).toEqual(only)
     expect(userActions(U, P)).toEqual(none)
-    expect(userActions(A, { ...P, is_pending: false })).toEqual({ ...all, changeRole: false })
+    expect(userActions(A, { ...P, is_pending: false })).toEqual(all)
   })
 })
 

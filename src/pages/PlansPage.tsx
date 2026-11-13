@@ -25,7 +25,7 @@ import Icon, { type IconName } from '../components/ui/Icon'
 import PageHeader from '../components/ui/PageHeader'
 import Pagination from '../components/ui/Pagination'
 import { useToast } from '../components/ui/Toast'
-import { EDIT_DENIED_HINT, canEditRow, canUpdateRow } from '../lib/auth'
+import { EDIT_DENIED_HINT, canEditRow, canUpdateRow, isViewerRole } from '../lib/auth'
 import { BLOCKED_MSG, useIncomplete } from '../lib/useIncomplete'
 import CopyButton from '../components/ui/CopyButton'
 import { untilLabel, useMyEditRequests } from '../lib/useEditRequests'
@@ -74,6 +74,7 @@ export default function PlansPage() {
   const navigate = useNavigate()
   const stats = useMonthStats()
   const { profile } = useProfile()
+  const viewer = isViewerRole(profile?.role) // Chỉ xem: không thêm phiếu, không yêu cầu sửa
   const mine = useMyEditRequests(profile?.id)
   const inc = useIncomplete() // D-029: phiếu/dòng thiếu quá 24h → khóa thao tác khác
   const canEdit = (r: PlanRow) => canEditRow(profile, r.created_by, r.created_at) // xóa (khi không bị khóa)
@@ -92,9 +93,10 @@ export default function PlansPage() {
   const [inlineBusy, setInlineBusy] = useState(false)
   const { blocked } = inc
   const openNew = useCallback(() => {
+    if (viewer) return // phím N cũng đi qua đây
     if (blocked) return toast.error(BLOCKED_MSG)
     if (isBelowMd()) setModal({ plan: null }); else setInlineKey((k) => k ?? 0)
-  }, [blocked, toast])
+  }, [viewer, blocked, toast])
   // D-030: sửa tại chỗ (≥ md, có quyền sửa): chính dòng đó thành dòng nhập; màn nhỏ hoặc chỉ xem → modal. Một dòng sửa tại một thời điểm.
   const [editingId, setEditingId] = useState<number | null>(null)
   const editCtl = useRef<InlineControls | null>(null)
@@ -163,7 +165,7 @@ export default function PlansPage() {
         const showUntil = !!state && !!until
         return (
           <span className="inline-flex items-center gap-0.5">
-            {profile && r.created_by === profile.id && !canEdit(r) && !state && !inc.has('plan', r.id) && <Button size="sm" onClick={() => setRequesting(r)} data-testid={`request-edit-${r.tk_number}`}>Yêu cầu sửa</Button>}
+            {profile && !viewer && r.created_by === profile.id && !canEdit(r) && !state && !inc.has('plan', r.id) && <Button size="sm" onClick={() => setRequesting(r)} data-testid={`request-edit-${r.tk_number}`}>Yêu cầu sửa</Button>}
             {state?.status === 'pending' && <span className={`${PILL} bg-orange-100 text-orange-900`} title="Yêu cầu sửa đang chờ admin duyệt" data-testid={`edit-pending-${r.tk_number}`}>Chờ duyệt</span>}
             {showUntil && <span className={`${PILL} bg-green-100 text-green-900`} title={`Được sửa đến ${untilLabel(until)}`} data-testid={`edit-unlocked-${r.tk_number}`}>Sửa đến {untilLabel(until)}</span>}
             <IconButton icon="edit" label={canUpdate(r) ? `Sửa phiếu ${r.tk_number}${showUntil ? ` (được sửa đến ${untilLabel(until)})` : ''}` : `Xem phiếu ${r.tk_number} (${EDIT_DENIED_HINT})`} onClick={() => openEdit(r)} data-testid={`edit-${r.tk_number}`} />
@@ -186,7 +188,7 @@ export default function PlansPage() {
         <PanelToggle controls="plans-stats" open={statsOpen} onToggle={toggleStats} openLabel="Ẩn số liệu" closedLabel="Hiện số liệu" testId="toggle-stats" />
         <PanelToggle controls="plans-filters" open={filtersOpen} onToggle={toggleFilters} openLabel="Ẩn bộ lọc" closedLabel="Hiện bộ lọc" badge={activeCount} badgeLabel="Bộ lọc" testId="toggle-filters" />
         {!filtersOpen && filtered && <Button size="sm" icon="close" onClick={list.clearFilters} aria-label="Xóa lọc" title="Xóa lọc" data-testid="clear-filters-hidden"><span className="hidden sm:inline">Xóa lọc</span></Button>}
-        <Button variant="primary" size="sm" icon="plus" onClick={openNew} title="Thêm phiếu (phím N)" data-testid="add-plan">Thêm phiếu</Button>
+        {!viewer && <Button variant="primary" size="sm" icon="plus" onClick={openNew} title="Thêm phiếu (phím N)" data-testid="add-plan">Thêm phiếu</Button>}
         {inlineKey !== null && (
           <>
             <Button variant="primary" size="sm" disabled={inlineBusy} onClick={() => inlineCtl.current?.save()} data-testid="header-save">{inlineBusy ? 'Đang lưu…' : 'Lưu phiếu'}</Button>
@@ -228,8 +230,8 @@ export default function PlansPage() {
             <Button onClick={list.clearFilters}>Xóa bộ lọc</Button>
           </EmptyState>
         ) : (
-          <EmptyState title="Chưa có phiếu nào." hint="Bấm “Thêm phiếu” (hoặc phím N) để nhập phiếu đầu tiên.">
-            <Button variant="primary" icon="plus" onClick={openNew}>Thêm phiếu</Button>
+          <EmptyState title="Chưa có phiếu nào." hint={viewer ? undefined : 'Bấm “Thêm phiếu” (hoặc phím N) để nhập phiếu đầu tiên.'}>
+            {!viewer && <Button variant="primary" icon="plus" onClick={openNew}>Thêm phiếu</Button>}
           </EmptyState>
         )} />
       {!list.loading && !list.error && list.hasData && (

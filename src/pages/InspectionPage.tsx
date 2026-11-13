@@ -23,7 +23,7 @@ import EmptyState from '../components/ui/EmptyState'
 import PageHeader from '../components/ui/PageHeader'
 import Pagination from '../components/ui/Pagination'
 import { useToast } from '../components/ui/Toast'
-import { EDIT_DENIED_HINT, canEditRow, canUpdateRow } from '../lib/auth'
+import { EDIT_DENIED_HINT, canEditRow, canUpdateRow, isViewerRole } from '../lib/auth'
 import { BLOCKED_MSG, useIncomplete } from '../lib/useIncomplete'
 import CopyButton from '../components/ui/CopyButton'
 import { targetLabel, untilLabel, useMyEditRequests } from '../lib/useEditRequests'
@@ -51,6 +51,7 @@ export default function InspectionPage() {
   const lookups = useLookups()
   const toast = useToast()
   const { profile } = useProfile()
+  const viewer = isViewerRole(profile?.role) // Chỉ xem: không thêm dòng, không yêu cầu sửa
   const mine = useMyEditRequests(profile?.id)
   const inc = useIncomplete() // D-029: phiếu/dòng thiếu quá 24h → khóa thao tác khác
   const canEdit = (r: InspectionRow) => canEditRow(profile, r.created_by, r.created_at) // xóa (khi không bị khóa)
@@ -84,13 +85,14 @@ export default function InspectionPage() {
     setNewRows((rs) => [...rs, ...add])
   }, [newRows, toast])
   const openNew = useCallback(() => {
+    if (viewer) return // phím N cũng đi qua đây
     if (blocked) return toast.error(BLOCKED_MSG)
     if (isBelowMd()) return setModal({ row: null })
     if (editCtl.current && !editCtl.current.cancel()) return // đang sửa dở: hỏi trước khi đóng
     setEditingId(null)
     if (newRows.length === 0) setNewRows([makeRow()])
     else addRows(1) // đang mở dòng nhập: bấm "Thêm dòng" / phím N là thêm tiếp một dòng
-  }, [blocked, toast, newRows.length, addRows])
+  }, [viewer, blocked, toast, newRows.length, addRows])
   /** Đóng mọi dòng nhập; dòng nào đang gõ dở thì hỏi từng dòng. false = người dùng giữ lại (dừng, không mất dữ liệu). */
   function cancelNew(): boolean {
     for (const { ctl } of newRows) if (!ctl.current?.cancel()) return false
@@ -134,7 +136,7 @@ export default function InspectionPage() {
     {
       key: 'actions', header: 'Thao tác', nowrap: true, mobile: 'actions', // cột đầu, dính trái khi cuộn ngang
       render: (r) => {
-        const own = !!profile && r.created_by === profile.id && !canEdit(r) && !inc.has('detail', r.id) // người tạo, đã quá 24 giờ (dòng còn thiếu thì sửa thẳng, D-029)
+        const own = !!profile && !viewer && r.created_by === profile.id && !canEdit(r) && !inc.has('detail', r.id) // người tạo, đã quá 24 giờ (dòng còn thiếu thì sửa thẳng, D-029)
         const until = own ? mine.unlockOfLine(r.id, r.plan_id) : null
         const pending = own && !until && mine.detailUnlocks.get(r.id)?.status === 'pending'
         return (
@@ -191,7 +193,7 @@ export default function InspectionPage() {
       <PageHeader title="Bảng kiểm chi tiết" description="Từng mặt hàng trên mỗi phiếu xuất kho">
         <PanelToggle controls="inspection-filters" open={filtersOpen} onToggle={toggleFilters} openLabel="Ẩn bộ lọc" closedLabel="Hiện bộ lọc" badge={activeCount} badgeLabel="Bộ lọc" testId="toggle-filters" />
         {!filtersOpen && filtered && <Button size="sm" icon="close" onClick={clearFilters} aria-label="Xóa lọc" title="Xóa lọc" data-testid="clear-filters-hidden"><span className="hidden sm:inline">Xóa lọc</span></Button>}
-        <Button variant="primary" size="sm" icon="plus" onClick={openNew} title="Thêm dòng (phím N)" data-testid="add-inspection">Thêm dòng</Button>
+        {!viewer && <Button variant="primary" size="sm" icon="plus" onClick={openNew} title="Thêm dòng (phím N)" data-testid="add-inspection">Thêm dòng</Button>}
         {inline && (
           <>
             <Button variant="primary" size="sm" disabled={inlineBusy || savingAll} onClick={() => (newRows.length > 1 ? void saveAll() : void newRows[0].ctl.current?.save())} data-testid="header-save">
@@ -227,8 +229,8 @@ export default function InspectionPage() {
             <Button onClick={clearFilters}>Xóa bộ lọc</Button>
           </EmptyState>
         ) : (
-          <EmptyState title="Chưa có dòng nào." hint="Bấm “Thêm dòng” (hoặc phím N) để nhập dòng đầu tiên.">
-            <Button variant="primary" icon="plus" onClick={openNew}>Thêm dòng</Button>
+          <EmptyState title="Chưa có dòng nào." hint={viewer ? undefined : 'Bấm “Thêm dòng” (hoặc phím N) để nhập dòng đầu tiên.'}>
+            {!viewer && <Button variant="primary" icon="plus" onClick={openNew}>Thêm dòng</Button>}
           </EmptyState>
         )} />
       {!list.loading && !list.error && list.hasData && (

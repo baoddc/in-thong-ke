@@ -150,18 +150,19 @@ describe('UsersPage', () => {
     await waitFor(() => expect(body('set_active')).toEqual([{ action: 'set_active', user_id: 'u1', active: false }]))
   })
 
-  it('admin: dòng root bị khóa mọi thao tác; không có ô vai trò khi thêm/sửa', async () => {
+  it('admin: dòng root bị khóa mọi thao tác; có ô vai trò nhưng chỉ Người dùng / Chỉ xem (không có Admin)', async () => {
     setup()
     await screen.findByTestId('user-table')
     expect(within(screen.getByTestId('user-row-root')).getByText('Root')).toBeTruthy()
     for (const a of ['edit', 'reset', 'toggle']) expect(off(`user-${a}-root`)).toBe(true)
     expect(off('user-edit-bao.lt')).toBe(false)
     await userEvent.click(screen.getByTestId('user-edit-bao.lt'))
-    expect(screen.queryByTestId('user-edit-role')).toBeNull()
+    const optionsOf = (id: string) => Array.from(screen.getByTestId(id).querySelectorAll('option')).map((o) => o.value)
+    expect(optionsOf('user-edit-role')).toEqual(['user', 'viewer'])
     cleanup()
     setup()
     await userEvent.click(await screen.findByTestId('add-user'))
-    expect(screen.queryByTestId('user-role-select')).toBeNull()
+    expect(optionsOf('user-role-select')).toEqual(['user', 'viewer'])
   })
 
   it('root: Thêm có chọn vai trò (gửi admin); Sửa chính mình/dòng root khóa ô vai trò, người khác thì sửa được', async () => {

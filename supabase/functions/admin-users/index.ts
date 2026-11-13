@@ -68,7 +68,7 @@ async function handle(req: Request): Promise<Response> {
 
   const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false, autoRefreshToken: false } })
   const { data: myProfile } = await admin.from('profiles').select('role, is_active').eq('id', me.user.id).maybeSingle()
-  if (!myProfile || !isRole(myProfile.role) || myProfile.role === 'user' || !myProfile.is_active) {
+  if (!myProfile || !isRole(myProfile.role) || myProfile.role === 'user' || myProfile.role === 'viewer' || !myProfile.is_active) {
     return fail('Chỉ quản trị viên mới được quản lý người dùng', 403)
   }
   const myRole: Role = myProfile.role

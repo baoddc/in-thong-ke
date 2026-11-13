@@ -48,6 +48,20 @@ const cases: [Role, Role, boolean, Action, Role | undefined, boolean][] = [
   ['root', 'root', true, 'change_role', 'admin', false],
   ['admin', 'user', false, 'change_role', 'admin', false],
   ['admin', 'admin', true, 'change_role', 'user', false],
+  // viewer (Chỉ xem): không quản lý ai; root đặt được; admin quản lý được tài khoản viewer như user
+  ['viewer', 'user', false, 'view', undefined, false],
+  ['viewer', 'viewer', true, 'reset_password', undefined, false],
+  ['root', 'user', false, 'change_role', 'viewer', true],
+  ['root', 'viewer', false, 'change_role', 'user', true],
+  ['admin', 'user', false, 'change_role', 'viewer', true],
+  ['admin', 'viewer', false, 'change_role', 'user', true],
+  ['admin', 'viewer', false, 'change_role', 'admin', false],
+  ['admin', 'admin', false, 'change_role', 'user', false],
+  ['admin', 'viewer', true, 'change_role', 'user', false],
+  ['root', 'viewer', false, 'create', undefined, true],
+  ['admin', 'viewer', false, 'set_active', undefined, true],
+  ['admin', 'viewer', false, 'reset_password', undefined, true],
+  ['admin', 'viewer', false, 'rename', undefined, true],
 ]
 
 Deno.test('canManage theo D-014', () => {
@@ -76,7 +90,7 @@ Deno.test('thông điệp lỗi chính', () => {
 
 // Giữ kín tài khoản cấp cao nhất: không thông điệp lỗi nào gửi tới admin được nhắc tới "root"
 Deno.test('thông điệp lỗi không nhắc tới root', () => {
-  const targets: Role[] = ['root', 'admin', 'user']
+  const targets: Role[] = ['root', 'admin', 'user', 'viewer']
   const actions: Action[] = ['view', 'create', 'rename', 'change_role', 'set_active', 'reset_password', 'approve', 'reject']
   for (const t of targets) for (const a of actions) {
     for (const pending of [false, true]) {
