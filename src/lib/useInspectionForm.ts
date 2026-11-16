@@ -5,6 +5,7 @@ import type { LookupItem } from './useLookups'
 import type { Opt } from './lookupSearch'
 import { EDIT_DENIED_HINT } from './auth'
 import { useReportActivity } from './presence'
+import { pushToSheet } from './sheetSync'
 import { PLAN_SELECT, mergeShippers, planShipperId, shipperIdToSave } from './plans'
 import type { PlanRow } from '../types/plan'
 import type { InspectionRow } from '../types/inspection'
@@ -125,6 +126,7 @@ export function useInspectionForm({ row, readOnly = false, lookups, validity, on
     setBusy(false)
     if (res.error) return fail(errorMessage(res.error))
     if (row && !res.data?.length) return fail(`Bạn không có quyền sửa dòng này. ${EDIT_DENIED_HINT}.`) // RLS chặn: 0 dòng được cập nhật
+    pushToSheet() // thêm và sửa đều đồng bộ sang Sheet
     if (!andNext) {
       onSaved(row ? 'Đã cập nhật dòng' : 'Đã lưu dòng', false)
       return true

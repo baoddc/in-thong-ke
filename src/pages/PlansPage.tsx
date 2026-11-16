@@ -30,6 +30,7 @@ import { BLOCKED_MSG, useIncomplete } from '../lib/useIncomplete'
 import CopyButton from '../components/ui/CopyButton'
 import { untilLabel, useMyEditRequests } from '../lib/useEditRequests'
 import { useProfile } from '../lib/useProfile'
+import { pushToSheet } from '../lib/sheetSync'
 import { EditRequestModal } from '../components/EditRequestModals'
 import { fromRpcPlan, sortedMaterials, type PlanRpcRow } from '../lib/plans'
 import type { PlanRow } from '../types/plan'
@@ -129,6 +130,7 @@ export default function PlansPage() {
     if (error) return toast.error(errorMessage(error))
     if (!data?.length) return toast.error(`Bạn không có quyền xóa phiếu ${tk}. ${EDIT_DENIED_HINT}.`) // RLS chặn: 0 dòng bị xóa
     toast.success(`Đã xóa phiếu ${tk}`)
+    pushToSheet()
     void reload()
     void stats.reload()
   }

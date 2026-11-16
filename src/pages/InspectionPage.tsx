@@ -29,6 +29,7 @@ import CopyButton from '../components/ui/CopyButton'
 import { targetLabel, untilLabel, useMyEditRequests } from '../lib/useEditRequests'
 import { EditRequestModal } from '../components/EditRequestModals'
 import { useProfile } from '../lib/useProfile'
+import { pushToSheet } from '../lib/sheetSync'
 import type { InspectionRow } from '../types/inspection'
 
 const CFG: ListConfig = {
@@ -119,6 +120,7 @@ export default function InspectionPage() {
     if (error) return toast.error(errorMessage(error))
     if (!data?.length) return toast.error(`Bạn không có quyền xóa dòng này. ${EDIT_DENIED_HINT}.`) // RLS chặn: 0 dòng bị xóa
     toast.success('Đã xóa dòng')
+    pushToSheet()
     void reload()
   }
 

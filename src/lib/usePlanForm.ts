@@ -5,6 +5,7 @@ import { sortedMaterials } from './plans'
 import { useTkReservation } from './useTkReservation'
 import { useReportActivity } from './presence'
 import { useProfile } from './useProfile'
+import { pushToSheet } from './sheetSync'
 import type { Opt } from './lookupSearch'
 import type { PlanRow } from '../types/plan'
 
@@ -106,6 +107,7 @@ export function usePlanForm({ plan, readOnly = false, onSaved, onExpired, lookup
       : await supabase.rpc('create_transport_plan', args)
     setBusy(false)
     if (res.error) return setError(errorMessage(res.error))
+    pushToSheet() // thêm và sửa đều đồng bộ sang Sheet
     if (plan) return onSaved(`Đã cập nhật phiếu ${plan.tk_number}`)
     hold.markSaved() // máy chủ đã xóa chỗ giữ khi lưu → không release thừa
     const tk = res.data.tk_number

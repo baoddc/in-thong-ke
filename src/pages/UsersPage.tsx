@@ -3,6 +3,7 @@ import { formatDateTime } from '../lib/format'
 import { ROLE_LABEL, userActions, type Role } from '../lib/auth'
 import { callAdmin, countPending, messageOf, useAdminUsers, type AdminUser } from '../lib/useAdminUsers'
 import { useProfile } from '../lib/useProfile'
+import { fullSyncSheet } from '../lib/sheetSync'
 import { useAvatarPaths } from '../lib/useAvatarPaths'
 import { CreateUserModal, CredentialsDialog, EditUserModal, ResetPasswordModal } from '../components/UserModals'
 import AvatarDialog from '../components/AvatarDialog'
@@ -22,6 +23,7 @@ type Dialog =
   | { kind: 'toggle'; user: AdminUser; busy: boolean }
   | { kind: 'reject'; user: AdminUser; busy: boolean }
   | { kind: 'credentials'; title: string; username: string; password: string }
+  | { kind: 'sheet'; busy: boolean; written: number }
 
 const pill = 'inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold'
 const ROLE_PILL: Record<Role, string> = { root: 'bg-amber-300 text-slate-900', admin: 'bg-primary-soft text-primary-dark', user: 'bg-stone-200 text-gray-800', viewer: 'bg-sky-100 text-sky-900' }
@@ -89,6 +91,17 @@ export default function UsersPage() {
     close()
   }
 
+  async function runSheetSync() {
+    setDialog({ kind: 'sheet', busy: true, written: 0 })
+    try {
+      const n = await fullSyncSheet((written) => setDialog({ kind: 'sheet', busy: true, written }))
+      toast.success(`Đã ghi ${n.toLocaleString('vi-VN')} dòng lên Google Sheet`)
+    } catch (e) {
+      toast.error(messageOf(e))
+    }
+    close()
+  }
+
   const columns: Column<AdminUser>[] = [
     {
       key: 'name', header: 'Họ tên',
@@ -145,6 +158,7 @@ export default function UsersPage() {
   return (
     <div className="flex flex-col gap-3 md:min-h-0 md:flex-1">
       <PageHeader title="Quản lý người dùng" description="Tạo tài khoản, duyệt đăng ký, đổi vai trò, khóa/mở khóa, đặt lại mật khẩu">
+        <Button size="sm" onClick={() => setDialog({ kind: 'sheet', busy: false, written: 0 })} title="Ghi lại toàn bộ phiếu và bảng kiểm lên Google Sheet" data-testid="sheet-sync">Đồng bộ Google Sheet</Button>
         <Button variant="primary" size="sm" icon="plus" onClick={() => setDialog({ kind: 'create' })} data-testid="add-user">Thêm người dùng</Button>
       </PageHeader>
 
@@ -183,6 +197,11 @@ export default function UsersPage() {
         <ConfirmDialog title={`Từ chối ${dialog.user.username}?`} busy={dialog.busy} confirmLabel="Từ chối"
           message={`Từ chối sẽ xóa hẳn yêu cầu đăng ký của ${dialog.user.full_name}. Không thể hoàn tác.`}
           onConfirm={() => void confirmReject(dialog.user)} onCancel={close} />
+      )}
+      {dialog?.kind === 'sheet' && (
+        <ConfirmDialog title="Đồng bộ lại toàn bộ lên Google Sheet?" busy={dialog.busy} confirmLabel={dialog.busy ? `Đang ghi… ${dialog.written.toLocaleString('vi-VN')} dòng` : 'Đồng bộ'}
+          message="Xóa nội dung 2 tab (Phiếu thống kê, Bảng kiểm) trong file Google Sheet rồi ghi lại toàn bộ dữ liệu hiện có trên hệ thống. Có thể mất vài phút; đừng đóng trang khi đang chạy."
+          onConfirm={() => void runSheetSync()} onCancel={close} />
       )}
       {dialog?.kind === 'credentials' && <CredentialsDialog title={dialog.title} username={dialog.username} password={dialog.password} onClose={close} />}
     </div>
