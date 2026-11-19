@@ -206,6 +206,7 @@ function LayoutBody({ email }: { email: string }) {
             <Icon name="logout" />{showLabels && <span>Đăng xuất</span>}
           </button>
           {showLabels && <p className="px-2 pb-1 text-[11px] text-slate-300" data-testid="credit">Phát triển bởi Mr.Storm</p>}
+          {showLabels && <p className="-mt-1 px-2 pb-1 text-[11px] text-slate-300" data-testid="license">© 2026 · Giấy phép MIT</p>}
         </div>
       </aside>
 
