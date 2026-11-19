@@ -18,6 +18,7 @@ import LookupsPage from './pages/LookupsPage'
 import ReportPage from './pages/ReportPage'
 import WorkflowPage from './pages/WorkflowPage'
 import GuidePage from './pages/GuidePage'
+import LicensePage from './pages/LicensePage'
 import AboutPage from './pages/AboutPage'
 import UsersPage from './pages/UsersPage'
 import AuditLogPage from './pages/AuditLogPage'
@@ -206,7 +207,7 @@ function LayoutBody({ email }: { email: string }) {
             <Icon name="logout" />{showLabels && <span>Đăng xuất</span>}
           </button>
           {showLabels && <p className="px-2 pb-1 text-[11px] text-slate-300" data-testid="credit">Phát triển bởi Mr.Storm</p>}
-          {showLabels && <p className="-mt-1 px-2 pb-1 text-[11px] text-slate-300" data-testid="license">© 2026 · <a href="https://github.com/baoddc/in-thong-ke/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded">Giấy phép MIT</a></p>}
+          {showLabels && <p className="-mt-1 px-2 pb-1 text-[11px] text-slate-300" data-testid="license">© 2026 · <NavLink to="/giay-phep" onClick={() => setDrawer(false)} className="underline underline-offset-2 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded">Giấy phép MIT</NavLink></p>}
         </div>
       </aside>
 
@@ -267,6 +268,7 @@ export default function App() {
         <Route path="/danh-muc" element={<LookupsPage />} />
         <Route path="/luong-cong-viec" element={<WorkflowPage />} />
         <Route path="/huong-dan" element={<GuidePage />} />
+        <Route path="/giay-phep" element={<LicensePage />} />
         <Route path="/gioi-thieu" element={<AboutPage />} />
         <Route path="/yeu-cau-sua" element={<AdminOnly><EditRequestsPage /></AdminOnly>} />
         <Route path="/nguoi-dung" element={<AdminOnly><UsersPage /></AdminOnly>} />
