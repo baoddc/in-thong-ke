@@ -17,6 +17,7 @@ import PrintPage from './pages/PrintPage'
 import LookupsPage from './pages/LookupsPage'
 import ReportPage from './pages/ReportPage'
 import WorkflowPage from './pages/WorkflowPage'
+import GuidePage from './pages/GuidePage'
 import AboutPage from './pages/AboutPage'
 import UsersPage from './pages/UsersPage'
 import AuditLogPage from './pages/AuditLogPage'
@@ -38,7 +39,10 @@ const ITEMS: NavItem[] = [
   { to: '/bao-cao', label: 'Báo cáo', icon: 'scale' },
   { to: '/danh-muc', label: 'Danh mục', icon: 'lookup' },
   { to: '/luong-cong-viec', label: 'Luồng công việc', icon: 'workflow' },
+]
+const HELP_ITEMS: NavItem[] = [ // nhóm "Trợ giúp"
   { to: '/gioi-thieu', label: 'Giới thiệu', icon: 'info' },
+  { to: '/huong-dan', label: 'Hướng dẫn sử dụng', icon: 'file' },
 ]
 const ADMIN_ITEMS: NavItem[] = [ // D-013/D-014: admin và root
   { to: '/yeu-cau-sua', label: 'Yêu cầu sửa', icon: 'edit' }, // D-019
@@ -70,6 +74,7 @@ function LayoutBody({ email }: { email: string }) {
   const pending = usePendingCount(isAdmin) // D-015: badge số tài khoản chờ duyệt
   const pendingEdits = useEditPendingCount(isAdmin) // D-019: badge số yêu cầu sửa chờ duyệt
   useEditRequestNotices(profile?.id, isAdmin) // D-020: thông báo tức thì khi yêu cầu sửa được duyệt/từ chối
+  const [openGroups, setOpenGroups] = useState({ help: true, admin: true })
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [drawer, setDrawer] = useState(false) // ngăn kéo trên màn hình nhỏ
   const [avatarOpen, setAvatarOpen] = useState(false)
@@ -92,7 +97,57 @@ function LayoutBody({ email }: { email: string }) {
   const row = `flex min-h-[48px] items-center gap-3 rounded-xl border py-2 md:min-h-10 [@media(max-height:820px)]:md:min-h-8 [@media(max-height:820px)]:md:py-1 whitespace-nowrap transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${showLabels ? 'px-3' : 'justify-center'}`
   const link = ({ isActive }: { isActive: boolean }) =>
     `${row} ${isActive ? 'glass-active font-semibold text-white' : 'border-transparent text-slate-200 hover:bg-white/10 hover:text-white'}`
+  // Mục con (như mẫu): không icon, chữ nhỏ hơn, chấm tròn trên đường nối dọc bên trái; mục đang chọn sáng lên.
+  const subLink = ({ isActive }: { isActive: boolean }) =>
+    `relative flex min-h-10 items-center gap-2 rounded-lg border py-1.5 pl-7 pr-2 text-[13px] whitespace-nowrap transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${isActive ? 'border-transparent bg-white/10 font-semibold text-white' : 'border-transparent text-slate-300 hover:bg-white/10 hover:text-white'}`
   const hint = (text: string) => (showLabels ? {} : { title: text, 'aria-label': text })
+
+  const groupItems = [...(isAdmin ? ADMIN_ITEMS : []), ...(isRoot ? ROOT_ITEMS : [])] // gom vào mục "Admin" trên menu
+  const renderItem = (i: NavItem, sub = false, last = false) => {
+    const Tree = () => sub ? (
+      // Nhánh cây như mẫu: đường dọc từ icon cha, cong ở chân rồi tới chấm tròn trước chữ.
+      <>
+        <span aria-hidden="true" className="pointer-events-none absolute -left-px -top-px h-[calc(50%+1px)] w-3 rounded-bl-xl border-b border-l border-white/40" />
+        {!last && <span aria-hidden="true" className="pointer-events-none absolute -left-px top-1/2 -bottom-px border-l border-white/40" />}
+        <span aria-hidden="true" className="pointer-events-none absolute left-[15px] top-1/2 h-1 w-1 -translate-y-1/2 rounded-full bg-white/70" />
+      </>
+    ) : <Icon name={i.icon} />
+    const isEdits = i.to === '/yeu-cau-sua'
+    const count = isEdits ? pendingEdits : i.to === '/nguoi-dung' ? pending : 0
+  const what = isEdits ? 'yêu cầu' : 'tài khoản'
+  return (
+    <NavLink key={i.to} to={i.to} end={i.end} className={sub ? subLink : link} onClick={() => setDrawer(false)}
+      {...hint(count ? `${i.label} (${count} chờ duyệt)` : i.label)}>
+      <Tree />
+      {showLabels && <span>{i.label}</span>}
+      {count > 0 && (
+        <span className={showLabels ? 'ml-auto rounded-full bg-orange-500 px-2 text-xs font-bold text-white' : 'sr-only'} data-testid={isEdits ? 'edit-pending-badge' : 'pending-badge'} title={`${count} ${what} chờ duyệt`}>{count}</span>
+      )}
+    </NavLink>
+  )
+  }
+
+  // Nhóm mục con gập được (Trợ giúp, Admin). Menu thu gọn (chỉ icon): bỏ tiêu đề nhóm, hiện phẳng các icon.
+  const renderGroup = (id: 'help' | 'admin', label: string, icon: IconName, items: NavItem[], badge: number) => {
+    if (items.length === 0) return null
+    const open = openGroups[id]
+    return (
+      <>
+        <button type="button" onClick={() => setOpenGroups((g) => ({ ...g, [id]: !g[id] }))} aria-expanded={open} aria-controls={`nav-${id}`} data-testid={`nav-${id}-toggle`}
+          className={`${row} w-full border-transparent text-slate-200 hover:bg-white/10 hover:text-white ${showLabels ? '' : 'hidden'}`}>
+          <Icon name={icon} />
+          <span>{label}</span>
+          {!open && badge > 0 && <span className="ml-auto rounded-full bg-orange-500 px-2 text-xs font-bold text-white" title="Có mục chờ duyệt">{badge}</span>}
+          <Icon name="next" size={16} className={`${!open && badge > 0 ? '' : 'ml-auto'} opacity-60 transition-transform ${open ? 'rotate-90' : ''}`} />
+        </button>
+        {(open || !showLabels) && (
+          <div id={`nav-${id}`} className={`flex flex-col ${showLabels ? '-mt-1 ml-[22px]' : 'gap-0.5'}`}>
+            {items.map((i, k) => renderItem(i, showLabels, k === items.length - 1))}
+          </div>
+        )}
+      </>
+    )
+  }
 
   return (
     // Từ md: khung đúng bằng màn hình, không cuộn cả trang — bảng tự cuộn bên trong; khi in thì trả về dòng chảy bình thường.
@@ -135,22 +190,9 @@ function LayoutBody({ email }: { email: string }) {
         )}
         {showLabels && <p className="mt-2 px-2 text-[11px] font-semibold tracking-widest text-slate-300" aria-hidden="true">MENU</p>}
         <nav aria-label="Menu chính" className="mt-1 flex flex-col gap-1 [@media(max-height:820px)]:md:gap-0.5">
-          {[...ITEMS, ...(isAdmin ? ADMIN_ITEMS : []), ...(isRoot ? ROOT_ITEMS : [])].map((i) => {
-            const isEdits = i.to === '/yeu-cau-sua'
-            const count = isEdits ? pendingEdits : i.to === '/nguoi-dung' ? pending : 0
-            const what = isEdits ? 'yêu cầu' : 'tài khoản'
-            return (
-              <NavLink key={i.to} to={i.to} end={i.end} className={link} onClick={() => setDrawer(false)}
-                {...hint(count ? `${i.label} (${count} chờ duyệt)` : i.label)}>
-                <Icon name={i.icon} />
-                {showLabels && <span>{i.label}</span>}
-                {count > 0 && (
-                  <span className={showLabels ? 'ml-auto rounded-full bg-orange-500 px-2 text-xs font-bold text-white' : 'sr-only'} data-testid={isEdits ? 'edit-pending-badge' : 'pending-badge'} title={`${count} ${what} chờ duyệt`}>{count}</span>
-                )}
-                
-              </NavLink>
-            )
-          })}
+          {ITEMS.map((i) => renderItem(i))}
+          {renderGroup('help', 'Trợ giúp', 'info', HELP_ITEMS, 0)}
+          {renderGroup('admin', 'Admin', 'shield', groupItems, pending + pendingEdits)}
         </nav>
         <div className="mt-auto space-y-1 border-t border-white/10 pt-2">
           <OnlineUsers showLabels={showLabels} />
@@ -222,6 +264,7 @@ export default function App() {
         <Route path="/bao-cao" element={<ReportPage />} />
         <Route path="/danh-muc" element={<LookupsPage />} />
         <Route path="/luong-cong-viec" element={<WorkflowPage />} />
+        <Route path="/huong-dan" element={<GuidePage />} />
         <Route path="/gioi-thieu" element={<AboutPage />} />
         <Route path="/yeu-cau-sua" element={<AdminOnly><EditRequestsPage /></AdminOnly>} />
         <Route path="/nguoi-dung" element={<AdminOnly><UsersPage /></AdminOnly>} />

@@ -10,7 +10,7 @@ const STEPS = [
   { to: '/', title: 'Nhập phiếu', desc: 'Tạo phiếu thống kê, số TK tự cấp.' },
   { to: '/bang-kiem', title: 'Bảng kiểm', desc: 'Nhập từng mặt hàng của phiếu.' },
   { to: '/in-thong-ke', title: 'In thống kê', desc: 'Chọn phiếu, in A4 hoặc lưu PDF.' },
-  { to: '/', title: 'Yêu cầu sửa', desc: 'Quá 24 giờ: bấm "Yêu cầu sửa" ở dòng cần sửa.' },
+  { to: '/bao-cao', title: 'Báo cáo', desc: 'Xem khối lượng theo tháng, nhóm hàng, dự án.' },
 ]
 
 const GROUPS: FeatureGroup[] = [
@@ -23,6 +23,7 @@ const GROUPS: FeatureGroup[] = [
           'Số phiếu TK tự cấp dạng TK2026/10-005, tự lấp số khuyết, không bao giờ trùng.',
           'Chọn Phân loại VC, Số xe, Tài xế, NV xuất TP/BTP; NV xuất VT chọn nhiều, giữ thứ tự.',
           'Gõ để tìm không cần dấu; chưa có thì bấm "+ Thêm" ngay.',
+          'Nhập thẳng trên bảng, hoặc mở form thêm phiếu.',
         ],
       },
       {
@@ -30,6 +31,7 @@ const GROUPS: FeatureGroup[] = [
         points: [
           'Mở form thêm phiếu là số TK được giữ cho riêng bạn trong 5 phút.',
           'Nhiều người cùng tạo phiếu vẫn không bị trùng số; mở lại khi còn hạn thì giữ đúng số cũ.',
+          'Có nút sao chép số TK.',
         ],
       },
       {
@@ -38,7 +40,7 @@ const GROUPS: FeatureGroup[] = [
           'Mỗi dòng là 1 mặt hàng trên 1 phiếu xuất kho.',
           'Số lệnh VC, Số xe, Tài xế, NV xuất hàng tự lấy theo số phiếu TK.',
           'Nhập Mã công trình tự điền Tên công trình.',
-          '"Lưu và thêm dòng tiếp" giữ lại phần chung.',
+          'Nhập được nhiều dòng cùng lúc, rồi "Lưu tất cả".',
         ],
       },
       {
@@ -51,7 +53,7 @@ const GROUPS: FeatureGroup[] = [
     ],
   },
   {
-    id: 'in-tra-cuu', title: 'In & tra cứu',
+    id: 'in-tra-cuu', title: 'In, báo cáo & tra cứu',
     features: [
       {
         icon: 'print', color: 'bg-sky-50 text-sky-700', title: 'In thống kê',
@@ -62,18 +64,19 @@ const GROUPS: FeatureGroup[] = [
         ],
       },
       {
+        icon: 'scale', color: 'bg-amber-50 text-amber-700', title: 'Báo cáo',
+        points: [
+          '4 tab: Tổng quan, Theo nhóm hàng, Theo dự án, Top 10 dự án.',
+          'Lọc theo Từ ngày / Đến ngày hoặc chọn nhanh theo tháng.',
+          'Số liệu lấy từ Bảng kiểm theo ngày xuất; khối lượng tính bằng tấn.',
+        ],
+      },
+      {
         icon: 'search', color: 'bg-violet-50 text-violet-700', title: 'Tra cứu nhanh dữ liệu lớn',
         points: [
           'Tìm theo số TK, số lệnh VC, số phiếu xuất kho.',
           'Lọc theo khoảng ngày, loại hình xuất, mặt hàng, công trình, đơn vị nhận; sắp theo cột, phân trang.',
           'Thiết kế cho hàng trăm nghìn đến hàng triệu dòng vẫn mở trang trong tích tắc.',
-        ],
-      },
-      {
-        icon: 'scale', color: 'bg-amber-50 text-amber-700', title: 'Số liệu tức thì',
-        points: [
-          'Thẻ số phiếu, số dòng bảng kiểm và tổng khối lượng (kg) của tháng.',
-          'Thống kê được tính sẵn trong cơ sở dữ liệu.',
         ],
       },
     ],
@@ -84,7 +87,7 @@ const GROUPS: FeatureGroup[] = [
       {
         icon: 'shield', color: 'bg-rose-50 text-rose-700', title: 'Phân quyền & an toàn',
         points: [
-          '3 vai trò: Admin / Người dùng / Chỉ xem.',
+          '3 vai trò: Admin / Người dùng / Chỉ xem (xem bảng bên dưới).',
           'Người tạo được sửa/xóa dữ liệu của mình trong 24 giờ, sau đó chỉ admin.',
           'Dữ liệu được bảo vệ ở tầng cơ sở dữ liệu (RLS); mọi thao tác ghi lại người tạo và người sửa lần cuối.',
         ],
@@ -102,7 +105,23 @@ const GROUPS: FeatureGroup[] = [
         points: [
           'Đăng nhập bằng tên đăng nhập (vd bao.lt) hoặc email.',
           'Tự đăng ký và chờ quản trị viên duyệt.',
-          'Quản trị viên tạo tài khoản, khóa/mở khóa, đặt lại mật khẩu.',
+          'Quản trị viên tạo tài khoản, đổi vai trò Người dùng / Chỉ xem, khóa/mở khóa, đặt lại mật khẩu.',
+          'Bấm ảnh đại diện ở thanh bên để đổi ảnh.',
+        ],
+      },
+      {
+        icon: 'file', color: 'bg-lime-50 text-lime-800', title: 'Đồng bộ Google Sheet',
+        points: [
+          'Phiếu và bảng kiểm được ghi sang Google Sheet sau mỗi lần thêm, sửa, xóa.',
+          'Admin có nút "Đồng bộ Google Sheet" ở Quản lý người dùng để ghi lại toàn bộ.',
+        ],
+      },
+      {
+        icon: 'list', color: 'bg-cyan-50 text-cyan-800', title: 'Làm việc cùng nhau',
+        points: [
+          'Thanh bên cho biết ai đang trực tuyến.',
+          'Dữ liệu do người khác nhập tự cập nhật, không cần tải lại trang.',
+          'Còn phiếu quá hạn chưa hoàn tất thì có cảnh báo và chưa tạo được phiếu mới.',
         ],
       },
     ],
@@ -114,12 +133,13 @@ type Cell = boolean | string
 // Không nhắc vai trò root ở giao diện chung (người dùng chốt 04/11/2026: giữ kín sự tồn tại của root).
 const ROLES = ['Admin', 'Người dùng', 'Chỉ xem'] as const
 const PERMISSIONS: { label: string; cells: [Cell, Cell, Cell] }[] = [
-  { label: 'Xem, in, xuất dữ liệu', cells: [true, true, true] },
+  { label: 'Xem dữ liệu, báo cáo, in thống kê', cells: [true, true, true] },
   { label: 'Nhập phiếu, bảng kiểm', cells: [true, true, false] },
   { label: 'Sửa/xóa trong 24 giờ', cells: [true, 'Của mình', false] },
   { label: 'Sửa sau 24 giờ', cells: [true, 'Sau khi duyệt', false] },
   { label: 'Duyệt yêu cầu sửa', cells: [true, false, false] },
   { label: 'Quản lý tài khoản', cells: ['Người dùng, Chỉ xem', false, false] },
+  { label: 'Đồng bộ lại Google Sheet', cells: [true, false, false] },
 ]
 
 function PermissionCell({ value }: { value: Cell }) {
@@ -142,15 +162,17 @@ export default function AboutPage() {
     <div className="space-y-5" data-testid="about-page">
       <PageHeader title="Giới thiệu" />
 
-      <section className="overflow-hidden rounded-card border border-stone-200 bg-white shadow-card" data-testid="about-hero">
+      <section className="overflow-hidden rounded-card border border-primary-line bg-primary-soft shadow-card print:shadow-none" data-testid="about-hero">
         <div className="h-1 bg-primary-brand" aria-hidden="true" />
-        <div className="p-4">
-          <div className="flex items-start gap-3 sm:items-center">
-            <img src="/logo-daidung.png" alt="Đại Dũng" className="h-12 w-auto shrink-0" />
+        <div className="p-4 sm:p-5">
+          <div className="flex items-start gap-4 sm:items-center">
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white p-2 shadow-card">
+              <img src="/logo-daidung.png" alt="Đại Dũng" className="max-h-full max-w-full object-contain" />
+            </span>
             <div className="min-w-0">
               <h2 className="text-lg font-bold text-gray-900">In thống kê — Kho An Hạ</h2>
-              <p className="mt-1 text-gray-700">
-                Nhập phiếu thống kê vận chuyển, bảng kiểm chi tiết phiếu xuất kho và in phiếu bàn giao cho Kho An Hạ — Công ty Cổ phần Cơ khí Xây dựng Thương mại Đại Dũng.
+              <p className="mt-1 text-gray-800">
+                Nhập phiếu thống kê vận chuyển, bảng kiểm chi tiết phiếu xuất kho, in phiếu bàn giao và xem báo cáo cho Kho An Hạ — Công ty Cổ phần Cơ khí Xây dựng Thương mại Đại Dũng.
               </p>
             </div>
           </div>
@@ -183,7 +205,7 @@ export default function AboutPage() {
           <SectionTitle id={`about-${g.id}`}>{g.title}</SectionTitle>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3" data-testid="feature-grid">
             {g.features.map((f) => (
-              <article key={f.title} className="rounded-card border border-stone-200 bg-white p-4 shadow-card" data-testid="feature-card">
+              <article key={f.title} className="break-inside-avoid rounded-card border border-stone-200 bg-white p-4 shadow-card" data-testid="feature-card">
                 <div className="flex items-center gap-3">
                   <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${f.color}`}><Icon name={f.icon} /></span>
                   <h3 className="font-semibold text-gray-900">{f.title}</h3>
@@ -228,17 +250,15 @@ export default function AboutPage() {
             <li><Kbd>N</Kbd> thêm mới</li>
             <li><Kbd>/</Kbd> tìm kiếm</li>
             <li><Kbd>Ctrl</Kbd> + <Kbd>Enter</Kbd> lưu</li>
+            <li><Kbd>Tab</Kbd> chọn mục đầu của gợi ý khi đang gõ tìm</li>
           </ul>
-          <p className="mt-3">Ngày dạng dd/mm/yyyy, số kiểu Việt Nam 1.234,5. Chữ gọn, bảng hiển thị nhiều dòng; ẩn/hiện bộ lọc và số liệu, menu thu gọn, dùng tốt trên điện thoại.</p>
+          <p className="mt-3">Ngày dạng dd/mm/yyyy, số kiểu Việt Nam 1.234,5. Menu bên trái thu gọn được; dùng tốt trên điện thoại.</p>
         </div>
       </section>
 
       <footer className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-muted">
-        <div className="flex flex-wrap gap-x-3">
-          <p>Phiên bản 30/10/2026</p>
-          <p data-testid="credit-about">Phát triển bởi Mr.Storm · © 2026</p>
-        </div>
-        <Link to="/luong-cong-viec" data-testid="workflow-link" className="font-medium text-primary underline underline-offset-2 hover:text-primary-dark">Xem trang Luồng công việc</Link>
+        <p data-testid="credit-about">Phát triển bởi Mr.Storm · © 2026</p>
+        <Link to="/luong-cong-viec" data-testid="workflow-link" className="font-medium text-primary underline underline-offset-2 hover:text-primary-dark print:hidden">Xem trang Luồng công việc</Link>
       </footer>
     </div>
   )
