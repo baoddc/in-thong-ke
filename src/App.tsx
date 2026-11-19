@@ -74,7 +74,8 @@ function LayoutBody({ email }: { email: string }) {
   const pending = usePendingCount(isAdmin) // D-015: badge số tài khoản chờ duyệt
   const pendingEdits = useEditPendingCount(isAdmin) // D-019: badge số yêu cầu sửa chờ duyệt
   useEditRequestNotices(profile?.id, isAdmin) // D-020: thông báo tức thì khi yêu cầu sửa được duyệt/từ chối
-  const [openGroups, setOpenGroups] = useState({ help: true, admin: true })
+  // Mặc định gập cả hai nhóm; chỉ mở sẵn nhóm chứa trang đang xem.
+  const [openGroups, setOpenGroups] = useState(() => ({ help: HELP_ITEMS.some((i) => i.to === pathname), admin: [...ADMIN_ITEMS, ...ROOT_ITEMS].some((i) => i.to === pathname) }))
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [drawer, setDrawer] = useState(false) // ngăn kéo trên màn hình nhỏ
   const [avatarOpen, setAvatarOpen] = useState(false)

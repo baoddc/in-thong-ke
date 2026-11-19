@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -25,11 +25,14 @@ import { ToastProvider } from './components/ui/Toast'
 
 afterEach(() => { cleanup(); localStorage.clear(); prof.value = null })
 
-const renderLayout = () => render(
+// Menu mặc định gập hai nhóm Trợ giúp / Admin; test cần thấy mục con thì mở ra.
+const openGroups = () => { for (const id of ['nav-help-toggle', 'nav-admin-toggle']) { const b = screen.queryByTestId(id); if (b) fireEvent.click(b) } }
+
+const renderLayout = (expand = false) => { const r = render(
   <MemoryRouter><ToastProvider>
     <Routes><Route element={<Layout email="a@b.vn" />}><Route path="/" element={<p>Nội dung</p>} /></Route></Routes>
   </ToastProvider></MemoryRouter>,
-)
+); if (expand) openGroups(); return r }
 
 describe('Quyền người dùng (D-013)', () => {
   it('user thường: sidebar không có "Quản lý người dùng", hiện họ tên + badge "Người dùng"', () => {
@@ -42,7 +45,7 @@ describe('Quyền người dùng (D-013)', () => {
 
   it('admin: có "Quản lý người dùng" ở cuối danh sách, badge "Admin"', () => {
     prof.value = { id: 'a', full_name: 'Quản trị', role: 'admin', is_active: true }
-    renderLayout()
+    renderLayout(true)
     const links = Array.from(screen.getByRole('navigation', { name: 'Menu chính' }).querySelectorAll('a'))
     const last = links[links.length - 1]
     expect(last.textContent).toBe('Quản lý người dùng')
@@ -52,7 +55,7 @@ describe('Quyền người dùng (D-013)', () => {
 
   it('root: có "Quản lý người dùng", badge "Root" màu nổi khác admin', () => {
     prof.value = { id: 'r', full_name: 'Bão', role: 'root', is_active: true }
-    renderLayout()
+    renderLayout(true)
     expect(screen.getByRole('link', { name: 'Quản lý người dùng' })).toBeTruthy()
     const badge = screen.getByTestId('user-role')
     expect(badge.textContent).toBe('Root')
@@ -62,7 +65,7 @@ describe('Quyền người dùng (D-013)', () => {
   it('admin: badge số tài khoản chờ duyệt ở mục Quản lý người dùng; user thường không gọi list', async () => {
     invoke.mockResolvedValue({ data: [{ is_pending: true }, { is_pending: true }, { is_pending: false }], error: null })
     prof.value = { id: 'a', full_name: 'Quản trị', role: 'admin', is_active: true }
-    renderLayout()
+    renderLayout(true)
     expect((await screen.findByTestId('pending-badge')).textContent).toBe('2')
     expect(invoke).toHaveBeenCalledWith('admin-users', { body: { action: 'list' } })
     expect((await screen.findByTestId('edit-pending-badge')).textContent).toBe('4') // mục "Yêu cầu sửa" (D-019)
@@ -70,18 +73,18 @@ describe('Quyền người dùng (D-013)', () => {
     cleanup()
     invoke.mockClear()
     prof.value = { id: 'u', full_name: 'A', role: 'user', is_active: true }
-    renderLayout()
+    renderLayout(true)
     expect(screen.queryByTestId('pending-badge')).toBeNull()
     expect(invoke).not.toHaveBeenCalled()
   })
 
   it('"Lịch sử thao tác" chỉ hiện cho root; RootOnly chặn admin', () => {
     prof.value = { id: 'a', full_name: 'Quản trị', role: 'admin', is_active: true }
-    renderLayout()
+    renderLayout(true)
     expect(screen.queryByRole('link', { name: 'Lịch sử thao tác' })).toBeNull()
     cleanup()
     prof.value = { id: 'r', full_name: 'Bão', role: 'root', is_active: true }
-    renderLayout()
+    renderLayout(true)
     expect(screen.getByRole('link', { name: 'Lịch sử thao tác' }).getAttribute('href')).toBe('/lich-su-thao-tac')
     cleanup()
     const go = () => render(
@@ -137,8 +140,18 @@ describe('Quyền người dùng (D-013)', () => {
 })
 
 describe('Layout sidebar', () => {
-  it('6 mục chính, rồi nhóm Trợ giúp (Giới thiệu, Hướng dẫn sử dụng)', () => {
+  it('mặc định gập Trợ giúp và Admin (mũi tên, mục con ẩn); bấm để mở', () => {
+    prof.value = { id: 'a', full_name: 'Quản trị', role: 'admin', is_active: true }
     renderLayout()
+    for (const id of ['nav-help-toggle', 'nav-admin-toggle']) expect(screen.getByTestId(id).getAttribute('aria-expanded')).toBe('false')
+    for (const name of ['Giới thiệu', 'Hướng dẫn sử dụng', 'Yêu cầu sửa', 'Quản lý người dùng']) expect(screen.queryByRole('link', { name: new RegExp(name) })).toBeNull()
+    fireEvent.click(screen.getByTestId('nav-help-toggle'))
+    expect(screen.getByRole('link', { name: 'Giới thiệu' }).getAttribute('href')).toBe('/gioi-thieu')
+    expect(screen.queryByRole('link', { name: 'Quản lý người dùng' })).toBeNull()
+  })
+
+  it('6 mục chính, rồi nhóm Trợ giúp (Giới thiệu, Hướng dẫn sử dụng)', () => {
+    renderLayout(true)
     const labels = screen.getByRole('navigation', { name: 'Menu chính' }).textContent
     expect(labels).toBe('Nhập phiếuBảng kiểmIn thống kêBáo cáoDanh mụcLuồng công việcTrợ giúpGiới thiệuHướng dẫn sử dụng')
   })
@@ -155,7 +168,7 @@ describe('Layout sidebar', () => {
   })
 
   it('đủ 8 liên kết, mỗi mục là liên kết có nhãn đọc được (kể cả mục đang chọn "Nhập phiếu")', () => {
-    renderLayout()
+    renderLayout(true)
     const nav = screen.getByRole('navigation', { name: 'Menu chính' })
     const links = Array.from(nav.querySelectorAll('a'))
     expect(links.map((a) => a.textContent)).toEqual(['Nhập phiếu', 'Bảng kiểm', 'In thống kê', 'Báo cáo', 'Danh mục', 'Luồng công việc', 'Giới thiệu', 'Hướng dẫn sử dụng'])
