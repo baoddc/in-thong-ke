@@ -37,7 +37,7 @@ function Card({ id, title, aside, className = '', children }: { id: string; titl
 function HBar({ value, max, color, delay }: { value: number; max: number; color: string; delay: number }) {
   return (
     <div aria-hidden="true" className="h-2 rounded-r bg-stone-100">
-      <div className="h-2 origin-left animate-grow-x rounded-r transition-[width] duration-500" style={{ width: `${max > 0 ? Math.max((value / max) * 100, 1) : 0}%`, backgroundColor: color, animationDelay: `${delay}ms` }} />
+      <div className="h-2 origin-left animate-grow-x rounded-r" style={{ width: `${max > 0 ? Math.max((value / max) * 100, 1) : 0}%`, backgroundColor: color, animationDelay: `${delay}ms` }} />
     </div>
   )
 }
@@ -68,8 +68,8 @@ function MonthChart({ year, months, prev }: { year: number; months: MonthRow[]; 
               return (
                 <li key={m.month} tabIndex={0} className="group relative flex h-full min-w-0 flex-1 flex-col justify-end rounded text-center outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid={`month-${m.month}`}>
                   <span aria-hidden="true" className="flex min-h-0 flex-1 items-end justify-center gap-0.5 border-b border-stone-300 group-hover:bg-stone-50 group-focus-visible:bg-stone-50">
-                    {p && <span className="relative w-[34%] origin-bottom animate-grow-y rounded-t bg-stone-300 transition-[height] duration-500" style={{ height: h(p.weightKg), animationDelay: `${i * 40}ms` }} />}
-                    <span className="relative w-[42%] origin-bottom animate-grow-y rounded-t bg-primary transition-[height] duration-500 group-hover:bg-primary-dark" style={{ height: h(m.weightKg), animationDelay: `${i * 40}ms` }}>
+                    {p && <span className="relative w-[34%] origin-bottom animate-grow-y rounded-t bg-stone-300" style={{ height: h(p.weightKg), animationDelay: `${i * 40}ms` }} />}
+                    <span className="relative w-[42%] origin-bottom animate-grow-y rounded-t bg-primary group-hover:bg-primary-dark" style={{ height: h(m.weightKg), animationDelay: `${i * 40}ms` }}>
                       {labelled(m, i) && <span className="absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-semibold tabular-nums text-gray-900">{ton(m.weightKg)}</span>}
                     </span>
                   </span>

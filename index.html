@@ -9,10 +9,26 @@
   <meta name="copyright" content="© 2026 Mr.Storm. MIT License" />
   <!-- In thống kê — Kho An Hạ. Developed by Mr.Storm (2026), MIT License. -->
   <link rel="icon" type="image/png" href="/logo-daidung.png" />  <title>In thống kê — Kho An Hạ</title>
+  <style>
+    /* Màn chờ nằm ngoài #root, phủ cả trang, không bị dựng lại giữa các lần chờ nên animation chạy liền mạch; LoadingScreen chỉ bật/tắt độ mờ của nó. */
+    #boot { position: fixed; inset: 0; z-index: 9999; transition: opacity .12s; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; color: #e2e8f0; font: 14px system-ui, sans-serif; letter-spacing: .02em; }
+    #boot, #boot * { user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; outline: none; } #boot img { pointer-events: none; -webkit-user-drag: none; }
+    #boot::before { content: ''; position: absolute; inset: 0; background: radial-gradient(60% 50% at 15% 10%, rgba(200,16,46,.28), transparent 70%), radial-gradient(50% 50% at 90% 90%, rgba(42,120,214,.22), transparent 70%), #0b1220; transition: opacity .45s; } #boot > * { position: relative }
+    #boot .ring { position: relative; width: 96px; height: 96px; display: flex; align-items: center; justify-content: center; }
+    #boot .ring i { position: absolute; inset: 0; border-radius: 50%; animation: boot-ping 1.2s ease-out infinite; }
+    #boot .ring b { position: relative; width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.25); }
+    #boot .ring img { width: 48px; height: 48px; object-fit: contain; }
+    #boot .dots span { display: inline-block; width: 6px; height: 6px; margin-left: 4px; border-radius: 50%; background: #e2e8f0; animation: boot-bounce 1s infinite; }
+    #boot .dots span:nth-child(3) { animation-delay: .15s } #boot .dots span:nth-child(4) { animation-delay: .3s }
+    #boot.leaving { transition: opacity .12s; } #boot.leaving::before { opacity: 0 } #boot.leaving .dots, #boot.leaving .ring i { opacity: 0; transition: opacity .2s } #boot.leaving .ring b { background: transparent; border-color: transparent; transition: .3s }
+    @keyframes boot-ping { from { box-shadow: 0 0 0 0 rgba(200,16,46,.45) } to { box-shadow: 0 0 0 40px rgba(200,16,46,0) } }
+    @keyframes boot-bounce { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-6px) } }
+    @media (prefers-reduced-motion: reduce) { #boot * { animation: none !important } }
+  </style>
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root"></div><div id="boot" role="status"><div class="ring"><i></i><b><img src="/logo-daidung.png" alt="" /></b></div><p class="dots">Đang tải<span></span><span></span><span></span></p></div>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 

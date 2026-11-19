@@ -23,6 +23,17 @@ html::-webkit-scrollbar, body::-webkit-scrollbar, #noi-dung::-webkit-scrollbar {
 dialog[open] { animation: pop-in 180ms ease-out; }
 dialog[open]::backdrop { animation: fade-in 180ms ease-out; }
 
+/* Kính mờ (glassmorphism): nền tối chuyển sắc cho khung ứng dụng, tấm kính cho sidebar. Có dự phòng nền đặc nếu trình duyệt không hỗ trợ blur. */
+@layer components {
+  .app-bg { background: radial-gradient(60rem 40rem at 0% 0%, #5b1a2a 0%, transparent 60%), radial-gradient(50rem 40rem at 100% 100%, #1e3a5f 0%, transparent 60%), #0b1020; }
+  .glass { background: rgb(15 23 42 / 0.9); border: 1px solid rgb(255 255 255 / 0.22); box-shadow: 0 10px 40px rgb(0 0 0 / 0.35), inset 0 1px 0 rgb(255 255 255 / 0.15); }
+  .glass-card { background: rgb(255 255 255 / 0.1); border: 1px solid rgb(255 255 255 / 0.15); border-radius: 1rem; }
+  .glass-active { background: rgb(255 255 255 / 0.2); border-color: rgb(255 255 255 / 0.35); box-shadow: 0 2px 8px rgb(0 0 0 / 0.25), inset 0 1px 0 rgb(255 255 255 / 0.25); }
+  @supports (backdrop-filter: blur(1px)) {
+    .glass { background: linear-gradient(160deg, rgb(255 255 255 / 0.18), rgb(255 255 255 / 0.06)), rgb(15 23 42 / 0.45); backdrop-filter: blur(24px) saturate(140%); }
+  }
+}
+
 /* Người dùng tắt hiệu ứng chuyển động trong hệ điều hành → bỏ hết animation/transition. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }

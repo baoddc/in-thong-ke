@@ -32,19 +32,21 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary-dark via-primary to-ink p-4">
-      <form onSubmit={submit} className="w-full max-w-md animate-pop-in overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <img src="/header-daidung.png" alt="Công ty Cổ phần Cơ khí Xây dựng Thương mại Đại Dũng" className="block w-full border-b border-stone-100" />
+    <div className="app-bg relative flex min-h-screen items-center justify-center overflow-hidden p-4">
+      <div aria-hidden="true" className="pointer-events-none absolute -left-24 top-10 h-72 w-72 rounded-full bg-primary/40 blur-3xl" />
+      <div aria-hidden="true" className="pointer-events-none absolute -right-24 bottom-10 h-80 w-80 rounded-full bg-sky-600/30 blur-3xl" />
+      <form onSubmit={submit} className="glass relative w-full max-w-md animate-pop-in overflow-hidden rounded-3xl">
+        <img src="/header-daidung.png" alt="Công ty Cổ phần Cơ khí Xây dựng Thương mại Đại Dũng" className="m-3 block w-[calc(100%-1.5rem)] rounded-2xl bg-white" />
         <div className="space-y-4 p-4 sm:p-6">
           <div className="space-y-1 text-center">
-            <h1 className="text-xl font-bold" data-testid="login-title">In thống kê — Kho An Hạ</h1>
-            <p className="text-sm text-muted">Đăng nhập để tiếp tục</p>
+            <h1 className="text-xl font-bold text-white" data-testid="login-title">In thống kê — Kho An Hạ</h1>
+            <p className="text-sm text-slate-200">Đăng nhập để tiếp tục</p>
           </div>
-        <Field label="Tên đăng nhập hoặc email">
+        <Field label="Tên đăng nhập hoặc email" className="!text-slate-100">
           <Input type="text" required autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} autoFocus value={email} onChange={(e) => setEmail(e.target.value)} data-testid="login-email" />
         </Field>
         <div className="relative">
-          <Field label="Mật khẩu">
+          <Field label="Mật khẩu" className="!text-slate-100">
             <Input type={show ? 'text' : 'password'} required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)}
               className="pr-20" data-testid="login-password" />
           </Field>
@@ -57,9 +59,9 @@ export default function LoginPage() {
         <Button type="submit" variant="primary" disabled={busy} className="w-full" data-testid="login-submit">
           {busy ? 'Đang đăng nhập...' : 'Đăng nhập'}
         </Button>
-        <p className="text-center text-sm text-gray-700">
+        <p className="text-center text-sm text-slate-100">
           Chưa có tài khoản?{' '}
-          <Link to="/dang-ky" className="font-semibold text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="login-register-link">Đăng ký</Link>
+          <Link to="/dang-ky" className="rounded font-semibold text-white underline underline-offset-2 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white" data-testid="login-register-link">Đăng ký</Link>
         </p>
         </div>
       </form>

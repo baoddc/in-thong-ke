@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import LookupCombobox from '../components/LookupCombobox'
 import { formatNumber, todayISO } from '../lib/format'
 import { useMatrix, type MatrixMode, type TypeCol } from '../lib/useMatrix'
@@ -26,11 +26,33 @@ const shade = (row: boolean, col: boolean, center = false) => {
 /** Ô màu đậm dần theo khối lượng (căn bậc hai để ô nhỏ vẫn thấy được); chữ giữ màu thường nên đọc được cả khi in. */
 const heat = (v: number, max: number) => (v > 0 && max > 0 ? { backgroundColor: `rgba(200, 16, 46, ${(0.05 + 0.3 * Math.sqrt(v / max)).toFixed(3)})` } : undefined)
 
+/** Hiệu ứng quay số: số nguyên đầu tiên trong `value` chạy từ số cũ (lần đầu: 0) tới số mới, chậm dần. */
+function useRolling(value: string): string {
+  const m = /\d[\d.]*/.exec(value)
+  const target = m ? Number(m[0].replace(/\./g, '')) : null
+  const skip = target === null || /,\d/.test(value) || /jsdom/.test(navigator.userAgent) || matchMedia?.('(prefers-reduced-motion: reduce)').matches // jsdom: test thấy ngay số cuối
+  const shown = useRef(0)
+  const [now, setNow] = useState(skip ? target : 0)
+  useEffect(() => {
+    if (skip || target === null) { setNow(target); return }
+    const from = shown.current, t0 = performance.now()
+    let raf = requestAnimationFrame(function step(t) {
+      const k = Math.min((t - t0) / 1200, 1)
+      shown.current = Math.round(from + (target - from) * (1 - (1 - k) ** 3))
+      setNow(shown.current)
+      if (k < 1) raf = requestAnimationFrame(step)
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [target, skip])
+  return m && now !== null ? value.replace(m[0], formatNumber(now)) : value
+}
+
 export function Kpi({ label, value, unit, note, tone, testId }: { label: string; value: string; unit?: string; note?: string; tone?: 'up' | 'down'; testId: string }) {
+  const text = useRolling(value)
   return (
     <div className="min-w-0 rounded-card border border-stone-200 bg-white p-3 shadow-card print:shadow-none" data-testid={testId}>
       <p className="text-xs text-muted">{label}</p>
-      <p className={`mt-1 break-words font-bold tabular-nums text-gray-900 ${value.length > 12 ? 'text-base leading-snug' : 'text-2xl'}`}>{value}{unit && <span className="ml-1 text-sm font-medium text-muted">{unit}</span>}</p>
+      <p className={`mt-1 break-words font-bold tabular-nums text-gray-900 ${value.length > 12 ? 'text-base leading-snug' : 'text-2xl'}`}>{text}{unit && <span className="ml-1 text-sm font-medium text-muted">{unit}</span>}</p>
       {/* màu trạng thái luôn đi kèm ký hiệu ▲/▼ và chữ, không chỉ dựa vào màu */}
       {note && <p className={`mt-0.5 text-xs ${tone === 'up' ? 'font-medium text-success' : tone === 'down' ? 'font-medium text-danger' : 'text-muted'}`}>{tone === 'up' ? '▲ ' : tone === 'down' ? '▼ ' : ''}{note}</p>}
     </div>

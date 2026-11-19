@@ -1,5 +1,6 @@
+import LoadingScreen from './components/ui/LoadingScreen'
 import { useEffect, useState, type ReactNode } from 'react'
-import { NavLink, Navigate, Outlet, Route, Routes } from 'react-router-dom'
+import { NavLink, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { useSession } from './lib/useSession'
 import Icon, { type IconName } from './components/ui/Icon'
@@ -63,6 +64,7 @@ export function Layout({ email }: { email: string }) {
 }
 
 function LayoutBody({ email }: { email: string }) {
+  const { pathname } = useLocation() // key của <main>: đổi trang thì chạy lại hiệu ứng mờ dần, đổi bộ lọc (?query) thì không
   const { profile, isAdmin, isRoot } = useProfile()
   const displayName = profile?.full_name || email
   const pending = usePendingCount(isAdmin) // D-015: badge số tài khoản chờ duyệt
@@ -86,15 +88,15 @@ function LayoutBody({ email }: { email: string }) {
     try { localStorage.setItem(STORAGE_KEY, next ? '1' : '0') } catch { /* bỏ qua: chỉ mất ghi nhớ */ }
   }
 
-  // Sidebar nền tối cố định: mục đang chọn = chữ trắng + vạch đỏ bên trái, luôn đọc được (không phụ thuộc màu nền riêng của mục).
-  const row = `flex min-h-[48px] items-center gap-3 rounded-lg border-l-4 py-2 md:min-h-10 whitespace-nowrap transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${showLabels ? 'px-3' : 'justify-center'}`
+  // Sidebar kính mờ trên nền tối: mục đang chọn = viên kính sáng nổi có viền mảnh, chữ trắng (tương phản cao trên nền tối).
+  const row = `flex min-h-[48px] items-center gap-3 rounded-xl border py-2 md:min-h-10 [@media(max-height:820px)]:md:min-h-8 [@media(max-height:820px)]:md:py-1 whitespace-nowrap transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${showLabels ? 'px-3' : 'justify-center'}`
   const link = ({ isActive }: { isActive: boolean }) =>
-    `${row} ${isActive ? 'border-primary-brand bg-white/15 font-semibold text-white' : 'border-transparent text-slate-300 hover:bg-white/10 hover:text-white'}`
+    `${row} ${isActive ? 'glass-active font-semibold text-white' : 'border-transparent text-slate-200 hover:bg-white/10 hover:text-white'}`
   const hint = (text: string) => (showLabels ? {} : { title: text, 'aria-label': text })
 
   return (
     // Từ md: khung đúng bằng màn hình, không cuộn cả trang — bảng tự cuộn bên trong; khi in thì trả về dòng chảy bình thường.
-    <div className="min-h-screen bg-surface text-gray-900 md:flex md:h-dvh md:min-h-0 md:overflow-hidden print:block print:h-auto print:overflow-visible">
+    <div className="min-h-screen bg-surface text-gray-900 md:app-bg md:flex md:h-dvh md:min-h-0 md:gap-3 md:overflow-hidden md:p-3 print:block print:h-auto print:overflow-visible print:bg-transparent print:p-0">
       <header className="sticky top-0 z-20 md:hidden print:hidden flex items-center gap-3 border-b-2 border-primary-brand bg-white p-2 shadow-sm">
         <button onClick={() => setDrawer(true)} aria-label="Mở menu" className="flex h-[44px] w-[44px] items-center justify-center rounded-lg border border-line transition duration-150 hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="open-drawer">
           <Icon name="menu" />
@@ -105,17 +107,34 @@ function LayoutBody({ email }: { email: string }) {
 
       {drawer && <div className="fixed inset-0 z-30 animate-fade-in bg-slate-900/50 md:hidden print:hidden" onClick={() => setDrawer(false)} data-testid="drawer-overlay" />}
 
-      <aside className={`print:hidden fixed inset-y-0 left-0 z-40 flex w-72 max-w-[85vw] flex-col overflow-y-auto bg-ink md:overflow-visible p-2 text-slate-200 shadow-xl transition-all duration-200 md:sticky md:top-0 md:h-screen md:translate-x-0 md:shadow-none md:visible ${collapsed ? 'md:w-16' : 'md:w-60'} ${drawer ? 'translate-x-0' : '-translate-x-full invisible'}`}>
-        <div className={`flex items-center gap-3 px-1 pb-3 pt-2 ${showLabels ? '' : 'justify-center'}`} data-testid="brand">
-          <LogoTile className={showLabels ? 'h-11 w-11' : 'h-10 w-10'} />
+      <aside className={`print:hidden glass fixed inset-y-2 left-2 z-40 flex w-72 max-w-[85vw] flex-col overflow-y-auto rounded-3xl p-3 text-slate-100 transition-all duration-200 md:static md:h-full md:shrink-0 md:translate-x-0 md:overflow-y-auto md:visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${collapsed ? 'md:w-16' : 'md:w-64'} ${drawer ? 'translate-x-0' : '-translate-x-[110%] invisible'}`}>
+        <div className={`flex items-center gap-2 px-1 pb-1 pt-0 ${showLabels ? '' : 'justify-center'}`} data-testid="brand">
+          <LogoTile className={showLabels ? 'h-8 w-8' : 'h-8 w-8'} />
           {showLabels && (
             <div className="min-w-0 leading-tight">
-              <p className="truncate text-base font-bold text-white">Kho An Hạ</p>
-              <p className="truncate text-xs text-slate-400">Công ty Đại Dũng</p>
+              <p className="truncate text-sm font-bold text-white">Kho An Hạ</p>
+              <p className="truncate text-[11px] text-slate-400">Công ty Đại Dũng</p>
             </div>
           )}
         </div>
-        <nav aria-label="Menu chính" className="mt-1 flex flex-col gap-1">
+        {showLabels && (
+          <div className="flex items-center gap-2 glass-card p-1.5" data-testid="user-chip">
+            {profile
+              ? (
+                <button type="button" onClick={() => setAvatarOpen(true)} title="Đổi ảnh đại diện" aria-label="Đổi ảnh đại diện" data-testid="avatar-button"
+                  className="shrink-0 rounded-full transition duration-150 hover:ring-2 hover:ring-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
+                  <Avatar name={displayName} path={profile.avatar_path} />
+                </button>
+              )
+              : <Avatar name={displayName} />}
+            <div className="min-w-0 leading-tight">
+              <p className="truncate text-sm text-white" data-testid="user-name" title={displayName}>{displayName}</p>
+              {profile && <span className={`mt-0.5 inline-block rounded px-1.5 text-xs font-medium ${profile.role === 'root' ? 'bg-amber-400 font-bold text-slate-900' : 'bg-white/20 text-white'}`} data-testid="user-role">{ROLE_LABEL[profile.role]}</span>}
+            </div>
+          </div>
+        )}
+        {showLabels && <p className="mt-2 px-2 text-[11px] font-semibold tracking-widest text-slate-300" aria-hidden="true">MENU</p>}
+        <nav aria-label="Menu chính" className="mt-1 flex flex-col gap-1 [@media(max-height:820px)]:md:gap-0.5">
           {[...ITEMS, ...(isAdmin ? ADMIN_ITEMS : []), ...(isRoot ? ROOT_ITEMS : [])].map((i) => {
             const isEdits = i.to === '/yeu-cau-sua'
             const count = isEdits ? pendingEdits : i.to === '/nguoi-dung' ? pending : 0
@@ -128,6 +147,7 @@ function LayoutBody({ email }: { email: string }) {
                 {count > 0 && (
                   <span className={showLabels ? 'ml-auto rounded-full bg-orange-500 px-2 text-xs font-bold text-white' : 'sr-only'} data-testid={isEdits ? 'edit-pending-badge' : 'pending-badge'} title={`${count} ${what} chờ duyệt`}>{count}</span>
                 )}
+                
               </NavLink>
             )
           })}
@@ -135,34 +155,18 @@ function LayoutBody({ email }: { email: string }) {
         <div className="mt-auto space-y-1 border-t border-white/10 pt-2">
           <OnlineUsers showLabels={showLabels} />
           <button onClick={toggle} aria-expanded={!collapsed} aria-label={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
-            className={`${row} hidden w-full border-transparent text-slate-300 hover:bg-white/10 hover:text-white md:flex`} data-testid="toggle-sidebar">
+            className={`${row} hidden w-full border-transparent text-slate-200 hover:bg-white/10 hover:text-white md:flex`} data-testid="toggle-sidebar">
             <Icon name={collapsed ? 'expand' : 'collapse'} />
             {collapsed ? null : <span>Thu gọn</span>}
           </button>
-          {showLabels && (
-            <div className="flex items-center gap-2 px-2 py-1" data-testid="user-chip">
-              {profile
-                ? (
-                  <button type="button" onClick={() => setAvatarOpen(true)} title="Đổi ảnh đại diện" aria-label="Đổi ảnh đại diện" data-testid="avatar-button"
-                    className="shrink-0 rounded-full transition duration-150 hover:ring-2 hover:ring-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
-                    <Avatar name={displayName} path={profile.avatar_path} />
-                  </button>
-                )
-                : <Avatar name={displayName} />}
-              <div className="min-w-0 leading-tight">
-                <p className="truncate text-sm text-slate-100" data-testid="user-name" title={displayName}>{displayName}</p>
-                {profile && <span className={`mt-0.5 inline-block rounded px-1.5 text-xs font-medium ${profile.role === 'root' ? 'bg-amber-400 font-bold text-slate-900' : 'bg-white/15 text-slate-200'}`} data-testid="user-role">{ROLE_LABEL[profile.role]}</span>}
-              </div>
-            </div>
-          )}
-          <button className={`${row} w-full border-transparent text-slate-300 hover:bg-primary hover:text-white`} onClick={() => supabase.auth.signOut()} {...hint('Đăng xuất')}>
+          <button className={`${row} w-full border-transparent text-slate-200 hover:bg-primary hover:text-white`} onClick={() => supabase.auth.signOut()} {...hint('Đăng xuất')}>
             <Icon name="logout" />{showLabels && <span>Đăng xuất</span>}
           </button>
-          {showLabels && <p className="px-2 pb-1 text-[11px] text-slate-400" data-testid="credit">Phát triển bởi Mr.Storm</p>}
+          {showLabels && <p className="px-2 pb-1 text-[11px] text-slate-300" data-testid="credit">Phát triển bởi Mr.Storm</p>}
         </div>
       </aside>
 
-      <main id="noi-dung" className="min-w-0 flex-1 p-3 md:flex md:min-h-0 md:flex-col md:overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:p-6 print:block print:overflow-visible print:p-0">
+      <main key={pathname} id="noi-dung" className="min-w-0 flex-1 animate-fade-in p-3 md:flex md:rounded-3xl md:bg-surface md:min-h-0 md:flex-col md:overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:p-6 print:block print:overflow-visible print:rounded-none print:p-0">
         <IncompleteNotice />
         <Outlet />
       </main>
@@ -175,7 +179,7 @@ function LayoutBody({ email }: { email: string }) {
 /** Đăng nhập được nhưng không có hồ sơ hoặc bị khóa → thông báo + Đăng xuất (RLS cũng chặn mọi dữ liệu). */
 export function AccessGate({ email }: { email: string }) {
   const { profile, loading, error } = useProfile()
-  if (loading) return <p className="p-4 text-muted" role="status">Đang tải...</p>
+  if (loading) return <LoadingScreen />
   if (!profile || !profile.is_active) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-surface p-4">
@@ -206,7 +210,7 @@ export function RootOnly({ children }: { children: ReactNode }) { // T-085: nh�
 
 export default function App() {
   const session = useSession()
-  if (session === undefined) return <p className="p-4 text-muted" role="status">Đang tải...</p>
+  if (session === undefined) return <LoadingScreen />
   const routes = (
     <Routes>
       <Route path="/dang-nhap" element={session ? <Navigate to="/" replace /> : <LoginPage />} />
