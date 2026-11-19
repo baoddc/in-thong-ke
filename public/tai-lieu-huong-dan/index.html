@@ -140,7 +140,7 @@
   <h2 class="plain">Nội dung</h2>
   <div class="toc">
     <a href="#c1"><span class="num">1</span><span><span class="t">Bắt đầu</span><br><span class="d">Phần mềm làm gì, đăng ký, đăng nhập</span></span></a>
-    <a href="#c2"><span class="num">2</span><span><span class="t">Màn hình chính</span><br><span class="d">Menu, số liệu tháng, bộ lọc, người đang online</span></span></a>
+    <a href="#c2"><span class="num">2</span><span><span class="t">Màn hình chính</span><br><span class="d">Menu và nhóm Trợ giúp / Admin, số liệu tháng, bộ lọc, người đang online</span></span></a>
     <a href="#c3"><span class="num">3</span><span><span class="t">Nhập phiếu thống kê</span><br><span class="d">Thêm phiếu, số TK giữ 5 phút, ô gợi ý</span></span></a>
     <a href="#c4"><span class="num">4</span><span><span class="t">Sửa, xóa, in, chép số phiếu</span><br><span class="d">Sửa ngay trên bảng như Google Sheets</span></span></a>
     <a href="#c5"><span class="num">5</span><span><span class="t">Bảng kiểm chi tiết</span><br><span class="d">Nhập từng mặt hàng theo số phiếu TK</span></span></a>
@@ -173,8 +173,8 @@
         <tr><td><b>Báo cáo</b></td><td>Xem khối lượng xuất theo tháng, nhóm hàng, dự án (chương 9)</td></tr>
         <tr><td><b>Danh mục</b></td><td>Danh sách lựa chọn dùng chung (chương 10)</td></tr>
         <tr><td><b>Luồng công việc</b></td><td>Sơ đồ quy trình (chương 13)</td></tr>
-        <tr><td><b>Giới thiệu</b></td><td>Tính năng, bảng phân quyền</td></tr>
-        <tr><td><b>Yêu cầu sửa</b>, <b>Quản lý người dùng</b></td><td>Chỉ Admin thấy (chương 12)</td></tr>
+        <tr><td><b>Trợ giúp</b> (nhóm, bấm để mở)</td><td><b>Giới thiệu</b> (tính năng, bảng phân quyền) và <b>Hướng dẫn sử dụng</b> (tài liệu này, mở ngay trong phần mềm)</td></tr>
+        <tr><td><b>Admin</b> (nhóm, bấm để mở)</td><td><b>Yêu cầu sửa</b>, <b>Quản lý người dùng</b> — chỉ Admin thấy (chương 12)</td></tr>
       </table>
     </div>
   </div>
@@ -236,13 +236,13 @@
   <div class="shot-block">
     <figure><img src="hinh/v2/03-tong-quan.jpg" alt="Màn hình chính"><figcaption>Trang Nhập phiếu — trang mở đầu tiên sau khi đăng nhập.</figcaption></figure>
     <ul class="legend">
-      <li><span class="n">1</span><span><b>Menu</b> dạng khung kính mờ bên trái, bấm để chuyển trang; mục đang mở sáng lên. Gồm Nhập phiếu, Bảng kiểm, In thống kê, Báo cáo, Danh mục, Luồng công việc, Giới thiệu. Admin thấy thêm Yêu cầu sửa và Quản lý người dùng.</span></li>
+      <li><span class="n">1</span><span><b>Menu</b> dạng khung kính mờ bên trái, bấm để chuyển trang; mục đang mở sáng lên. Phía trên là các mục chính: Nhập phiếu, Bảng kiểm, In thống kê, Báo cáo, Danh mục, Luồng công việc. Bên dưới có nhóm <b>Trợ giúp</b> (Giới thiệu, Hướng dẫn sử dụng) và, chỉ với Admin, nhóm <b>Admin</b> (Yêu cầu sửa, Quản lý người dùng). Hai nhóm này đang thu lại: bấm tên nhóm (mũi tên &gt; bên phải) để mở, bấm lần nữa để đóng. Nhóm tự mở khi bạn đang ở một trang bên trong nó. Hướng dẫn sử dụng mở ngay trong phần mềm, menu vẫn còn bên trái.</span></li>
       <li><span class="n">2</span><span><b>Số liệu tháng này</b>: số phiếu, số dòng bảng kiểm, tổng khối lượng (kg). Nút <span class="btn">Ẩn số liệu</span> thu gọn.</span></li>
       <li><span class="n">3</span><span><b>Bộ lọc</b>: tìm nhanh và khoảng ngày (chương 6). Nút <span class="btn">Ẩn bộ lọc</span> thu gọn.</span></li>
       <li><span class="n">4</span><span><span class="btn red">+ Thêm phiếu</span> (phím <kbd>N</kbd>). Tài khoản Chỉ xem không có nút này.</span></li>
       <li><span class="n">5</span><span><b>Tiêu đề cột</b>. Cột có mũi tên sắp xếp ↕ bấm được. Cột <b>Thao tác</b> luôn đứng đầu.</span></li>
       <li><span class="n">6</span><span><b>Đang trực tuyến</b>: danh sách người đang mở phần mềm.</span></li>
-      <li><span class="n">7</span><span><b>Tên và vai trò</b> của bạn (Chỉ xem / Người dùng / Admin). Bấm vào ảnh đại diện để đổi ảnh. Bên dưới là <span class="btn">Đăng xuất</span>.</span></li>
+      <li><span class="n">7</span><span><b>Tên và vai trò</b> của bạn (Chỉ xem / Người dùng / Admin). Bấm vào ảnh đại diện để đổi ảnh. Bên dưới là <span class="btn">Đăng xuất</span>, rồi dòng “Phát triển bởi Mr.Storm” và “© 2026 · Giấy phép MIT” (bấm chữ Giấy phép MIT để xem giấy phép, mở thẻ mới).</span></li>
     </ul>
   </div>
   <div class="two">
@@ -250,7 +250,7 @@
       <h3>Thu gọn menu</h3>
       
       <figure class="w70"><img src="hinh/v2/10-thu-gon.jpg" alt="Menu thu gọn"></figure>
-      <ul class="legend one"><li><span class="n">1</span><span>Bấm <span class="btn">Thu gọn</span> ở cuối menu để menu chỉ còn biểu tượng, bảng rộng hơn. Bấm nút mở rộng để mở lại. Phần mềm nhớ lựa chọn của bạn.</span></li></ul>
+      <ul class="legend one"><li><span class="n">1</span><span>Bấm <span class="btn">Thu gọn</span> ở cuối menu để menu chỉ còn biểu tượng, bảng rộng hơn. Bấm nút mở rộng để mở lại. Phần mềm nhớ lựa chọn của bạn. Khi thu gọn, tên nhóm được ẩn và mọi biểu tượng (kể cả các mục trong nhóm Trợ giúp, Admin) hiện thành một hàng chung.</span></li></ul>
     </div>
     <div>
       <h3>Dữ liệu tự cập nhật</h3>
@@ -259,7 +259,7 @@
       <ul>
         <li><b>Thông báo nổi</b> ở góc màn hình: đã lưu, đã xóa, yêu cầu sửa được duyệt / từ chối…</li>
         <li><b>Thanh nhắc vàng / đỏ</b> ở đầu trang khi bạn còn phiếu hoặc dòng thiếu thông tin (chương 7).</li>
-        <li>Số màu cam cạnh <b>Yêu cầu sửa</b> / <b>Quản lý người dùng</b> (Admin): số mục đang chờ duyệt.</li>
+        <li>Số màu cam trên menu (Admin): số mục đang chờ duyệt. Khi nhóm <b>Admin</b> đang đóng, số tổng (tài khoản chờ duyệt + yêu cầu sửa) hiện ở dòng Admin; khi mở nhóm, mỗi mục <b>Yêu cầu sửa</b> / <b>Quản lý người dùng</b> có số riêng.</li>
       </ul>
       <h3>Nhiều người cùng làm</h3>
       <ul>
@@ -559,7 +559,7 @@
   <div class="phones">
     <div class="phone"><div class="frame"><img src="hinh/v2/m1-nhap-phieu.jpg" alt=""></div><div class="cap"><b>Danh sách dạng thẻ.</b> <span class="n">1</span> nút ☰ mở menu · <span class="n">2</span> Thêm phiếu. Mỗi thẻ hiện đủ thông tin, nút Sửa / In / Xóa ở góc phải.</div></div>
     <div class="phone"><div class="frame"><img src="hinh/v2/m2-menu.jpg" alt=""></div>
-    <div class="cap"><b>Menu ☰.</b> Bấm ra ngoài vùng tối để đóng.</div></div>
+    <div class="cap"><b>Menu ☰.</b> Cùng menu như trên máy tính; nhóm Trợ giúp, Admin cũng bấm tên để mở / đóng. Bấm ra ngoài vùng tối để đóng.</div></div>
     <div class="phone"><div class="frame"><img src="hinh/v2/m4-them-phieu.jpg" alt=""></div><div class="cap"><b>Thêm phiếu</b> mở khung nhập toàn màn hình. Bấm <span class="btn red">Lưu</span> ở cuối (hoặc <kbd>Ctrl</kbd>+<kbd>Enter</kbd>).</div></div>
   </div>
   <div class="phones">
@@ -574,13 +574,14 @@
 <section class="chap" id="c12">
   <div class="chap-head"><span class="big">12</span><h2>Dành cho Admin</h2><span class="who">Admin</span></div>
   <div class="goal"><b>Bạn sẽ làm gì:</b> quản lý tài khoản nhân viên, đổi vai trò, duyệt yêu cầu sửa và đồng bộ lại Google Sheet.</div>
+  <div class="box tip"><span class="h">Tìm ở đâu</span>Hai trang của Admin nằm trong nhóm <b>Admin</b> ở cuối menu (bấm tên nhóm để mở): <b>Yêu cầu sửa</b> và <b>Quản lý người dùng</b>. Người dùng và Chỉ xem không thấy nhóm này.</div>
   <h3>Quản lý người dùng</h3>
   <div class="shot-block">
     
     <figure><img src="hinh/v2/16-nguoi-dung.jpg" alt="Quản lý người dùng"></figure>
     <ul class="legend">
       <li><span class="n">1</span><span><b>Tất cả</b> tài khoản người dùng.</span></li>
-      <li><span class="n">2</span><span><b>Chờ duyệt</b> — tài khoản tự đăng ký (số đếm cũng hiện trên menu). Bấm <span class="btn red">Duyệt</span> hoặc <span class="btn">Từ chối</span>.</span></li>
+      <li><span class="n">2</span><span><b>Chờ duyệt</b> — tài khoản tự đăng ký (số đếm cũng hiện trên menu, ở dòng Admin hoặc ngay mục này). Bấm <span class="btn red">Duyệt</span> hoặc <span class="btn">Từ chối</span>.</span></li>
       <li><span class="n">3</span><span><span class="btn red">+ Thêm người dùng</span> — tạo sẵn tài khoản cho nhân viên.</span></li>
       <li><span class="n">4</span><span><span class="btn">Đồng bộ Google Sheet</span> — ghi lại toàn bộ dữ liệu lên Google Sheet (xem bên dưới).</span></li>
     </ul>
@@ -608,14 +609,14 @@
     <figure><img src="hinh/v2/15-yeu-cau-sua.jpg" alt="Yêu cầu sửa"><figcaption>Lọc theo Chờ duyệt / Đã duyệt / Từ chối / Tất cả (ảnh chụp lúc không có yêu cầu chờ duyệt).</figcaption></figure>
   </div>
   <ul>
-    <li>Menu <b>Yêu cầu sửa</b> có số đếm khi có yêu cầu mới. Xem lý do → <span class="btn red">Duyệt</span> (mở sửa 24 giờ) hoặc <span class="btn">Từ chối</span> (nên ghi lý do).</li>
+    <li>Mở nhóm <b>Admin</b> → <b>Yêu cầu sửa</b>; có số đếm cam khi có yêu cầu mới. Xem lý do → <span class="btn red">Duyệt</span> (mở sửa 24 giờ) hoặc <span class="btn">Từ chối</span> (nên ghi lý do).</li>
     <li>Duyệt chỉ cho phép <b>sửa</b>, không cho phép xóa.</li>
     <li>Giữ danh mục NV xuất TP/BTP đúng người — ô chọn và việc tự điền tên dựa vào đây.</li>
   </ul>
   <h3>Đồng bộ Google Sheet</h3>
   <ul>
     <li>Mỗi lần thêm, sửa, xóa phiếu hoặc dòng bảng kiểm, dữ liệu được <b>tự ghi sang file Google Sheet</b> (2 tab: Phiếu thống kê, Bảng kiểm). Không cần làm gì thêm.</li>
-    <li>Khi cần ghi lại tất cả (ví dụ file Google Sheet bị sửa nhầm), bấm <span class="btn">Đồng bộ Google Sheet</span> ở trang Quản lý người dùng, rồi bấm <span class="btn red">Đồng bộ</span> để xác nhận.</li>
+    <li>Khi cần ghi lại tất cả (ví dụ file Google Sheet bị sửa nhầm), bấm <span class="btn">Đồng bộ Google Sheet</span> ở trang Quản lý người dùng (nhóm Admin), rồi bấm <span class="btn red">Đồng bộ</span> để xác nhận.</li>
   </ul>
   <div class="box warn"><span class="h">Lưu ý khi đồng bộ lại</span>Nội dung 2 tab trong file Google Sheet sẽ bị <b>xóa rồi ghi lại</b> theo dữ liệu trên phần mềm. Có thể mất vài phút — <b>đừng đóng trang</b> khi đang chạy. Xong có thông báo “Đã ghi … dòng lên Google Sheet”.</div>
   <p>Google Sheet chỉ để tham khảo / báo cáo thêm. Dữ liệu chuẩn nằm trên phần mềm; sửa trực tiếp trong Google Sheet sẽ không đổi dữ liệu trên phần mềm.</p>
@@ -650,10 +651,12 @@
     <tr><td>Đăng ký báo “thử lại sau”</td><td>Mạng đã gửi quá 5 lần đăng ký trong 1 giờ, hoặc đang có 20 tài khoản chờ duyệt. Đợi hoặc nhờ Admin tạo tài khoản.</td></tr>
     <tr><td>Bản in bị lệch, có đầu / chân trang lạ</td><td>Khổ A4, lề Mặc định, tắt “Đầu trang và chân trang”, tỉ lệ 100%.</td></tr>
     <tr><td>Quên mật khẩu</td><td>Liên hệ Admin để đặt lại.</td></tr>
+    <tr><td>Không thấy Giới thiệu / Hướng dẫn sử dụng trên menu</td><td>Hai mục này nằm trong nhóm <b>Trợ giúp</b> (đang thu lại) — bấm tên nhóm để mở.</td></tr>
+    <tr><td>Không thấy Yêu cầu sửa / Quản lý người dùng</td><td>Chỉ Admin có nhóm <b>Admin</b> trên menu. Nếu bạn là Admin mà chưa thấy mục: bấm tên nhóm Admin để mở.</td></tr>
   </table>
 
   <h3>Luồng công việc</h3>
-  <p>Menu <b>Luồng công việc</b> mở sơ đồ quy trình làm việc. Bấm vào từng ô để xem chi tiết; dùng nút “Mở toàn màn hình” để xem lớn. Trang này chỉ để xem, không nhập gì.</p>
+  <p>Mục <b>Luồng công việc</b> trên menu mở sơ đồ quy trình làm việc. Bấm vào từng ô để xem chi tiết; dùng nút “Mở toàn màn hình” để xem lớn. Trang này chỉ để xem, không nhập gì.</p>
   
   <figure><img src="hinh/v2/18-luong-cong-viec.jpg" alt="Luồng công việc"><figcaption>Trang <b>Luồng công việc</b> trong phần mềm.</figcaption></figure>
 
