@@ -303,3 +303,5 @@ select setval(pg_get_serial_sequence('public.inspection_details','id'), (select 
 - 08/11/2026 (T-099, migration 000029): thêm `profiles.avatar_path`, bucket `avatars`, RPC `set_avatar(p_path)` — chỉ chủ tài khoản đổi/gỡ ảnh của mình, admin/root không can thiệp.
 - 08/11/2026 (T-100, migration 000030): `get_user_names` không trả tên tài khoản cấp cao nhất cho người gọi không phải tài khoản đó; Edge Function `admin-users` để trống `created_by_name`/`approved_by_name` của tài khoản đó với admin và dùng thông điệp lỗi trung tính.
 - 08/11/2026 (T-101, migration 000031): `profiles_select` cho admin đọc cả admin khác (trước: chỉ user + chính mình); `admin-users` action `list` trả thêm admin khác cho admin. Admin vẫn chỉ sửa/khóa/đặt lại mật khẩu user thường và chính mình.
+
+- 2026-11-26: migration `20261126000036_sheet_payload_all_columns.sql` - `sheet_payload` (Google Sheet): tab Phiếu 12 → 14 cột (+ Người sửa, Giờ sửa), tab Bảng kiểm 21 → 24 cột (+ Số lệnh vận chuyển, Người sửa, Giờ sửa); cột mới thêm cuối nên Sheet đã đồng bộ không lệch. Edge Function `sheets-sync`: `ensureHeader` luôn ghi lại hàng tiêu đề (thêm cột không cần xóa tab). Không breaking cho FE.

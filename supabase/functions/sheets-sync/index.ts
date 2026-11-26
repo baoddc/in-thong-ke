@@ -17,7 +17,10 @@ const json = (data: unknown, status = 200) =>
 
 const BATCH = 200 // mục hàng đợi mỗi lần lấy
 const MAX_BATCHES = 5 // một lần gọi xử lý tối đa 1000 mục; phần còn lại ở lần gọi sau
-const WRITE_CHUNK = 500 // dòng mỗi yêu cầu ghi
+const WRITE_CHUNK = 500 // mục mỗi yêu cầu sửa / xóa dòng
+const APPEND_CHUNK = 2000 // dòng mỗi yêu cầu thêm; ≥ FULL_PAGE nên mỗi trang full_sync chỉ tốn 1 lần ghi (Google giới hạn 60 lần ghi/phút/dự án)
+const RETRY_WAIT_MS = 20_000 // gặp 429 (hết hạn mức ghi theo phút) thì chờ rồi thử lại, tối đa RETRIES lần
+const RETRIES = 2
 const FULL_PAGE = 1500 // dòng mỗi trang khi đồng bộ lại toàn bộ
 const FULL_BUDGET_MS = 80_000 // một lượt full_sync chạy tối đa ~80 giây rồi trả next_after để gọi tiếp
 const LOCK_SECONDS = 120
@@ -51,12 +54,15 @@ async function accessToken(sa: { client_email: string; private_key: string }): P
 class Sheet {
   constructor(private token: string, private id: string, private tab: string) {}
   private async call(path: string, init?: RequestInit) {
-    const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${this.id}${path}`, {
-      ...init, headers: { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' },
-    })
-    const body = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(`Google Sheets (tab "${this.tab}"): ${body?.error?.message ?? res.status}`)
-    return body
+    for (let attempt = 0; ; attempt++) {
+      const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${this.id}${path}`, {
+        ...init, headers: { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+      })
+      const body = await res.json().catch(() => ({}))
+      if (res.status === 429 && attempt < RETRIES) { await new Promise((r) => setTimeout(r, RETRY_WAIT_MS)); continue }
+      if (!res.ok) throw new Error(`Google Sheets (tab "${this.tab}"): ${res.status === 429 ? 'Google đang giới hạn số lần ghi mỗi phút. Chờ khoảng 1 phút rồi bấm lại.' : (body?.error?.message ?? res.status)}`)
+      return body
+    }
   }
   private range = (a1: string) => encodeURIComponent(`'${this.tab}'!${a1}`)
   private cells = (rows: Row[]) => rows.map((r) => r.map(safe))
@@ -66,9 +72,9 @@ class Sheet {
     await this.call(`/values/${this.range(a1)}?valueInputOption=USER_ENTERED`, { method: 'PUT', body: JSON.stringify({ values: this.cells(rows) }) })
   }
   async append(rows: Row[]) {
-    for (let i = 0; i < rows.length; i += WRITE_CHUNK) {
+    for (let i = 0; i < rows.length; i += APPEND_CHUNK) {
       await this.call(`/values/${this.range('A1')}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
-        method: 'POST', body: JSON.stringify({ values: this.cells(rows.slice(i, i + WRITE_CHUNK)) }),
+        method: 'POST', body: JSON.stringify({ values: this.cells(rows.slice(i, i + APPEND_CHUNK)) }),
       })
     }
   }
@@ -149,11 +155,12 @@ async function handle(req: Request): Promise<Response> {
 
 type Admin = ReturnType<typeof createClient>
 
-/** Tab trống → ghi tiêu đề; tab có nội dung lạ (ô A1 không phải "ID") → từ chối để không ghi đè dữ liệu của người dùng. */
+/** Tab có nội dung lạ (ô A1 không phải "ID") → từ chối để không ghi đè dữ liệu của người dùng. Còn lại luôn ghi lại hàng tiêu đề:
+ *  hệ thống thêm cột mới (luôn thêm cuối) thì tiêu đề tự cập nhật, không cần xóa tab. Ô cột mới của các dòng cũ được điền khi dòng đó
+ *  được sửa hoặc khi admin bấm "Đồng bộ lại toàn bộ". */
 async function ensureHeader(sheet: Sheet, colA: unknown[][] | undefined, headers: string[]) {
   const a1 = String(colA?.[0]?.[0] ?? '')
-  if (a1 === 'ID') return
-  if (colA?.some((c) => c?.[0] !== undefined && c[0] !== '')) throw new Error('Tab đã có nội dung khác (ô A1 không phải "ID"). Hãy dùng tab trống hoặc xóa nội dung tab đó.')
+  if (a1 !== 'ID' && colA?.some((c) => c?.[0] !== undefined && c[0] !== '')) throw new Error('Tab đã có nội dung khác (ô A1 không phải "ID"). Hãy dùng tab trống hoặc xóa nội dung tab đó.')
   await sheet.write('A1', [headers])
 }
 
